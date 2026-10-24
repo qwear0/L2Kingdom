@@ -111,6 +111,12 @@ function advance(record) {
     if (record.cursor >= record.path.length) return;
     const next = record.path[record.cursor];
     if (!visiblePath(loc(npc), next)) { record.rejoin = true; return; }
+    // Native combat cleanup switches to walking; advertise running before
+    // coordinate movement resumes at the server's running speed.
+    if (!npc.fetchStateRun()) {
+        npc.setStateRun(true);
+        transport.dataSendToMeAndOthers(Response.walkAndRun(npc.fetchId(), true), npc);
+    }
     const generation = record.generation;
     record.moving = true;
     record.sample = { ...loc(npc), at: Date.now() };
