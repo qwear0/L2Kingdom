@@ -122,6 +122,18 @@ const BotAvailability = {
         const timestamp = Number(options.timestamp ?? Date.now());
 
         if (!player || !bot) return result;
+        if (botSession.fortressOwnerId) {
+            let reason = 'available';
+            if (Number(player.fetchId()) !== botSession.fortressOwnerId) reason = 'not_squad_owner';
+            else if (player.state?.fetchDead?.() || player.fetchHp() <= 0) reason = 'player_dead';
+            else if (bot.state?.fetchDead?.() || bot.fetchHp() <= 0) reason = 'bot_dead';
+            else if (botSession.partyCompanion) reason = 'already_grouped';
+            result.distance = distance(actorLocation(player), actorLocation(bot));
+            result.available = reason === 'available';
+            result.reason = reason;
+            result.reasonText = reason === 'not_squad_owner' ? 'This defender follows only the character who summoned the squad.' : reasonText(reason);
+            return result;
+        }
         const refusal = options.forceFriend ? null : socialRefusal(result.memory, timestamp);
 
         result.distance = distance(actorLocation(player), actorLocation(bot));

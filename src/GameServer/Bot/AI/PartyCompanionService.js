@@ -862,10 +862,10 @@ function detachState(companionSession, plan = 'hunting', preserveTakeover = fals
     try { invoke('GameServer/Bot/BotTradeService').cleanup(companionSession, 'party_detach'); } catch (_) { /* optional hot trade modules */ }
     invoke('GameServer/Bot/AI/HotBotPolicyOverlay').clearForPartyDetach(companionSession);
     cancelCompanionAction(companionSession);
-    companionSession.plan = plan;
+    companionSession.plan = companionSession.fortressOwnerId ? 'fortress_wait' : plan;
     companionSession.followPlayerSession = null;
     companionSession.partyCompanion = false;
-    if (!preserveTakeover) invoke('GameServer/Bot/Population/BotLifeState').releasePlayerPartyTakeover(companionSession);
+    if (!preserveTakeover && !companionSession.fortressOwnerId) invoke('GameServer/Bot/Population/BotLifeState').releasePlayerPartyTakeover(companionSession);
     invoke('GameServer/Bot/AI/BotPvpIndex').invalidate();
     refreshPartyMemberships([companionSession], invoke);
     companionSession.botStay = false;
@@ -1167,6 +1167,8 @@ const PartyCompanionService = {
         const leader = leaderSession?.actor;
         const bot = companionSession?.actor;
         if (!leader || !bot) return false;
+        if (companionSession.fortressOwnerId && (Number(leader.fetchId()) !== companionSession.fortressOwnerId
+            || bot.state?.fetchDead?.() || bot.fetchHp() <= 0)) return false;
         if (!require('../../AfkTrade/TradeMeetingService').canJoinParty(bot.fetchId(), companionSession.coldLifeState, companionSession)) return false;
         // An autonomous hot roster has one lifecycle owner. Do not leave its
         // other actors orphaned by attaching a single member to a player.
@@ -1246,7 +1248,7 @@ const PartyCompanionService = {
         detachState(companionSession, options.plan || 'hunting', options.preserveTakeover === true);
 
         if (options.message) {
-            BotManager.botSay(companionSession, options.message);
+            BotManager.botSay(companionSession, companionSession.fortressOwnerId ? 'I will wait here for my commander.' : options.message);
         }
 
         refreshLeaderView(leaderSession, options);

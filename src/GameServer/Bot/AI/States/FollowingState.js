@@ -1264,7 +1264,7 @@ const FollowingState = {
             // available only when the companion is already in a starter town
             // with a Newbie Guide, where characters through level 20 can
             // recover and renew their blessing before returning to the party.
-            if (canRecoverAtNewbieGuide(bot, BotAI)) {
+            if (!session.fortressOwnerId && canRecoverAtNewbieGuide(bot, BotAI)) {
                 beginNewbieGuideVisit(session, bot, playerSession, role, hotTownRebuffVisit);
                 recordRoleDecision(session, bot, botVitals.hpRatio < 0.30 ? 'recover_hp' : 'save_mp', 'newbie_guide_recovery');
                 BotPartyChat.announce(session, {
@@ -1304,7 +1304,7 @@ const FollowingState = {
         let acted = false;
         let keepRoleDecision = false;
 
-        const buffsNeedRefresh = BotBuffs.needsNewbieRefresh(bot);
+        const buffsNeedRefresh = !session.fortressOwnerId && BotBuffs.needsNewbieRefresh(bot);
         if (buffsNeedRefresh) {
             const unsafeToRefresh = unsafeSupportMoment(bot, currentPartyAggroMonsters().length);
             const inTown = TownPathfinder.isInsideTown({
@@ -1351,7 +1351,7 @@ const FollowingState = {
             }
         }
 
-        if (!partyThreat && !leaderTargetId && !isBusy(bot)) {
+        if (!session.fortressOwnerId && !partyThreat && !leaderTargetId && !isBusy(bot)) {
             const errand = timedFollowingStage('townErrand', () => (
                 companionTownErrand(session, bot, player, BotAI)
             ));
@@ -1365,7 +1365,7 @@ const FollowingState = {
             }
         }
 
-        if (!partyThreat
+        if (!session.fortressOwnerId && !partyThreat
             && !leaderTargetId
             && !isBusy(bot)
             && HotTownRebuff.needsVisit(session, hotTownRebuffVisit)

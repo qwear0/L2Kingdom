@@ -952,6 +952,7 @@ function registerTools() {
             mutating: !['none', 'say', 'list_safe_loadouts', 'list_party_candidates'].includes(name),
             available(session) {
                 if (!session) return true;
+                if (session.fortressOwnerId && ['hunt', 'shop', 'fetch_resources', 'move_to_spot'].includes(name)) return false;
                 if (session.plan === 'merchant') {
                     return ['none', 'say'].includes(name) || economyActions.has(name) && economyActionAvailable(session, name);
                 }

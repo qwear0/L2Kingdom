@@ -302,6 +302,12 @@ class Npc extends NpcModel {
             return true;
         }
 
+        // Damage/social aggro can start combat between scenario ticks. Retire
+        // the march now, before native chase movement takes over its automation.
+        if (this.fortressDefense) {
+            this.automation.abortMovement(this);
+            this.stopForCombatAction(session);
+        }
         this.switchCombatTarget(target);
         this.state.setCombats(true);
 

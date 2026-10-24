@@ -324,6 +324,10 @@ const BotManager = {
     init() {
         if (invoke('GameServer/Bot/Population/PopulationConfig').developerDiagnostics === true) console.info("BotManager :: Initializing automated bots...");
         BotFriendship.init();
+        PopulationService.startDatabaseMaintenance();
+        // Shared party/friend facilities remain available without starting any
+        // ambient simulation, merchant timers, seeders or recovery monitors.
+        if (invoke('GameServer/Bot/Population/PopulationConfig').enabled === false) return;
         PopulationService.init();
         GoalService.init();
         SimulationKernel.init({ population: PopulationService });
@@ -346,7 +350,7 @@ const BotManager = {
         // Wait 5 seconds after startup to let world finish loading
         setTimeout(() => {
             bots.forEach((botData, idx) => {
-                this.provisionAndSpawn(botData, idx);
+                this.provisionAndSpawn(botData, idx).catch(error => utils.infoWarn('BotManager', 'static bot provisioning failed: %s', error.message));
             });
             // PK encounter profiles were part of the old static population as
             // well. Do not introduce high-level hunters into a newly seeded
@@ -410,7 +414,7 @@ const BotManager = {
             const hasPopulation = this.activePopulationForPk(botData.pkProfile).length > 0;
             if (hasPopulation && !active && !this.pkEncounterPending.has(botData.username)) {
                 this.pkEncounterPending.add(botData.username);
-                this.provisionAndSpawn(botData, 1000 + index);
+                this.provisionAndSpawn(botData, 1000 + index).catch(error => utils.infoWarn('BotManager', 'PK bot provisioning failed: %s', error.message));
                 setTimeout(() => this.pkEncounterPending.delete(botData.username), 12000);
                 return null;
             }
@@ -432,19 +436,18 @@ const BotManager = {
         if (typeof this.pkEncounterTimer.unref === 'function') this.pkEncounterTimer.unref();
     },
 
-    provisionAndSpawn(botData, idx) {
+    async provisionAndSpawn(botData, idx) {
         const username = (botData.username || ("bot_" + botData.name.toLowerCase())).slice(0, 16);
-        
-        // 1. Ensure Bot Account exists
-        Database.fetchUserPassword(username).then((rows) => {
-            if (!rows[0]) {
-                Database.createAccount(username, "botpass").then(() => {
-                    this.provisionCharacter(username, botData, idx);
-                });
-            } else {
-                this.provisionCharacter(username, botData, idx);
-            }
-        });
+        this.assertActivationAllowed(username, botData);
+        const rows = await Database.fetchUserPassword(username);
+        if (!rows[0]) await Database.createAccount(username, "botpass");
+        return this.provisionCharacter(username, botData, idx);
+    },
+
+    assertActivationAllowed(username, botData) {
+        if (invoke('GameServer/Bot/Population/PopulationConfig').enabled !== false) return;
+        if (invoke('GameServer/Bot/FortressSquad').mayActivate(username, botData)) return;
+        throw new Error('Background bot activation is disabled');
     },
 
     resolveCharacterName(baseName, attempt = 0) {
@@ -457,72 +460,44 @@ const BotManager = {
         });
     },
 
-    provisionCharacter(username, botData, idx) {
-        Database.fetchCharacters(username).then((characters) => {
-            if (characters[0]) {
-                const existing = characters[0];
-                const recoveredBotData = recoverStarterSpawn(botData, existing);
-                const recoveredLoc = recoveredBotData.locX === undefined
-                    ? Promise.resolve()
-                    : Database.updateCharacterLocation(existing.id, recoveredBotData);
-                recoveredLoc
-                    .then(() => this.applyProfileLevel(existing, recoveredBotData))
-                    .then(() => this.awardProfileSkills(existing.id, recoveredBotData, existing.classId))
-                    .then(() => this.loadAndSpawnBot(username, recoveredBotData));
-                return;
-            }
-
-            this.resolveCharacterName(botData.name).then((characterName) => {
-                const effectiveBotData = { ...botData, name: characterName };
-                if (characterName !== botData.name) {
-                    utils.infoWarn('BotManager', 'bot name %s is taken; using %s for %s', botData.name, characterName, username);
-                }
-
-                Shared.fetchClassInformation(effectiveBotData.classId).then((classInfo) => {
-                    let coords;
-                    if (effectiveBotData.locX !== undefined) {
-                        coords = {
-                            locX: effectiveBotData.locX,
-                            locY: effectiveBotData.locY,
-                            locZ: effectiveBotData.locZ
-                        };
-                    } else {
-                        const spawns = BotAI.newbieSpawnCoords(effectiveBotData.spawnClassId || effectiveBotData.classId);
-                        const spawn = spawns[Math.floor(Math.random() * spawns.length)];
-                        coords = {
-                            locX: spawn.locX + utils.oneFromSpan(-180, 180),
-                            locY: spawn.locY + utils.oneFromSpan(-180, 180),
-                            locZ: spawn.locZ
-                        };
-                    }
-
-                    const charData = {
-                        name: effectiveBotData.name,
-                        race: effectiveBotData.race,
-                        sex: effectiveBotData.sex,
-                        classId: effectiveBotData.classId,
-                        hair: effectiveBotData.hair ?? 0,
-                        hairColor: effectiveBotData.hairColor ?? 0,
-                        face: effectiveBotData.face ?? 0,
-                        ...classInfo.vitals,
-                        ...coords
-                    };
-
-                    Database.createCharacter(username, charData).then((packet) => {
-                        const charId = Number(packet.insertId);
-                        this.applyProfileLevel({ id: charId }, effectiveBotData)
-                            .then(() => this.awardProfileSkills(charId, effectiveBotData))
-                            .then(() => {
-                                this.awardBaseGear(charId, effectiveBotData.classId);
-                                if (Number(effectiveBotData.level || 1) <= 1) {
-                                    this.awardBaseSkills(charId, effectiveBotData.classId);
-                                }
-                                this.loadAndSpawnBot(username, effectiveBotData);
-                            });
-                    });
-                });
-            });
+    async provisionCharacter(username, botData, idx) {
+        this.assertActivationAllowed(username, botData);
+        const characters = await Database.fetchCharacters(username);
+        if (characters[0]) {
+            if (botData.fortressOwnerId) throw new Error('Temporary squad characters must be fresh');
+            const existing = characters[0];
+            const recovered = recoverStarterSpawn(botData, existing);
+            if (recovered.locX !== undefined) await Database.updateCharacterLocation(existing.id, recovered);
+            await this.applyProfileLevel(existing, recovered);
+            await this.awardProfileSkills(existing.id, recovered, existing.classId);
+            return this.loadAndSpawnBot(username, recovered);
+        }
+        const name = await this.resolveCharacterName(botData.name);
+        const profile = { ...botData, name };
+        const classInfo = await Shared.fetchClassInformation(profile.classId);
+        let coords;
+        if (profile.locX !== undefined) {
+            coords = { locX: profile.locX, locY: profile.locY, locZ: profile.locZ };
+        } else {
+            const spawns = BotAI.newbieSpawnCoords(profile.spawnClassId || profile.classId);
+            const spawn = spawns[Math.floor(Math.random() * spawns.length)];
+            coords = { locX: spawn.locX + utils.oneFromSpan(-180, 180), locY: spawn.locY + utils.oneFromSpan(-180, 180), locZ: spawn.locZ };
+        }
+        const created = await Database.createCharacter(username, {
+            name, race: profile.race, sex: profile.sex, classId: profile.classId,
+            hair: profile.hair ?? 0, hairColor: profile.hairColor ?? 0, face: profile.face ?? 0,
+            ...classInfo.vitals, ...coords
         });
+        const id = Number(created.insertId);
+        await this.applyProfileLevel({ id }, profile);
+        await this.awardProfileSkills(id, profile);
+        if (profile.fortressOwnerId) {
+            await invoke('GameServer/Bot/FortressSquad').equip(id, profile);
+        } else {
+            await this.awardBaseGear(id, profile.classId);
+            if (Number(profile.level || 1) <= 1) await this.awardBaseSkills(id, profile.classId);
+        }
+        return this.loadAndSpawnBot(username, profile);
     },
 
     applyProfileLevel(character, botData = {}) {
@@ -537,6 +512,11 @@ const BotManager = {
     awardProfileSkills(characterId, botData = {}, currentClassId = botData.classId) {
         const level = invoke('GameServer/Progression/ProgressionCap').clampLevel(botData.level || 1);
         if (level <= 1) return Promise.resolve();
+        if (botData.fortressOwnerId) {
+            const skillset = new (invoke('GameServer/Actor/Skillset'))();
+            return invoke('GameServer/ClassProgression').lineage(currentClassId).reduce((pending, classId) =>
+                pending.then(() => skillset.awardSkills(characterId, classId, level)), Promise.resolve());
+        }
         return BotClassProgression.reconcile({
             characterId,
             classId: currentClassId,
@@ -578,7 +558,9 @@ const BotManager = {
     },
 
     loadAndSpawnBot(username, botData = {}) {
+        this.assertActivationAllowed(username, botData);
         const session = new BotSession(username);
+        session.fortressOwnerId = Number(botData.fortressOwnerId || 0);
         session.populationStaging = botData.prepareOnly === true;
         // The servitor kept away from the player, read before a party or PvP
         // handoff re-captures the staged actor (which has none yet).
@@ -594,7 +576,8 @@ const BotManager = {
             // runtime actor so active companions never keep a level-one kit.
             const skillsReady = this.awardProfileSkills(firstCharacter.id, {
                 classId: firstCharacter.classId,
-                level: firstCharacter.level
+                level: firstCharacter.level,
+                fortressOwnerId: session.fortressOwnerId
             }, firstCharacter.classId);
             const spawnReady = skillsReady.then(() => Shared.fetchCharacters(username))
                 .then((reconciledCharacters) => {
@@ -628,12 +611,10 @@ const BotManager = {
                     // simulated player and gets a durable seed-based profile.
                     const staticService = !!storeCfg || (!!manufactureShop && !botData.coldCraftState);
                     if (!staticService) {
-                        BotPersona.ensure({
+                        session.persona = await BotPersona.ensure({
                             characterId: character.id,
                             classId: character.classId,
                             stats: botData.coldLifeState?.stats || {}
-                        }).then((persona) => {
-                            session.persona = persona;
                         });
                     }
                     // Hot bots do not have a client hotbar request to enable
@@ -725,9 +706,11 @@ const BotManager = {
                         // Persist ownership before publishing the actor to the
                         // world. markHot resolves null on a database failure,
                         // so the result must be treated as an activation error.
-                        const hotState = await PopulationService.markHot(session, 'spawn');
-                        if (!hotState) throw new Error('hot_state_persist_failed');
-                        hotPersisted = true;
+                        if (!session.fortressOwnerId) {
+                            const hotState = await PopulationService.markHot(session, 'spawn');
+                            if (!hotState) throw new Error('hot_state_persist_failed');
+                            hotPersisted = true;
+                        }
                         session.populationHotAt = Date.now();
 
                         // Spawn the bot actor in the World only after its
@@ -773,6 +756,13 @@ const BotManager = {
                 });
             });
         }).catch(error => {
+            if (session.fortressOwnerId && session.actor) {
+                try { invoke('GameServer/Bot/FortressSquad').dispose(session); }
+                catch (cleanupError) {
+                    cleanupError.cause = error;
+                    throw cleanupError;
+                }
+            }
             if (botData.prepareOnly && session.actor) {
                 session.actor.destructor();
                 session.actor = null;
@@ -788,15 +778,15 @@ const BotManager = {
             return Number(template?.etc?.slot || 0) === 14 &&
                 String(template?.template?.kind || '').startsWith('Weapon.');
         });
-        items.forEach((item) => {
-            item.slot = ItemTemplateIndex.findStrict(DataCache.items, item.selfId)?.etc?.slot ?? 0;
-            // Equip weapons/armors automatically for bots
+        return Promise.all(items.map((source) => {
+            const item = { ...source, slot: ItemTemplateIndex.findStrict(DataCache.items, source.selfId)?.etc?.slot ?? 0 };
             item.equipped = !(hasTwoHandedWeapon && Number(item.slot) === 8);
-            Database.setItem(id, item);
-        });
+            return Database.setItem(id, item);
+        }));
     },
 
     awardBaseSkills(id, classId, level = 1) {
+        const writes = [];
         DataCache.fetchSkillTreeFromClassId(classId, (skillTree) => {
             const skills = skillTree.skills ?? [];
             const eligibleSkills = skills.filter((ob) => ob.levels.find((ob) => ob.pLevel <= level));
@@ -805,10 +795,11 @@ const BotManager = {
                 skill.levels = skill.levels.filter((ob) => ob.pLevel <= level).slice(-1);
                 DataCache.fetchSkillFromSelfId(skill.selfId, (skillDetails) => {
                     skill = { ...utils.crushOb(skill), passive: skillDetails.template?.passive ?? false };
-                    Database.setSkill(skill, id);
+                    writes.push(Database.setSkill(skill, id));
                 });
             });
         });
+        return Promise.all(writes);
     },
 
     handlePlayerSpeak(playerSession, data) {
@@ -1208,6 +1199,7 @@ const BotManager = {
     applyPlayerSpeechRules(speech, session, distance, directCommandTarget) {
         const { playerSession, rawText, text, player } = speech;
         const bot = session.actor;
+        if (session.fortressOwnerId && session.fortressOwnerId !== Number(player.fetchId())) return true;
         let handledByRule = false;
         if (directCommandTarget && INSULT_PATTERN.test(rawText)) {
             handledByRule = true;

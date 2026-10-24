@@ -17,6 +17,10 @@ function npcTalk(session, npc) {
         title
     };
 
+    if (Number(npc.fetchSelfId()) === require('../FortressDefenseData').MANAGER_ID) {
+        return invoke('GameServer/World/FortressDefense').menu(session);
+    }
+
     const ClanHallNpc = require('../../ClanHall/Npc');
     if (ClanHallNpc.handles(npc.fetchSelfId())) {
         ClanHallNpc.render(session).catch(error => utils.infoWarn('ClanHall', 'NPC dialog failed: %s', error.message));

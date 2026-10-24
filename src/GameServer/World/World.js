@@ -363,6 +363,10 @@ const World = {
     },
 
     insertUser(session) {
+        if (session.botSession && invoke('GameServer/Bot/Population/PopulationConfig').enabled === false
+            && !invoke('GameServer/Bot/FortressSquad').ownsSession(session)) {
+            throw new Error('Only the manager-owned fortress squad may enter the world');
+        }
         const runtime = currentUserLocationIndex(this.user) ?? createUserLocationIndex(this.user);
         const exists = this.user.sessions.find((ob) => session.fetchAccountId() === ob.fetchAccountId());
         if (exists && exists !== session) {

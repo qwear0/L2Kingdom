@@ -202,6 +202,13 @@ class Session {
     dataReceive(data) {
         // Weird, sometimes the packet is sent twofold/duplicated. I had to limit it based on the header size...
         const packet = data.slice(2, data.readInt16LE());
+        // The preparation transaction publishes its inventory in the DB queue
+        // turn. Do not admit new client inventory/class actions while the
+        // character's earlier buffered writes and profession work are draining.
+        if (this.fortressPreparationPending) {
+            this.dataSendToMe(invoke('GameServer/Network/Response').actionFailed());
+            return;
+        }
         if (invoke('GameServer/Bot/Population/PopulationConfig').developerDiagnostics === true) this.tracePacket('in', packet, packetName(CLIENT_PACKET_NAMES, packetOpcode(packet)));
         if (this.enterWorldReady) {
             const actor = this.actor;

@@ -51,7 +51,8 @@ function validPair(playerSession, botSession) {
         actorId(playerSession) > 0 &&
         actorId(botSession) > 0 &&
         !String(playerSession.accountId || '').toLowerCase().startsWith('bot_') &&
-        isBotIdentity(botSession)
+        isBotIdentity(botSession) &&
+        (!botSession.fortressOwnerId || botSession.fortressOwnerId === actorId(playerSession))
     );
 }
 

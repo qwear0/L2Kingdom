@@ -128,5 +128,6 @@ module.exports = {
     karma(characterId, pvp, pk, karma) { merge(characterId, { pvp, pk, karma }); },
     flushCharacter,
     flushAll,
-    pendingCount
+    pendingCount,
+    hasPending(characterId) { return pending.has(Number(characterId)) || queued.has(Number(characterId)); }
 };

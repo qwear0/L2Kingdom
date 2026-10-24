@@ -73,6 +73,20 @@ CREATE INDEX IF NOT EXISTS characters_username ON characters(username);
 CREATE INDEX IF NOT EXISTS characters_clanId ON characters(clanId);
 CREATE INDEX IF NOT EXISTS characters_clan_level_id ON characters(clanId, level DESC, id ASC);
 
+-- Scenario ownership is explicit; ambient bot accounts must never be selected
+-- for cleanup by a username prefix or by their current location.
+CREATE TABLE IF NOT EXISTS fortress_squad_members (
+    username TEXT PRIMARY KEY COLLATE NOCASE REFERENCES accounts(username) ON DELETE CASCADE,
+    characterId INTEGER UNIQUE REFERENCES characters(id) ON DELETE SET NULL,
+    ownerId INTEGER NOT NULL,
+    createdAt INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS fortress_preparation_claims (
+    characterId INTEGER PRIMARY KEY REFERENCES characters(id) ON DELETE CASCADE,
+    claimedAt INTEGER NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS character_death_experience (
     characterId INTEGER PRIMARY KEY REFERENCES characters(id) ON DELETE CASCADE,
     deathSequence INTEGER NOT NULL DEFAULT 1,

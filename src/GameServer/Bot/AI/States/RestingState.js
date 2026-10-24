@@ -128,7 +128,7 @@ function retreatFromThreat(session, bot, threat) {
 module.exports = {
     maybeCastManaRegeneration,
     tick(session, bot, Generics, BotAI) {
-        invoke('GameServer/Bot/Economy/HotBoardReviewService').naturalBreak(session, 1);
+        if (!session.fortressOwnerId) invoke('GameServer/Bot/Economy/HotBoardReviewService').naturalBreak(session, 1);
         if (session.followPlayerSession && session.partyCompanion === true) {
             const playerSession = session.followPlayerSession;
             const player = playerSession?.actor;
@@ -185,7 +185,7 @@ module.exports = {
             // Newbie Guide instead of making the new party wait for normal
             // seated regeneration. This checks the bot's own position, so it
             // never leaves a farming spot just because the leader is in town.
-            if (!session.explicitRestOrder && !combatTargetId && !recovered && canRecoverAtNewbieGuide(bot, BotAI)) {
+            if (!session.fortressOwnerId && !session.explicitRestOrder && !combatTargetId && !recovered && canRecoverAtNewbieGuide(bot, BotAI)) {
                 beginNewbieGuideRecovery(session, bot, playerSession);
                 recordWakeDecision(session, bot, hpRatio < 0.95 ? 'recover_hp' : 'recover_mp', 'newbie_guide_recovery');
                 BotAI.say(session, "I'm recovering at the Newbie Guide, then I'll return to you.");

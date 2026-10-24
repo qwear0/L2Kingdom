@@ -400,6 +400,37 @@ const BotAI = {
         invoke('GameServer/Bot/Economy/BotTradeChat').flush();
         const bot = session.actor;
         if (!bot) return;
+        if (session.fortressOwnerId) {
+            const Generics = invoke(path.actor);
+            if (bot.state.fetchDead() || bot.fetchHp() <= 0) {
+                clearTacticalState(session);
+                BotTradeService.cleanup(session, 'death');
+                HotBotPolicyOverlay.clearForDeath(session);
+                PartyCompanionService.updateMember(session);
+                return;
+            }
+            const leader = session.followPlayerSession;
+            if (session.partyCompanion && leader?.actor?.fetchIsOnline?.()
+                && Number(leader.actor.fetchId()) === session.fortressOwnerId) {
+                PartyCompanionService.updateMember(session);
+                PartyCompanionService.reconcileGroundLoot(session);
+                if (PartyCompanionService.startQueuedGroundPickup(session)) return;
+                if (BotTradeService.activeTradeSummary(session)) return;
+                // Use the existing role/heal/buff/revival/combat state, without
+                // admitting autonomous town/hunting/recovery lifecycle work.
+                const state = session.plan === 'resting' ? States.resting : States.following;
+                state.tick(session, bot, Generics, this);
+            } else {
+                PartyCompanionService.clearCompanion(session);
+                if (session.plan !== 'fortress_wait') {
+                    bot.attack?.abortCast?.(session, bot);
+                    bot.attack?.clearTimers?.();
+                    bot.automation.abortAll(bot);
+                    session.plan = 'fortress_wait';
+                }
+            }
+            return;
+        }
         const tickStartedAt = Date.now();
         invoke('GameServer/Bot/AI/PendingSweep').prune(session, bot, tickStartedAt);
         let lodContext = { tier: 'preload' };

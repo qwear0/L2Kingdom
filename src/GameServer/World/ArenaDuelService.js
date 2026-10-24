@@ -359,6 +359,10 @@ function classes(session) {
 }
 
 async function select(session, sourceId, options = {}) {
+    if (invoke('GameServer/Bot/Population/PopulationConfig').enabled === false) {
+        session.dataSendToMe(ServerResponse.speak(session.actor, { kind: 0, text: 'Arena bot clones are disabled in fortress-defense mode.' }));
+        return false;
+    }
     const player = session.actor;
     // The source arena is one physical combat zone. Do not replace another
     // player's active clone (and leave their session orphaned) when a second

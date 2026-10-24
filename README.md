@@ -5,10 +5,9 @@
 
 # L2Solo (C4: Scions of Destiny)
 
-Old-school Lineage 2 solo play, locally in a live world with over 1700 bot population.
+This private L2Siege deployment defaults to **Fortress of Resistance defense**, not the upstream ambient population of over 1700 bots.
 
-L2Solo is a local-first Lineage II C4 server emulator, tuned for a solo MMO experiment: one real player, a live world, and bots with AI that makes the server feel alive.
-Nothing is auto-generated. Everything in the world is the result of a player's or a bot's actions.
+L2Solo is the upstream local-first Lineage II C4 server emulator. Its broader features remain in this fork; the current deployment restrictions and scenario are described below.
 
 **Project status:** PUBLIC ALPHA
 
@@ -24,6 +23,27 @@ Clean C4 client protocol 656
 🧩 [L2Solo client mod](https://drive.google.com/file/d/1nDTPAHRFe2WQmt2IDfkBZMwEqVEYT4XD/view?usp=sharing)
 Optional but recommended for a better experience
 
+
+## Fortress of Resistance defense (local default)
+
+Speak to **Tamutak** beside the fortress courtyard. New player characters start there; existing characters are not relocated. Ordinary town-return after death goes there too, while arena and clan-hall destinations keep their own rules.
+
+- **Prepare:** choose a legal first profession if needed, then a compatible complete high-D equipment kit. Preparation raises a lower level to 20 without reducing higher levels, preserves existing items, and adds **10,000,000 Adena**. Equipment is added **unequipped**. Make room and weight allowance first. The equipment/Adena grant and its lifetime character claim commit together; relogging or restarting does not renew it. Profession selection can be completed before the final kit claim.
+- **Supplies:** the normal NPC shop sells D soulshots, spiritshots/blessed spiritshots, arrows, HP/MP potions, movement/attack/casting-speed potions, antidotes, bandages, and escape/resurrection scrolls.
+- **Summon squad:** once per server process, create five native level-20 bot companions: female Human Cleric, male Human Knight, male Human Rogue with a bow, female Dark Elf Dark Wizard, female Elf Elven Wizard. They have class-appropriate equipment, supplies and random valid appearances. They wait for the summoner's normal `/invite`; only that character can recruit/control them. Existing party role, follow, support, combat, chat and trade mechanisms remain in use. Dismissed/disconnected companions wait rather than hunting or visiting shops; dead companions remain corpses for ordinary resurrection, without automatic town revival.
+- **Start attack:** a separate shared action, available to another player too. Group 1 is released after successful preflight; groups 2–15 follow at 30-second intervals. Groups 1–5 contain five Reserve; 6–10 four Reserve and one Shooter; 11–15 two Reserve, one Shooter and two Guerilla: **75 attackers (55/10/10)**. Three approaches lead toward distinct courtyard positions through native geodata movement. Monsters retain their normal combat, ranged behavior, XP and drops; they do not respawn. Defender deaths do not stop the schedule.
+
+Squad identities, progression and **all belongings left with them are disposable**. At the next startup, explicitly registered temporary accounts/characters and their dependent data are deleted, including after a crash. Items already transferred to real players remain theirs. Existing ambient bot identities are retained, not wiped.
+
+The summon and attack gates are global for the process, not per player. Preflight rejection before side effects permits another attempt. A provisioning/publication failure after side effects consumes that action until restart; Tamutak reports attack progress and technical release failures. There is no victory/defeat handler, bonus reward, automatic reset or replay button.
+
+Defaults disable both `[BotPopulation] enabled` and `[ClanSimulation] enabled`. Ambient simulation, static bot merchants, saved bot activation, bot shop projections and extra arena bot clones are not started. Ordinary real-player AFK shops remain available. Do not enable population in local/environment overrides: fortress initialization rejects that configuration. The progression cap must allow level 20. Verified geodata is required for squad placement and attack preflight (`npm run geodata` prepares it without starting the server).
+
+The source, syntax and offline geodata paths have been checked; startup, client interaction, combat/resurrection, relog persistence and crash/restart acceptance still require a separately authorized runtime session. Before first deployment of the ownership/cleanup changes, ensure a consistent SQLite backup (including WAL where applicable) under `/data/!backups/L2Siege/`; do not copy only a live main database file or wipe bots.
+
+## Upstream feature overview
+
+The simulation descriptions and feature lists below describe upstream capabilities, not the enabled ambient behavior of this deployment.
 
 💻 Simulation - everything that is happening in the game world besides player actions.
 
@@ -167,7 +187,7 @@ See the full update log on our [Discord](https://discord.gg/dXsQ8SJA7k) server.
 
 You will need:
 
-- Node.js v22.15+
+- Node.js >=22.5.0
 - A [Lineage II C4 client](https://drive.google.com/file/d/1u0nW3m9c6Hql8sR9POQAcvglxIno23lv/view?usp=sharing) using protocol 656
 
 ## Quick Start
@@ -293,7 +313,7 @@ it expires after 30 minutes of inactivity and resets on server restart.
 - `.go` to start arena PvP
 - `.buff` target a bot to ask for a paid buff service
 
-Nearby bots also react to plain chat lines such as `hi`, `follow`, `wait`, `hunt`, `heal`, and `buff`.
+Nearby bots also react to plain chat lines such as `hi`, `follow`, `wait`, `hunt`, `heal`, and `buff`. Fortress companions accept only their summoner's control and do not enter independent hunting, town shopping or supply errands; extra arena bot clones are disabled in this deployment.
 
 ## Credits
 

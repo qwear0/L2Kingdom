@@ -6940,11 +6940,15 @@ const Database = {
                 return inTransaction(() => {
                     const count = one('SELECT COUNT(*) AS total FROM characters WHERE username = ? COLLATE NOCASE', [accounts[0].username]).total;
                     const newbie = require('./GameServer/Quest/BeginnerReward').flagForNewCharacter(count);
-                    return write(`INSERT INTO characters(username, name, race, classId, maxHp, maxMp, sex, face, hair, hairColor, locX, locY, locZ, newbie)
+                    const squad = one('SELECT characterId FROM fortress_squad_members WHERE username = ? COLLATE NOCASE', [accounts[0].username]);
+                    if (squad && (squad.characterId || count)) throw new Error('Temporary squad account already has a character');
+                    const created = write(`INSERT INTO characters(username, name, race, classId, maxHp, maxMp, sex, face, hair, hairColor, locX, locY, locZ, newbie)
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
                         accounts[0].username, data.name, data.race, data.classId, data.maxHp, data.maxMp,
                         data.sex, data.face, data.hair, data.hairColor, data.locX, data.locY, data.locZ, newbie
                     ]);
+                    if (squad) write('UPDATE fortress_squad_members SET characterId = ? WHERE username = ? COLLATE NOCASE', [created.insertId, accounts[0].username]);
+                    return created;
                 }, 'character:create');
             });
     },
@@ -6963,6 +6967,83 @@ const Database = {
             write('DELETE FROM board_trade_participants WHERE characterId=?', [character.id]);
             return write('DELETE FROM characters WHERE id=?', [character.id]);
         }, 'character:delete');
+    },
+    createFortressSquadAccount(username, password, ownerId) {
+        return inTransaction(() => {
+            if (!one('SELECT id FROM characters WHERE id = ?', [ownerId])) throw new Error('Squad owner no longer exists');
+            write('INSERT INTO accounts(username, password) VALUES (?, ?)', [username, password]);
+            write('INSERT INTO fortress_squad_members(username, ownerId, createdAt) VALUES (?, ?, ?)', [username, ownerId, Date.now()]);
+        }, 'fortress:squad-account');
+    },
+    cleanupFortressSquadAccounts(usernames = null) {
+        return inTransaction(() => {
+            const members = usernames === null
+                ? all('SELECT username, characterId FROM fortress_squad_members')
+                : all(`SELECT username, characterId FROM fortress_squad_members WHERE username IN (${usernames.map(() => '?').join(',') || 'NULL'})`, usernames);
+            for (const member of members) {
+                const characters = all('SELECT id FROM characters WHERE username = ? COLLATE NOCASE', [member.username]);
+                for (const character of characters) {
+                    for (const meeting of TradeMeetings.active(character.id, true)) {
+                        const { meeting: row } = TradeMeetings.terminal(meeting.id, false, 'temporary_squad_deleted');
+                        TradeMeetings.acknowledge(row.id, row.actorA);
+                        TradeMeetings.acknowledge(row.id, row.actorB);
+                    }
+                    write('DELETE FROM board_trade_participants WHERE characterId = ?', [character.id]);
+                    write("DELETE FROM social_entities WHERE kind = 'character' AND externalKey = ?", [String(character.id)]);
+                }
+                // Account and character dependents use the existing FK cascades.
+                // Keep the ownership row until deletion commits, including for
+                // accounts whose character provisioning failed midway.
+                write('DELETE FROM accounts WHERE username = ? COLLATE NOCASE', [member.username]);
+            }
+            return members.length;
+        }, 'fortress:squad-cleanup');
+    },
+    hasFortressPreparation(characterId) {
+        return selectOne('fortress_preparation_claims', ['characterId'], 'characterId = ?', [characterId], 'fortress:claim-read')
+            .then(rows => !!rows[0]);
+    },
+    claimFortressPreparation(characterId, entries, liveInventory, publish) {
+        return withCharacterFlush(characterId, () => enqueue(() => {
+            const snapshot = liveInventory();
+            const result = performTransaction(() => {
+                if (one('SELECT characterId FROM fortress_preparation_claims WHERE characterId = ?', [characterId])) return { claimed: false, items: [] };
+                // Native items resolve an unset DB slot from the template on
+                // load. Compare persisted stock, not that presentation default.
+                const current = all('SELECT id, selfId, amount, equipped FROM items WHERE characterId = ? AND amount > 0 ORDER BY id', [characterId]);
+                if (JSON.stringify(current.map(row => [row.id, row.selfId, row.amount, row.equipped])) !== JSON.stringify(snapshot)) {
+                    throw new Error('Inventory is busy. Close trade windows and try preparation again.');
+                }
+                const changed = [];
+                for (const entry of entries) {
+                    if (!Number.isSafeInteger(entry.amount) || entry.amount < 1 || (!entry.stackable && entry.amount !== 1)) throw new Error('Invalid fortress kit');
+                    const stack = entry.stackable ? one('SELECT id, amount FROM items WHERE characterId = ? AND selfId = ? ORDER BY id LIMIT 1', [characterId, entry.selfId]) : null;
+                    let id;
+                    if (stack) {
+                        id = stack.id;
+                        write('UPDATE items SET amount = ? WHERE id = ?', [stack.amount + entry.amount, id]);
+                    } else {
+                        id = Number(write('INSERT INTO items(selfId, name, amount, equipped, slot, characterId) VALUES (?, ?, ?, 0, ?, ?)',
+                            [entry.selfId, entry.name, entry.amount, entry.slot, characterId]).insertId);
+                    }
+                    changed.push(one('SELECT * FROM items WHERE id = ?', [id]));
+                }
+                write('INSERT INTO fortress_preparation_claims(characterId, claimedAt) VALUES (?, ?)', [characterId, Date.now()]);
+                return { claimed: true, items: changed };
+            }, 'fortress:claim');
+            // Publish in this same queue turn after COMMIT. The caller rejects
+            // admission while buffered absolute item writes are pending, so a
+            // later flush cannot replace the newly granted Adena with old stock.
+            if (result.claimed) {
+                try { publish(result.items); }
+                catch (cause) {
+                    const error = new Error('Fortress preparation committed; live inventory needs reconciliation', { cause });
+                    error.fortressClaimCommitted = true;
+                    throw error;
+                }
+            }
+            return result.claimed;
+        }, { operation: 'fortress:claim', read: false }));
     },
     fetchSkills(characterId) {
         return select('skills', ['*'], 'characterId = ?', [characterId], 'skill:list');

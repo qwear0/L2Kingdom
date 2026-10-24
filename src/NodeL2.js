@@ -35,6 +35,8 @@ function shutdown(signal) {
     // Each step logs its own failure and the next steps still run, so the
     // database is always closed.
     (async () => {
+        try { await invoke('GameServer/World/FortressDefense').stop(); }
+        catch (error) { utils.infoWarn('Fortress', 'scenario shutdown failed: %s', error.message); }
         try { await invoke('GameServer/Bot/Population/PopulationService').stop(); }
         catch (error) { utils.infoWarn('ColdWorker', 'cold simulation drain failed: %s', error.message); }
         try { await CharacterWriteQueue.flushAll(); }
@@ -99,7 +101,10 @@ Database.init(() => {
         if (result.reclaimed) {
             utils.infoSuccess('DB', 'reclaimed unused SQLite space pages=%d bytes=%d', result.freePages, result.reclaimedBytes);
         }
-    }).then(() => ClanService.init()).then(async () => {
+    }).then(async () => {
+        await invoke('GameServer/World/FortressDefense').init();
+        await ClanService.init();
+    }).then(async () => {
         GeodataEngine.init();
         await World.init();
         await invoke('GameServer/ClanHall/Runtime').start();

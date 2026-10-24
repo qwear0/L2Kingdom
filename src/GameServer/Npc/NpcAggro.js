@@ -107,6 +107,7 @@ module.exports = {
     MAX_AGGRO_Z_DIFFERENCE,
     isHotBotSession,
     isLiveSession,
+    isSilentMoving,
     isEligible,
     canEngage,
     engageNearby,

@@ -381,6 +381,10 @@ function spawnProjection(shop) {
 }
 
 function spawnProjectionEntry(shop) {
+    // Saved bot shops are not a second activation path when only the fortress
+    // squad is allowed. Keep the durable record; real-player shops still work.
+    if (String(shop.ownerAccount || '').startsWith('bot_')
+        && invoke('GameServer/Bot/Population/PopulationConfig').enabled === false) return null;
     removeProjection(shop.ownerId);
     const projection = buildProjection(shop);
     projectionsByOwner.set(Number(shop.ownerId), projection);

@@ -1188,13 +1188,7 @@ const PopulationService = {
             if (typeof this.stateRetentionTimer.unref === 'function') this.stateRetentionTimer.unref();
         }
 
-        const walResetIntervalMs = Math.max(1000, Number(options.default.Database?.checkpointResetIntervalMs) || 5000);
-        if (Number(options.default.Database?.checkpointResetWalBytes) > 0) {
-            this.walResetTimer = setInterval(() => {
-                this.runAdaptiveWalReset();
-            }, walResetIntervalMs);
-            if (typeof this.walResetTimer.unref === 'function') this.walResetTimer.unref();
-        }
+        this.startDatabaseMaintenance();
 
         if (Config.phasePolicyEnabled !== false) {
             this.phasePolicyTimer = setInterval(() => {
@@ -3041,6 +3035,13 @@ const PopulationService = {
             resetGrowthBytes,
             resetDue
         };
+    },
+
+    startDatabaseMaintenance() {
+        if (this.walResetTimer || !(Number(options.default.Database?.checkpointResetWalBytes) > 0)) return;
+        const interval = Math.max(1000, Number(options.default.Database?.checkpointResetIntervalMs) || 5000);
+        this.walResetTimer = setInterval(() => this.runAdaptiveWalReset(), interval);
+        this.walResetTimer.unref?.();
     },
 
     runAdaptiveWalReset(timestamp = Date.now()) {

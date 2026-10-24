@@ -329,6 +329,7 @@ function tick(session, leaderSession, Generics) {
 }
 
 function shouldTownRespawn(leaderSession, deadSession, now = Date.now()) {
+    if (deadSession?.fortressOwnerId) return false;
     if (!isRescueMember(deadSession, leaderSession) || !leaderSession?.actor?.fetchIsOnline?.()) return true;
     // A remote courier cannot be rescued by this group. A fight elsewhere
     // must not pause its town recovery or send support across the map.

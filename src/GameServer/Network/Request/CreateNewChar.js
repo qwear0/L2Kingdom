@@ -46,8 +46,7 @@ function consume(session, data) {
         }
 
         return Shared.fetchClassInformation(data.classId).then((classInfo) => {
-            const spawns = fetchSpawnPoints(data.classId);
-            const coords = spawns[utils.randomNumber(utils.size(spawns))];
+            const coords = require('../../World/FortressDefenseData').START;
 
             data = {
                 ...data, ...classInfo.vitals, ...coords
@@ -82,10 +81,6 @@ function consume(session, data) {
             ServerResponse.charCreateFail(0x00)
         );
     });
-}
-
-function fetchSpawnPoints(classId) {
-    return ClassProgression.firstClassRow(DataCache.newbieSpawns, classId, 'strict')?.spawns;
 }
 
 function awardBaseSkills(id, classId) {

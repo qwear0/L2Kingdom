@@ -668673,8 +668673,8 @@
   {
     "aiType": "fighter",
     "availability": {
-      "directSpawn": true,
-      "knownReachable": true,
+      "directSpawn": false,
+      "knownReachable": false,
       "raidMinion": false
     },
     "defaultEffectiveStats": {
@@ -668709,9 +668709,7 @@
       "4045:1",
       "4295:1"
     ],
-    "spawnIds": [
-      "spawn-12038-958218703d7a"
-    ],
+    "spawnIds": [],
     "spoils": [],
     "template": {
       "base": {
@@ -668779,8 +668777,8 @@
   {
     "aiType": "fighter",
     "availability": {
-      "directSpawn": true,
-      "knownReachable": true,
+      "directSpawn": false,
+      "knownReachable": false,
       "raidMinion": false
     },
     "defaultEffectiveStats": {
@@ -668815,10 +668813,7 @@
       "4045:1",
       "4295:1"
     ],
-    "spawnIds": [
-      "spawn-12039-8dbaa6d19fbb",
-      "spawn-12039-d071e57c4336"
-    ],
+    "spawnIds": [],
     "spoils": [],
     "template": {
       "base": {
@@ -668886,8 +668881,8 @@
   {
     "aiType": "fighter",
     "availability": {
-      "directSpawn": true,
-      "knownReachable": true,
+      "directSpawn": false,
+      "knownReachable": false,
       "raidMinion": false
     },
     "defaultEffectiveStats": {
@@ -668922,16 +668917,7 @@
       "4045:1",
       "4295:1"
     ],
-    "spawnIds": [
-      "spawn-12040-1276f698d41d",
-      "spawn-12040-7483bbf1bc1a",
-      "spawn-12040-a76dec2e6cd4",
-      "spawn-12040-b457cd8dc002",
-      "spawn-12040-c1c198ab911e",
-      "spawn-12040-e29d1c58cda9",
-      "spawn-12040-e317d361f993",
-      "spawn-12040-edcba1deec04"
-    ],
+    "spawnIds": [],
     "spoils": [],
     "template": {
       "base": {
@@ -668999,8 +668985,8 @@
   {
     "aiType": "archer",
     "availability": {
-      "directSpawn": true,
-      "knownReachable": true,
+      "directSpawn": false,
+      "knownReachable": false,
       "raidMinion": false
     },
     "defaultEffectiveStats": {
@@ -669035,12 +669021,7 @@
       "4045:1",
       "4295:1"
     ],
-    "spawnIds": [
-      "spawn-12041-37e343612d9b",
-      "spawn-12041-90aed43cc1b5",
-      "spawn-12041-95b3e3c0b8c5",
-      "spawn-12041-dbae8f3280e4"
-    ],
+    "spawnIds": [],
     "spoils": [],
     "template": {
       "base": {
@@ -669108,8 +669089,8 @@
   {
     "aiType": "fighter",
     "availability": {
-      "directSpawn": true,
-      "knownReachable": true,
+      "directSpawn": false,
+      "knownReachable": false,
       "raidMinion": false
     },
     "defaultEffectiveStats": {
@@ -669144,9 +669125,7 @@
       "4045:1",
       "4295:1"
     ],
-    "spawnIds": [
-      "spawn-12042-aecaca6a88e1"
-    ],
+    "spawnIds": [],
     "spoils": [],
     "template": {
       "base": {
@@ -669214,8 +669193,8 @@
   {
     "aiType": "fighter",
     "availability": {
-      "directSpawn": true,
-      "knownReachable": true,
+      "directSpawn": false,
+      "knownReachable": false,
       "raidMinion": false
     },
     "defaultEffectiveStats": {
@@ -669250,10 +669229,7 @@
       "4045:1",
       "4295:1"
     ],
-    "spawnIds": [
-      "spawn-12043-3a67d1ad615a",
-      "spawn-12043-c37e13247948"
-    ],
+    "spawnIds": [],
     "spoils": [],
     "template": {
       "base": {
@@ -669321,8 +669297,8 @@
   {
     "aiType": "archer",
     "availability": {
-      "directSpawn": true,
-      "knownReachable": true,
+      "directSpawn": false,
+      "knownReachable": false,
       "raidMinion": false
     },
     "defaultEffectiveStats": {
@@ -669357,10 +669333,7 @@
       "4045:1",
       "4295:1"
     ],
-    "spawnIds": [
-      "spawn-12044-9ed37afeb211",
-      "spawn-12044-e91bfebccace"
-    ],
+    "spawnIds": [],
     "spoils": [],
     "template": {
       "base": {

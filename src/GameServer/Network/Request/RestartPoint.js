@@ -27,10 +27,9 @@ function consume(session, data) {
 
     const ArenaDuelService = invoke('GameServer/World/ArenaDuelService');
     const arenaDeath = session.arenaDeath === true && ArenaDuelService.duelForActor?.(actor);
-    const TownRespawn = invoke('GameServer/World/TownRespawn');
     const destination = arenaDeath
         ? invoke('GameServer/World/GiranArena').RESTART
-        : hallRestart || TownRespawn.restartCoords(actor);
+        : hallRestart || require('../../World/FortressDefenseData').START;
     const Generics = invoke(path.actor);
 
     // Restart is a complete respawn, unlike a gradual resurrection skill.
