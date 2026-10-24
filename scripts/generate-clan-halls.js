@@ -230,7 +230,7 @@ const doors = [...read('data/doors.xml').matchAll(/<door id="(\d+)" name="([^"]+
             .map(([, key, value]) => [key, Number(value)]));
         return { id: Number(id), name, hallId: values.clanHallId,
             locX: values.x, locY: values.y, locZ: values.z, maxHp: values.baseHpMax };
-    }).filter(door => halls.some(hall => hall.id === door.hallId));
+    }).filter(door => door.hallId === 21 || halls.some(hall => hall.id === door.hallId));
 save('data/ClanHalls/doors.json', doors);
 save('data/Npcs/clan_halls.json', npcs);
 save('data/Npcs/Spawns/clan_halls.json', [{ selfId: 'auction_clan_halls', bounds: [], spawns: missingSpawns }]);

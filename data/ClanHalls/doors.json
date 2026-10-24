@@ -252,6 +252,24 @@
     "maxHp": 158250
   },
   {
+    "id": 21210001,
+    "name": "partisan001",
+    "hallId": 21,
+    "locX": 43643,
+    "locY": 108908,
+    "locZ": -1970,
+    "maxHp": 158250
+  },
+  {
+    "id": 21210002,
+    "name": "partisan002",
+    "hallId": 21,
+    "locX": 43643,
+    "locY": 108783,
+    "locZ": -1970,
+    "maxHp": 158250
+  },
+  {
     "id": 22220012,
     "name": "giran_clanhall_001",
     "hallId": 44,

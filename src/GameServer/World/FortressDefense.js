@@ -74,7 +74,7 @@ async function preparationMenu(session) {
         page(session, `Choose your legal first profession. Your level will be raised to at least 20; higher levels are preserved.<br>${links}`);
     } else {
         const links = Loadouts.choices(actor.fetchClassId()).map(choice => `<a action="bypass -h fortress-defense claim ${choice}">${escape(Loadouts.WEAPONS[choice].name)} kit + 10,000,000 Adena</a><br>`).join('');
-        page(session, `Choose one complete high-D equipment kit. It is added unequipped without removing your current items. This claim is permanent, not renewed by server restart.<br>${links || 'No kit is available for this profession.'}`);
+        page(session, `Choose one complete high-D equipment kit with 5,000 D-grade soulshots or blessed spiritshots for its weapon. Equipment is added unequipped without removing your current items. This claim is permanent, not renewed by server restart.<br>${links || 'No kit is available for this profession.'}`);
     }
 }
 
@@ -156,7 +156,7 @@ module.exports = {
             }
             if (operation === 'start') {
                 const pending = Attackers.start();
-                menu(session, 'Checking all approach paths before releasing the first group...');
+                menu(session, 'Checking all approach paths. The gates open at attack start; the first group cannot spawn before the 30-second exit delay...');
                 const message = await pending;
                 if (session.actor === actor) menu(session, message);
                 return;

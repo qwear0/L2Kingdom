@@ -7,6 +7,7 @@ const Spawn = invoke('GameServer/World/Generics/SpawnNpcs');
 const Response = invoke('GameServer/Network/Response');
 const Restrictions = invoke('GameServer/Effects/EffectRestrictions');
 const NpcAggro = invoke('GameServer/Npc/NpcAggro');
+const Doors = require('../ClanHall/Doors');
 
 let state = 'unused';
 let stopped = false;
@@ -233,21 +234,31 @@ module.exports = {
     start() {
         if (state !== 'unused' || stopped) return Promise.resolve('The shared attack start has already been used or is unavailable.');
         state = 'preflight';
+        const releaseAt = Date.now() + Layout.START_DELAY_MS;
         starting = (async () => {
             let plans;
-            try { plans = await preflight(); }
-            catch (error) { if (!stopped) state = 'unused'; throw error; }
+            try {
+                Doors.change(Layout.HALL_ID, true);
+                plans = await preflight();
+            } catch (error) { if (!stopped) state = 'unused'; throw error; }
             if (stopped) throw new Error('Server is shutting down');
             transport = new (invoke('GameServer/Bot/BotSession'))('fortress_march');
-            state = 'releasing';
-            marchTimer = setInterval(() => {
-                try { tick(); }
-                catch (error) { utils.infoWarn('Fortress', 'march update failed: %s', error.message); }
-            }, 1000);
-            marchTimer.unref?.();
-            release(plans);
-            return state === 'failed' ? `Technical release failure at group ${failedGroup}; ${releasedMobs} attackers were published. Restart is required for another run.`
-                : 'The attack has begun. Fifteen groups arrive thirty seconds apart.';
+            state = 'countdown';
+            // Path validation may outlast the exit delay, but must never let
+            // the first group spawn before thirty seconds from the start click.
+            const remaining = Math.max(0, releaseAt - Date.now());
+            releaseTimer = setTimeout(() => {
+                releaseTimer = null;
+                if (stopped) return;
+                state = 'releasing';
+                marchTimer = setInterval(() => {
+                    try { tick(); }
+                    catch (error) { utils.infoWarn('Fortress', 'march update failed: %s', error.message); }
+                }, 1000);
+                marchTimer.unref?.();
+                release(plans);
+            }, remaining);
+            return `The gates are open. First group in ${Math.ceil(remaining / 1000)} seconds. Fifteen groups arrive thirty seconds apart.`;
         })();
         return starting;
     },

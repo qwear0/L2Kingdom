@@ -49,9 +49,9 @@ function kit(classId, choice, { equipped = false, consumables = false, adena = 0
         if (String(source.etc?.rank).toLowerCase() !== 'd') throw new Error(`Invalid fortress D-grade item ${entry.selfId}`);
         entry.equipped = equipped;
     });
+    result.push(item(weapon.armor === 'robe' ? 3948 : 1463, { amount: 5000 }));
     if (consumables) {
-        result.push(item(weapon.armor === 'robe' ? 3948 : 1463, { amount: weapon.armor === 'robe' ? 2000 : 3000 }),
-            item(1061, { amount: 30 }), item(728, { amount: 20 }),
+        result.push(item(1061, { amount: 30 }), item(728, { amount: 20 }),
             item(734, { amount: 10 }), item(735, { amount: 10 }), item(6036, { amount: 10 }),
             item(1832, { amount: 10 }), item(1834, { amount: 10 }),
             item(736, { amount: 3 }), item(737, { amount: 3 }));

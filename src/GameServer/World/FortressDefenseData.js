@@ -1,3 +1,4 @@
+const HALL_ID = 21;
 const MANAGER_ID = 7495;
 const START = Object.freeze({ locX: 43280, locY: 108840, locZ: -1984 });
 const SQUAD_POSITIONS = [
@@ -41,4 +42,4 @@ function attacker(group, member) {
     return { group, member, route, selfId, spawn, points: [approach, finish] };
 }
 
-module.exports = { MANAGER_ID, START, SQUAD_POSITIONS, ROUTES, HOLDING_POSITIONS, attacker, GROUPS: 15, GROUP_SIZE: 5, INTERVAL_MS: 30000 };
+module.exports = { HALL_ID, MANAGER_ID, START, SQUAD_POSITIONS, ROUTES, HOLDING_POSITIONS, attacker, GROUPS: 15, GROUP_SIZE: 5, START_DELAY_MS: 30000, INTERVAL_MS: 30000 };
