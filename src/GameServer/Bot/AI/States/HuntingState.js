@@ -590,7 +590,113 @@ function targetProgressing(session, bot, target) {
     return session.targetStallTicks < TARGET_STALL_TICKS;
 }
 
+// Duty trips reuse encounter completion without the outer hunting recovery or
+// a fresh target scan, either of which could prevent the trip from resuming.
+function tickTarget(session, bot, Generics, BotAI, { allowRetarget = true } = {}) {
+    const targetId = session.currentTargetId;
+    const dutyCurrent = session.vassal ? require('../VassalOrders').executionFence(session) : () => true;
+    World.fetchUser(targetId).then((targetActor) => {
+        if (!dutyCurrent() || session.currentTargetId !== targetId) return;
+        if (targetActor && targetActor.fetchIsOnline() && !targetActor.state.fetchDead()) {
+            if (bot.state.fetchTowards() || bot.state.fetchHits() || bot.state.fetchCasts()) {
+                return;
+            }
+            BotAI.executePvPCombat(session, bot, targetActor, Generics);
+        } else {
+            clearTarget(session, bot, targetId);
+        }
+    }).catch(() => {
+        World.fetchNpc(targetId).then((npc) => {
+            if (!dutyCurrent() || session.currentTargetId !== targetId) return;
+            if (session.vassal && !require('../VassalOrders').targetAllowed(session, npc)) {
+                bot.automation.abortAll(bot);
+                clearTarget(session, bot, targetId);
+                return;
+            }
+            if (BotRaidSafety.isProtectedRaidEntity(npc)) {
+                clearTarget(session, bot, targetId);
+                session.lastDecision = {
+                    action: 'abandon_target',
+                    reason: 'raid_entity_protected',
+                    targetId,
+                    at: Date.now()
+                };
+            } else if (npc.isDead()) {
+                const corpseSkill = SummonerTactics.corpseSummonSkill(bot, npc);
+                if (corpseSkill) {
+                    BotAI.executeCombat(session, bot, npc, Generics);
+                    return;
+                }
+                if (Math.random() < 0.20) {
+                    BotAI.say(session, BotAI.getRandomPhrase('victory'), { ambient: true, key: 'victory' });
+                }
+                clearTarget(session, bot, targetId);
+            } else {
+                const npcAggroedOnBot = Number(npc.fetchDestId?.() || 0) === Number(bot.fetchId());
+                if (!npcAggroedOnBot && !bot.state.fetchHits() && !bot.state.fetchCasts()
+                    && !HuntingVisibility.canSee(bot, npc)) {
+                    bot.automation?.abortAll?.(bot);
+                    clearTarget(session, bot, targetId, true);
+                    session.lastDecision = { action: 'abandon_target', reason: 'target_not_visible', targetId };
+                    return;
+                }
+                if (isSoloHunter(session) && !npcAggroedOnBot &&
+                    !bot.state.fetchTowards() && !bot.state.fetchHits() && !bot.state.fetchCasts()) {
+                    const readiness = encounterReadiness(bot, npc);
+                    rememberEncounterReadiness(session, npc, readiness);
+                    if (!readiness.ready) {
+                        beginVoluntaryRecovery(session, bot, BotAI, readiness);
+                        return;
+                    }
+                }
+                if (!targetProgressing(session, bot, npc)) {
+                    clearTarget(session, bot, targetId, true);
+                    session.lastDecision = {
+                        action: 'abandon_target',
+                        reason: 'no_progress',
+                        targetId,
+                        retryAfter: session.targetRetryAfter?.[targetId] || null
+                    };
+                    return;
+                }
+                if (BotRangedCombatPositioning.reposition(session, bot, npc)) return;
+                if (bot.state.fetchTowards() || bot.state.fetchHits() || bot.state.fetchCasts()) {
+                    return;
+                }
+
+                if (allowRetarget && isClaimedByOtherSoloBot(session, npc)) {
+                    const alternateMonster = findPreferredMonster(session, bot, 2500, {
+                        excludeTargetId: npc.fetchId(),
+                        freeOnly: true
+                    });
+                    if (alternateMonster) {
+                        assignTarget(session, bot, alternateMonster);
+                        BotAI.executeCombat(session, bot, alternateMonster, Generics);
+                        return;
+                    }
+                }
+
+                const crystal = bot.backpack.fetchItems().find(item => invoke('GameServer/Items/SoulCrystalProgression').crystal(item));
+                if (crystal && npc.fetchHp() <= npc.fetchMaxHp() / 2 && !npc.fetchSoulCrystalAbsorber?.(bot)
+                    && invoke('GameServer/Items/SoulCrystalProgression').canUse(session, crystal, npc)) {
+                    const itemSkill = invoke('GameServer/Items/C4ItemSkills').resolve(crystal.fetchSelfId());
+                    const skill = bot.backpack.buildItemSkill(itemSkill);
+                    if (skill && bot.fetchMp() >= skill.fetchConsumedMp() && bot.canUseSkill?.(skill) !== false) {
+                        bot.select({ id: npc.fetchId() });
+                        bot.backpack.useDrainSoulItem(session, crystal.fetchId(), itemSkill, skill);
+                        if (bot.state.fetchCasts()) return;
+                    }
+                }
+                BotAI.executeCombat(session, bot, npc, Generics);
+            }
+        }).catch(() => {
+            if (dutyCurrent()) clearTarget(session, bot, targetId);
+        });
+    });
+}
+
 module.exports = {
+    tickTarget,
     leaveShop,
     startWorkshopOrder,
     economyForHunt,
@@ -885,106 +991,7 @@ module.exports = {
 
         // 5. Hunt/Attack Combat execution
         if (session.currentTargetId) {
-            const targetId = session.currentTargetId;
-            const dutyCurrent = session.vassal ? require('../VassalOrders').executionFence(session) : () => true;
-            World.fetchUser(targetId).then((targetActor) => {
-                if (!dutyCurrent() || session.currentTargetId !== targetId) return;
-                if (targetActor && targetActor.fetchIsOnline() && !targetActor.state.fetchDead()) {
-                    if (bot.state.fetchTowards() || bot.state.fetchHits() || bot.state.fetchCasts()) {
-                        return;
-                    }
-                    BotAI.executePvPCombat(session, bot, targetActor, Generics);
-                } else {
-                    clearTarget(session, bot, targetId);
-                }
-            }).catch(() => {
-                World.fetchNpc(targetId).then((npc) => {
-                    if (!dutyCurrent() || session.currentTargetId !== targetId) return;
-                    if (session.vassal && !require('../VassalOrders').targetAllowed(session, npc)) {
-                        bot.automation.abortAll(bot);
-                        clearTarget(session, bot, targetId);
-                        return;
-                    }
-                    if (BotRaidSafety.isProtectedRaidEntity(npc)) {
-                        clearTarget(session, bot, targetId);
-                        session.lastDecision = {
-                            action: 'abandon_target',
-                            reason: 'raid_entity_protected',
-                            targetId,
-                            at: Date.now()
-                        };
-                    } else if (npc.isDead()) {
-                        const corpseSkill = SummonerTactics.corpseSummonSkill(bot, npc);
-                        if (corpseSkill) {
-                            BotAI.executeCombat(session, bot, npc, Generics);
-                            return;
-                        }
-                        if (Math.random() < 0.20) {
-                            BotAI.say(session, BotAI.getRandomPhrase('victory'), { ambient: true, key: 'victory' });
-                        }
-                        clearTarget(session, bot, targetId);
-                    } else {
-                        const npcAggroedOnBot = Number(npc.fetchDestId?.() || 0) === Number(bot.fetchId());
-                        if (!npcAggroedOnBot && !bot.state.fetchHits() && !bot.state.fetchCasts()
-                            && !HuntingVisibility.canSee(bot, npc)) {
-                            bot.automation?.abortAll?.(bot);
-                            clearTarget(session, bot, targetId, true);
-                            session.lastDecision = { action: 'abandon_target', reason: 'target_not_visible', targetId };
-                            return;
-                        }
-                        if (isSoloHunter(session) && !npcAggroedOnBot &&
-                            !bot.state.fetchTowards() && !bot.state.fetchHits() && !bot.state.fetchCasts()) {
-                            const readiness = encounterReadiness(bot, npc);
-                            rememberEncounterReadiness(session, npc, readiness);
-                            if (!readiness.ready) {
-                                beginVoluntaryRecovery(session, bot, BotAI, readiness);
-                                return;
-                            }
-                        }
-                        if (!targetProgressing(session, bot, npc)) {
-                            clearTarget(session, bot, targetId, true);
-                            session.lastDecision = {
-                                action: 'abandon_target',
-                                reason: 'no_progress',
-                                targetId,
-                                retryAfter: session.targetRetryAfter?.[targetId] || null
-                            };
-                            return;
-                        }
-                        if (BotRangedCombatPositioning.reposition(session, bot, npc)) return;
-                        if (bot.state.fetchTowards() || bot.state.fetchHits() || bot.state.fetchCasts()) {
-                            return;
-                        }
-
-                        if (isClaimedByOtherSoloBot(session, npc)) {
-                            const alternateMonster = findPreferredMonster(session, bot, 2500, {
-                                excludeTargetId: npc.fetchId(),
-                                freeOnly: true
-                            });
-                            if (alternateMonster) {
-                                assignTarget(session, bot, alternateMonster);
-                                BotAI.executeCombat(session, bot, alternateMonster, Generics);
-                                return;
-                            }
-                        }
-
-                        const crystal = bot.backpack.fetchItems().find(item => invoke('GameServer/Items/SoulCrystalProgression').crystal(item));
-                        if (crystal && npc.fetchHp() <= npc.fetchMaxHp() / 2 && !npc.fetchSoulCrystalAbsorber?.(bot)
-                            && invoke('GameServer/Items/SoulCrystalProgression').canUse(session, crystal, npc)) {
-                            const itemSkill = invoke('GameServer/Items/C4ItemSkills').resolve(crystal.fetchSelfId());
-                            const skill = bot.backpack.buildItemSkill(itemSkill);
-                            if (skill && bot.fetchMp() >= skill.fetchConsumedMp() && bot.canUseSkill?.(skill) !== false) {
-                                bot.select({ id: npc.fetchId() });
-                                bot.backpack.useDrainSoulItem(session, crystal.fetchId(), itemSkill, skill);
-                                if (bot.state.fetchCasts()) return;
-                            }
-                        }
-                        BotAI.executeCombat(session, bot, npc, Generics);
-                    }
-                }).catch(() => {
-                    if (dutyCurrent()) clearTarget(session, bot, targetId);
-                });
-            });
+            tickTarget(session, bot, Generics, BotAI);
         } else {
             if (!session.vassal) reconcilePhysicalSpot(session, bot);
             // Prefer unclaimed mobs so solo bots do not form accidental trains.

@@ -250,6 +250,7 @@ function townTick(session, row, run, BotAI) {
         if (row.order === 'gather') {
             run.phase = requiredSupplyMissing(bot) ? 'shortage' : 'gather';
             run.wallet = count(bot, 57);
+            run.stock = supplies(bot).map(s => [s.itemId, count(bot, s.itemId)]);
             session.plan = 'hunting';
         } else run.phase = 'service';
     }
@@ -307,7 +308,9 @@ function gatherTick(session, row, run, Generics, BotAI) {
             && count(bot, s.itemId) <= s.restockMin && Number(Shop.rowForNpc(Access.npcId, s.itemId)?.price) <= money);
         const floor = invoke('GameServer/Bot/Population/SurvivalFloor').forActor(bot);
         if (need || floor?.action === 'unload' && cargo(session).length) { run.phase = 'town'; return; }
-        if (floor?.action === 'unload') {
+        // Retained working stock can exceed 50% load (notably the Bow starter kit).
+        // With no cargo to unload, only full slots or maximum load prevent work.
+        if (floor?.action === 'unload' && (floor.reason === 'no_slot' || floor.weightPenalty >= 4)) {
             status(session, 'working_inventory_encumbered');
             return;
         }
@@ -404,9 +407,6 @@ function tick(session, Generics, BotAI) {
         }
         return;
     }
-    if (session.currentTargetId && row.order !== 'gather') {
-        bot.automation.abortAll(bot); session.currentTargetId = undefined;
-    }
     if (session.activeTrade || session.trade || session.activeNegotiation) {
         if (session.vassalRest) session.vassalRest.at = null;
         status(session, 'owner_trade');
@@ -418,6 +418,15 @@ function tick(session, Generics, BotAI) {
         return;
     }
     if (row.order === 'gather' && row.gatherResumePending) { graceTick(session, row); return; }
+    if (run.phase !== 'gather') {
+        // A supply trip must finish the defensive encounter, including corpse work,
+        // before travel/contact checks can stop treating the selected target as combat.
+        if (invoke('GameServer/Bot/AI/PendingSweep').tick(session, bot, Generics, BotAI)) return;
+        if (session.currentTargetId) {
+            invoke('GameServer/Bot/AI/States/HuntingState').tickTarget(session, bot, Generics, BotAI, { allowRetarget: false });
+            return;
+        }
+    }
     if (!session.currentTargetId && recovery(session)) return;
     if (useSupplies(session)) return;
     invoke('GameServer/Bot/AI/BotEquipmentUpgrade').applyBestUpgrades(session);
@@ -428,9 +437,13 @@ function tick(session, Generics, BotAI) {
         if (['town', 'supplies', 'warehouse', 'done'].includes(run.phase)) townTick(session, row, run, BotAI);
         else if (run.phase === 'gather') gatherTick(session, row, run, Generics, BotAI);
         else if (run.phase === 'shortage') {
+            if (!requiredSupplyMissing(bot)) { run.phase = 'gather'; return; }
+            if (count(bot, 57) !== run.wallet || run.stock.some(([id, amount]) => count(bot, id) !== amount)) {
+                run.phase = 'town';
+                return;
+            }
             status(session, 'required_supplies_unaffordable');
             move(session, Access.loc, 100);
-            if (count(bot, 57) !== run.wallet) run.phase = 'town';
         } else {
             status(session, 'returning_to_castellan');
             if (move(session, Access.loc, 100)) {
