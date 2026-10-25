@@ -21,7 +21,7 @@ function publishReward(session, actor, result) {
     actor.setClassId(result.character.classId);
     actor.setLevel(result.character.level);
     actor.setExpSp(result.character.exp, result.character.sp);
-    actor.skillset.populateSnapshot(result.skills);
+    actor.skillset.populateSnapshot(result.skills.map(row => ({ ...row, passive: Boolean(row.passive) })));
     invoke('GameServer/Actor/Generics/CalculateStats')(session, actor);
     if (!result.replayed) actor.fillupVitals();
     invoke('GameServer/Persistence/CharacterWriteQueue').vitals(actor.fetchId(), actor.fetchHp(), actor.fetchMaxHp(), actor.fetchMp(), actor.fetchMaxMp());

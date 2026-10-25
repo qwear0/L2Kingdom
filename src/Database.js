@@ -4873,6 +4873,10 @@ const Database = {
         const characterId = Number(ownerId);
         if (!characterId || !pendingSettlementOwners.has(characterId)) return Promise.resolve({ settled: false });
         return withCharacterFlush(characterId, () => inTransaction(() => {
+            // Historical bot custody stays dormant in owned-only mode. Read the
+            // account and registry here; absent runtime actors do not imply human owners.
+            if (DiagnosticConfig.ownedOnly && isBotOwnerUnsafe(characterId)
+                && !one('SELECT 1 FROM vassals WHERE characterId = ?', [characterId])) return { settled: false };
             const life = one('SELECT simulationOwner FROM bot_life_state WHERE characterId = ?', [characterId]);
             if (life?.simulationOwner === COLD_SIMULATION_OWNER) return { settled: false, leased: true };
             const merged = mergeBoardSettlementsUnsafe(characterId, { advance: true });
