@@ -38,7 +38,7 @@ At the end of a task, check whether `README.md`, these instructions, or other af
 
 - Use the `l2siege-doc-maintainer` skill for repository orientation, documentation audits and impact checks, and changes to code layout, runtime entrypoints, documented gameplay, ownership boundaries, packets, persistence, WorldObserver, AI integrations, authored resources, configuration, verification workflows, skills, agent instructions, or documentation itself.
 - The canonical skill is `skills/l2siege-doc-maintainer/SKILL.md`. If skill discovery is unavailable, read that file directly. Local installation uses `~/.agents/skills/l2siege-doc-maintainer` as a symlink to the canonical directory.
-- Read the affected navigation map and relevant feature docs before deep implementation when they exist. Until a maintained documentation tree is introduced, use `README.md` and relevant source-adjacent docs; verify historical `planning/` material and legacy subsystem descriptions against current source and configuration.
+- Start with `docs/README.md`, then read the affected feature docs before deep implementation. Use `README.md` for player-facing setup and relevant source-adjacent docs for detailed contracts; verify historical `planning/` material and legacy subsystem descriptions against current source and configuration.
 - Keep documentation changes proportionate. Update affected maps, links, and feature docs in the same task when their claims change; installing the skill alone does not require creating a documentation tree.
 - Validate changed claims, paths, and links and inspect `git diff --check`. There is no bundled documentation auditor; do not import QSD-specific commands or create test infrastructure merely to mirror its workflow.
 

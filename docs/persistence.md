@@ -1,0 +1,74 @@
+# SQLite, write ownership and durability
+
+Read this before changing database writes, snapshots, worker handoffs or recovery. See the [project map](README.md), [economy contracts](economy.md) and [save operations](operations.md).
+
+## Owners and schema sources
+
+| Owner | Responsibility |
+| --- | --- |
+| `src/Database.js` | Main world connection, serialized application writes, transactions, migrations and native operation APIs. |
+| `src/DatabaseStatements.js` | Bounded connection-local prepared-statement cache. |
+| `src/GameServer/Persistence/CharacterWriteQueue.js` | Coalesced character/item patches and flush barriers. |
+| `src/HistoryDatabase.js`, `src/HistoryWorker.js`, `src/HistoryStore.js` | Separate history database, outbox transfer, reads and retention. |
+| `src/DatabaseCheckpointCoordinator.js`, `src/DatabaseCheckpointWorker.js` | Background WAL checkpoint work. |
+| `src/DatabaseRestore.js` | Interrupted paired world/history replacement recovery. |
+| `scripts/database-access.js`, `scripts/saved-games.js` | Cross-process access lock and stopped-database saves. |
+
+`database/sql/sqlite.sql` is the SQLite bootstrap, but **not the complete evolved schema**. `Database.applySchemaMigrations` adds migrations transactionally with their receipts. Account warehouses additionally use `src/DatabasePlayerWarehouse.js`; Lord/vassal tables and capacity triggers use `src/GameServer/Lord/Repository.js`. `database/sql/database.sql` is legacy MySQL material, not the running SQLite bootstrap.
+
+`Database.init` recovers an interrupted restore before opening the current files. `src/NodeL2.js` also performs data-dependent startup maintenance. Reading a schema file does not establish the state of a deployed world.
+
+## Producer → write queue → world state
+
+- `Database.enqueue` serializes synchronous `node:sqlite` work through the main query chain. Transaction helpers own commit/rollback.
+- Position, experience and selected backpack mutations feed `CharacterWriteQueue`; it coalesces patches on a 750-ms delay rather than persisting every field change immediately.
+- Failed patch snapshots merge back under newer pending values, so an older retry does not overwrite newer fields.
+- `Database.applyBufferedCharacterStates` commits buffered batches. `withCharacterFlush` orders dependent native operations after relevant pending state.
+- Inventory/service transactions also write directly through `Database`; the character queue is not the sole write producer.
+- Live memory may change before a buffered write commits. A visible inventory or location change is not proof of immediate durability.
+
+Owned vassals have an additional lifecycle snapshot path: `PopulationService.persistOwnedActors` queues location/experience, flushes character state, saves status and marks lifecycle state hot. Owned-only startup schedules this every 30 seconds. Offscreen vassals remain hot; elapsed downtime is not simulated reward time.
+
+## Retained cold ownership protocol
+
+The cold worker architecture remains in source but is not started by the enforced owned-only policy. When tracing retained code, follow:
+
+`ColdSimulationWorker` proposals → `ColdSimulationCoordinator` / `ColdCommitQueue` → main `Database` transaction → acknowledgement.
+
+`ColdSimulationOwner` and database APIs compare owner, revision and lease before committing. Hot activation fences/drains worker work before handing ownership to the main process; stale cold snapshots cannot overwrite newer hot state. Explicit cooldown hands ownership back. Registered vassals are excluded from ordinary cooldown and legacy activation; see [bot runtime](bot-runtime.md).
+
+Do not reuse a worker snapshot as authoritative inventory or bypass ownership fencing just because the cold scheduler is currently disabled.
+
+## World → history outbox → projections
+
+1. World mutations stage corresponding durable events through `Database.historyOutboxUnsafe` where that transaction owns an event.
+2. The history worker reads world outbox rows and writes the separate history database, normally in batches at a 200-ms cadence.
+3. `HistoryStore.transfer` commits history events and its cursor together; acknowledged source rows are then deleted by the main database owner.
+4. World/history tokens and cursors guard pairing. Incompatible history is set aside as an orphan; legacy analytics tables can be migrated from world storage.
+
+This is an asynchronous projection, not a cross-file atomic transaction. Unknown/malformed ordinary events can be skipped while advancing the cursor; world-wipe failures have different abort behavior. History reads attempt a flush barrier, but a warned flush failure can leave the read stale. Do not use the observer's history as current gameplay authority.
+
+### Journals and retention
+
+- `src/EconomyJournal.js` observes the main connection through temporary triggers and aggregates successful-operation deltas in memory.
+- `src/PvpJournal.js` buffers combat history. Buffered journal data is volatile before outbox flush; it is not a complete crash-proof per-character audit.
+- `Database.flushJournals` normally transfers these buffers to the outbox every 60 seconds, draining only after commit.
+- `HistoryStore.retention` owns pruning/compaction: market trade/store history uses a 90-day window, hourly economy/PvP 14 days, raw PvP 12 hours, and terminal clan details compact after an hour. These are different histories, not a global retention promise.
+- AI conversations and social memory have separate persistence/retention contracts; see [AI and social behavior](ai-social.md).
+
+## Checkpoints, shutdown and recovery limits
+
+World/history use WAL with `synchronous=NORMAL`; neither in-memory buffering nor this mode promises per-event survival of power loss.
+
+- Passive checkpoint maintenance defaults to a five-second interval and a 4-MiB minimum WAL size. A passive checkpoint need not reset/shrink WAL, and busy results matter.
+- `PopulationService.runAdaptiveWalReset` gates a truncate reset on player protection, an idle database queue, checkpoint completion and growth/cooldown thresholds. It is not permission to truncate WAL externally.
+- Checkpointing is not backup. Copying only an active SQLite main file can omit WAL state.
+- Shutdown attempts service drains and character flushes before closing the database, but has a forced-exit deadline; see [runtime](runtime.md).
+- Paired save loading uses validated copies, fsynced markers and rollback files to recover interrupted replacement. It is recoverable replacement, not an atomic world+history filesystem transaction.
+- Preserve `.access.sqlite`, restore markers and pending files for their owner. Never unlink the shared lock file to clear a busy error.
+
+Authored SQL/resources, generated catalogue exports and live SQLite/WAL/SHM/history/access/recovery files are distinct categories. Do not edit generated persistent state as though it were authored game content.
+
+## Update together
+
+Changes to buffered fields or transactional operations require checking producers, flush barriers, restore/status readers and economic commit guards. Changes to outbox events require checking `HistoryStore`, transfer cursors, pairing, retention and observer consumers. Save-format changes also affect [operations](operations.md) and launcher UI. Recovery, crash replay and restart durability require separately authorized runtime checks; source research alone does not certify them.

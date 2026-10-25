@@ -1,0 +1,82 @@
+# L2Siege project map
+
+L2Siege is the private Lineage II C4 server in the `L2Kingdom` checkout, derived from L2Solo / NodeL2. Package names, runtime identifiers and upstream material still use those names. This map explains where current behavior lives and what must change together; it is not a generated file inventory.
+
+## Scope and current runtime
+
+- One Node.js application owns authentication/game TCP listeners, live world state and an integrated HTTP observer. Worker threads handle selected asynchronous responsibilities; source directories are not separate deployable services.
+- Built-in SQLite stores the world; a separate history database receives asynchronous projections. Authored resources, generated catalogues and live persistence are different sources of truth.
+- **Owned-only policy is enforced after configuration overrides.** Live player-owned vassals remain active; ambient seeding, cold simulation, background parties and autonomous clan simulation are bypassed. Historical modules/options do not prove activation.
+- External AI is optional. Native rule-based behavior and service validation remain responsible for game actions.
+- Source-backed descriptions are not evidence of real-client acceptance, a live deployment's private settings or complete retail C4 compatibility.
+
+## Reading order
+
+1. Read [`AGENTS.md`](../AGENTS.md) for execution, language, artifact and Git policy; read the root [`README.md`](../README.md) for player-facing setup/current-fork context.
+2. Read [runtime/configuration](runtime.md) and inspect `package.json`, `config/default.ini` and the relevant owner.
+3. Choose the feature below; follow its entrypoint → state owner → persistence/asynchronous boundary → client/observer consumer.
+4. Use CodeGraph for bounded cross-file discovery where available; validate dynamic wiring and critical negative claims against source/configuration. See the [retrieval policy](../skills/l2siege-doc-maintainer/references/semantic-retrieval-policy.md).
+
+## Documentation by question
+
+| Question | Document | Primary code anchors |
+| --- | --- | --- |
+| How does the application start, select config and shut down? | [Runtime and lifecycle](runtime.md) | `scripts/start.js`, `scripts/run-server.js`, `src/NodeL2.js`, `src/Global.js` |
+| Which commands download, write, delete or start processes? | [Operations and verification](operations.md) | `package.json`, `scripts/`, `AGENTS.md` |
+| Who admits accounts and dispatches client packets? | [Protocol and sessions](protocol.md) | `src/Server.js`, `src/AuthenticationServer/`, `src/GameServer/Network/`, `src/Packet/` |
+| Which state is durable, and who can replace it? | [Persistence and durability](persistence.md) | `src/Database*.js`, `src/History*.js`, `src/GameServer/Persistence/` |
+| Who owns a vassal, its orders and interrupted duties? | [Castellan and vassals](vassals.md) | `src/GameServer/Lord/`, `src/GameServer/Bot/AI/VassalOrders.js`, `src/GameServer/Bot/AI/PartyCompanionService.js` |
+| Which bot work actually runs, and what is retained legacy code? | [Bot execution boundary](bot-runtime.md) | `src/GameServer/Bot/BotManager.js`, `src/GameServer/Bot/BotAI.js`, `src/GameServer/Bot/Population/PopulationConfig.js` |
+| Who publishes actors, resolves movement and applies combat/effects? | [World and combat](world-combat.md) | `src/GameServer/World/`, `src/GameServer/Actor/`, `src/GameServer/Model/`, `src/GameServer/Effects/`, `src/GameServer/Geodata/` |
+| Who validates item/Adena transfers and owns custody? | [Economy and storage](economy.md) | `src/GameServer/Crafting/`, `src/GameServer/Warehouse/`, `src/GameServer/AfkTrade/`, `src/GameServer/PrivateStoreTrade.js`, `src/Database.js` |
+| What crosses the external inference boundary and becomes memory? | [AI and social behavior](ai-social.md) | `src/GameServer/Bot/AI/`, `src/GameServer/Social/`, `src/GameServer/Clan/` |
+| What does the browser read or mutate? | [WorldObserver](world-observer.md) | `src/WorldObserver/WorldObserverServer.js`, projections and `src/WorldObserver/public/` |
+| Which resource/rule is authoritative for a catalogue or NPC service? | [Content and progression](content.md) | `data/`, `src/GameServer/DataCache.js`, `src/GameServer/Knowledge/`, `src/GameServer/Quest/`, progression/service modules |
+
+Code anchors are repository-relative; wildcard notation identifies a family, not a literal filename.
+
+## Cross-subsystem flow
+
+```text
+launcher -> geodata wrapper -> NodeL2 initialization
+                                |
+C4 client -> TCP/session -> request -> gameplay owner -> native response
+                                      |          |
+                                      |          +-> live actor/world/visibility
+                                      +-> buffered patches or native DB transaction
+                                                  |
+                                              world SQLite
+                                                  |
+                                               outbox -> history worker -> history SQLite
+
+WorldObserver <- live/persisted projections + catalogue/history reads
+browser controls -> validated clan/control services -> gameplay/persistence
+chat -> deterministic routing / optional provider -> validated tools -> native services
+```
+
+These arrows show responsibility direction, not an assertion that every action traverses every box or commits one global transaction. See each feature's failure and durability limits.
+
+## Important boundaries when changing code
+
+- **Ownership:** vassals are character-owned and retain an original clan binding. Party membership, account sharing, social affinity and observer UI are not substitute authority.
+- **Publication:** a durable character, a live world actor, a native client recipient and an observer row are different states.
+- **Persistence:** queued memory changes, committed world transactions and asynchronously projected history have different durability/freshness.
+- **Activation:** owned-only startup skips retained cold/clan schedulers, but native pathfinding/history/checkpoint workers have separate activation paths.
+- **Operations:** saves/restore/wipes, content generation and load scripts have real effects. Do not run them as incidental documentation checks.
+- **Local exposure:** the observer contains mutations and no general browser-to-player authentication boundary; game-side authentication-key handoff is also incomplete. Keep local-project assumptions explicit; see the specific guides rather than assuming production guarantees.
+
+## Existing detailed and historical material
+
+- [Class policy](../src/GameServer/Bot/AI/CLASS_POLICY.md): shared policy consumers and approximations; cold consumers do not imply current activation.
+- [Resource competition](../src/GameServer/Bot/Population/COLD_COMPETITION.md): retained hot/cold mechanics, subject to the owned-only boundary.
+- [Interaction memory](../src/GameServer/Social/INTERACTION_MEMORY.md) and [clan reputation](../src/GameServer/Clan/CLAN_SOCIAL.md): state/event contracts; automatic clan background behavior is not enabled by their presence.
+- [Native HTML UI kit](../src/GameServer/World/Generics/HTML_UI_KIT.md): client-facing HTML constraints.
+- `planning/` and root README upstream updates/checklists contain historical material. Confirm current implementation and activation before treating them as requirements.
+
+New plans/reports belong under ignored `tmp/` according to `AGENTS.md`, not in this documentation tree. Do not copy provider transcripts, live database records, private configuration or generated symbol dumps into maintained docs.
+
+## Maintenance and verification
+
+Use the canonical [documentation-maintainer skill](../skills/l2siege-doc-maintainer/SKILL.md). Update the smallest affected feature and this map when ownership, reading paths or contracts change. Keep root README as an overview rather than duplicating every flow.
+
+For documentation changes, inspect source-backed claims, paths, relative links and `git diff --check`. JavaScript syntax checks, automated suites, runtime operations and independent review have separate scopes; see [operations](operations.md). The documentation describes implementation boundaries and known limitations, not a blanket claim that those checks passed.

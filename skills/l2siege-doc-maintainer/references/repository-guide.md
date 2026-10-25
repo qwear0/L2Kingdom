@@ -5,6 +5,7 @@ These are starting anchors, not an exhaustive architecture map or a guarantee th
 ## Runtime and configuration
 
 - `AGENTS.md`: execution, verification, artifact, language, and Git rules.
+- `docs/README.md`: maintained project map and links to runtime, operations, protocol, persistence, vassals, bot execution, world/combat, economy, AI/social, observer and content guides. Read the affected feature before deep implementation.
 - `README.md`: current fork overview and user-facing operations, alongside upstream material; cross-check affected claims against source.
 - `package.json`: Node.js requirement, dependencies, and command definitions.
 - `scripts/start.js`, `scripts/run-server.js`, `src/NodeL2.js`: launch/runtime entrypoints; read without starting the server.
@@ -30,7 +31,7 @@ These are areas within one repository; do not turn directory boundaries into inv
 
 ## Existing documentation and historical material
 
-Discover relevant Markdown with a bounded `rg --files` query; do not assume all documentation is under `docs/`.
+Start with the maintained [project map](../../../docs/README.md), then discover relevant source-adjacent Markdown with a bounded `rg --files` query; not all documentation is under `docs/`.
 
 Source-adjacent reading candidates include:
 
@@ -42,4 +43,4 @@ Source-adjacent reading candidates include:
 
 These documents may describe legacy or inactive behavior. Confirm applicability rather than presenting them as current runtime guarantees.
 
-`planning/` contains existing planning material, not an authoritative implementation specification. New task plans belong in `tmp/plans/`. If a future documentation task introduces `docs/`, choose a compact structure based on actual reading needs, not the number of source directories.
+`planning/` contains existing planning material, not an authoritative implementation specification. New task plans belong in `tmp/plans/`. Keep `docs/` organized by durable flows and reading needs, not one map per source directory.

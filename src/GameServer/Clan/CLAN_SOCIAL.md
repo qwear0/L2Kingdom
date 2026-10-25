@@ -1,5 +1,13 @@
 # Clan reputation and discipline
 
+Applicability: this describes the implemented reputation/discipline model,
+including retained autonomous consumers. Owned-only startup skips the cold/clan
+background callers that refresh/enforce automatic discipline; do not infer active
+automatic expulsion or founding from this document. Personal hot memory and
+transactional clan attribution are separate paths. See [AI/social boundaries](../../../docs/ai-social.md)
+and the [project map](../../../docs/README.md). The validation list is not a record
+of checks executed or a requirement to run them by default.
+
 Clan social memory is a directed, bounded projection owned by the clan. It is
 separate from a bot's personal character memories and personal clan impressions.
 Alliance relationships and formal declarations of war are outside this module.

@@ -1,5 +1,12 @@
 # Interaction memory foundation
 
+Applicability: the factual memory contract also serves live owned vassals.
+Cold competition and background-party consumers described below are retained
+architecture, not evidence that those services run under owned-only startup.
+See [AI/social boundaries](../../../docs/ai-social.md), the
+[bot runtime](../../../docs/bot-runtime.md) and [project map](../../../docs/README.md).
+Listed validation files are reading anchors, not a claim that checks were run.
+
 This module provides durable bounded memory, a shared decision view, and a
 transactional cold-outcome event channel. Resource competition, party decisions
 and independent revenge consume it in both simulation modes. `partyHistory`

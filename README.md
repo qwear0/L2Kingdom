@@ -5,7 +5,9 @@
 
 # L2Solo (C4: Scions of Destiny)
 
-A private local Lineage II C4 fork of L2Solo, transitioning from an ambient bot population to player-owned vassals.
+This checkout is **L2Siege** (`L2Kingdom`), a private local Lineage II C4 fork of L2Solo / NodeL2 with player-owned vassals. Upstream names remain in package metadata and runtime identifiers.
+
+**Project documentation:** start with the [architecture and ownership map](docs/README.md). It links the [runtime/configuration guide](docs/runtime.md), [operations and side effects](docs/operations.md), [vassal contract](docs/vassals.md), and detailed protocol, persistence, world, economy, AI, observer and content guides. The documentation distinguishes active owned-only behavior from retained upstream systems; it is not a claim of runtime or client acceptance.
 
 ### Current fork: Castellan and player-owned vassals
 
@@ -231,19 +233,19 @@ See the full update log on our [Discord](https://discord.gg/dXsQ8SJA7k) server.
 
 You will need:
 
-- Node.js v22.15+
+- Node.js >=22.5.0 (the engine requirement in `package.json`)
 - A [Lineage II C4 client](https://drive.google.com/file/d/1u0nW3m9c6Hql8sR9POQAcvglxIno23lv/view?usp=sharing) using protocol 656
 
 ## Quick Start
 
 ```bash
-git clone https://github.com/pmbstyle/L2Solo.git
-cd L2Solo
+git clone git@github.com:qwear0/L2Kingdom.git
+cd L2Kingdom
 npm install
 npm start
 ```
 
-That command will start the L2Solo Launcher.
+That command starts the local launcher. Cloning this private fork requires repository access; cloning upstream L2Solo does not provide the current fork's implementation.
 
 Press `Start` in the launcher to run the server. 
 
@@ -331,13 +333,22 @@ benefits from explicit reasoning.
 
 Clan chat uses the same `model` and `partyRouterModel` settings. Names, roles,
 selected clanmates, and follow-up messages are routed first; ambiguous messages
-use the routing model to choose one responder or ask for clarification. Both
-active and background clan bots can reply in the clan channel. This path is
-conversation-only, with no tools or game actions. The clan shares a bounded
+use the routing model to choose one responder or ask for clarification. The
+service supports hot and cached-background candidates, but owned-only startup
+does not run the autonomous background population. Clan chat also supports the
+narrow validated request to join an eligible existing autonomous party; it is
+not a general command channel. See [AI and social behavior](docs/ai-social.md)
+for the action and activation boundaries. The clan shares a bounded
 in-memory conversation history, separate from party chat and private tells;
 it expires after 30 minutes of inactivity and resets on server restart.
 
 ## In-Game Commands
+
+These are implemented command entrypoints, not a promise that every legacy
+scenario is available in owned-only mode. Vassal recruitment/control requires
+character ownership; autonomous-party takeover requires an eligible existing
+party, which current startup does not create. See the [vassal contract](docs/vassals.md)
+and [bot execution boundary](docs/bot-runtime.md).
 
 - `.admin` - open the admin menu.
 - `.sell` - sell all unequipped non-Adena items for 50% item value.

@@ -1,5 +1,10 @@
 # Class gameplay policy
 
+Applicability: shared native policy remains relevant to live vassals, but the
+cold/background consumers below are retained architecture, not enabled
+owned-only services. Start with the [bot execution boundary](../../../../docs/bot-runtime.md)
+and [project map](../../../../docs/README.md) before treating a consumer as active.
+
 `BotClassPolicy` is the initial shared runtime layer for all 89 C4 class stages.
 It reads the existing skill tree once, indexes inherited skill unlocks, and uses
 the existing class equipment profiles. It does not read research files or call

@@ -1,5 +1,12 @@
 # Resource competition in cold and hot simulation
 
+Applicability: this document describes retained population/competition machinery.
+The current owned-only policy bypasses cold workers, ambient competition and
+autonomous background parties; vassals use their native duty/companion paths.
+See the [bot execution boundary](../../../../docs/bot-runtime.md) and
+[project map](../../../../docs/README.md). Settings and historical defaults below
+are not activation guarantees; resolve current values in `PopulationConfig.js`.
+
 ## Configurable PvP aggression
 
 Set `[BotPopulation] pvpAggression` in `config/local.ini` and restart the server.
