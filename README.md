@@ -7,23 +7,70 @@
 
 A private local Lineage II C4 fork of L2Solo, transitioning from an ambient bot population to player-owned vassals.
 
-### Current fork: Castellan and owned vassal duties (P1–P3)
+### Current fork: Castellan and player-owned vassals
 
-Startup now restores only characters registered in `vassals`. Historical bots, clans and inventories remain in SQLite but are not spawned or cold-simulated. Static merchant bots, ambient seeding, autonomous clan planning, legacy population repairs and bot market replay are not started. Ordinary world NPCs and the human market board remain available.
+#### Owned-only world
 
-The retained bot services are registry/lifecycle loading, hot-actor snapshot persistence (every 30 seconds), buffered character writes and existing SQLite checkpoint maintenance. Registered vassals are pinned hot. The effective policy is applied **after** local/environment overrides: population persistence stays enabled; cold/background party/director/ambient jobs and `ClanSimulation` stay off; `staticShotsDisabled` stays false. An old `config/local.ini` cannot restore the previous population.
+Startup restores only characters registered in `vassals`. Historical bots, clans and inventories remain in SQLite but are not spawned or cold-simulated. Static merchant bots, ambient seeding, autonomous clan planning, legacy population repairs and bot market replay are not started. Ordinary NPC services, monsters and the human market board remain available.
 
-`src/GameServer/Lord/` provides atomic, once-per-character Lord enrollment, one-time free level-1 clan eligibility, and owner-authenticated, replayable vassal creation confirmations. Starter skills are a one-time level-20 lineage grant without SP/books; later paid learning is unchanged. Lord equipment is additive and unequipped to preserve existing gear; new vassals receive equipped mid-D kits. Successful confirmations survive publication failures and can be replayed without new rewards or characters. Clan capacity is enforced in SQLite for both vassal creation and ordinary joins. A Lord with vassals cannot be deleted.
+The retained bot services are registry/lifecycle loading, hot-actor snapshot persistence (every 30 seconds), buffered character writes and existing SQLite checkpoint maintenance. Registered vassals stay hot even offscreen or with no player online. The effective policy is applied **after** local/environment overrides: population persistence stays enabled; cold/background party/director/ambient jobs and `ClanSimulation` stay off; `staticShotsDisabled` stays false. Old population settings cannot restore legacy bots. Gathering continues while the server runs, but server downtime grants neither rewards nor rest-countdown credit.
 
-Castellan (stock C4 appearance, server identity `90002`) is permanently registered beside Bella in Gludio at `-12500, 122816, -3114`. His NPC dialogs offer Lord enrollment, the free level-1 clan grant, race/sex/base-class/first-profession vassal selection (Bow/Dagger for mixed classes), replayable creation confirmation, a paginated owned roster, saved duty orders and clan storage. Clan viewing uses the existing privilege; only the leader can withdraw. Autonomous equipment distribution does not consume stock from Lord-led clans. His paid NPC shop sells the starter consumables, D soulshots/blessed spiritshots, Bone Arrows, skill reagents, the approved upgraded healing/cure/speed potions and blessed escape/resurrection scrolls at normal progression-scaled template prices (no Mana Potion); ordinary grocers still do not sell graded shots. Player shop opening and purchase validate physical Castellan contact and the current quote. Vassals physically approach his real spawn to buy recurring supplies with their own Adena; cargo deposits use an ordinary warehouse keeper.
+#### Castellan, Lord enrollment and creation
 
-Vassal duties now execute through real hot actors, including when no player is online. Gathering is restricted to the selected authored Gludio/Gludin spawn polygons (Ruins of Agony/Despair, Abandoned Camp, Langk Lizardmen and Wasteland), with existing target safety, combat, Spoil/Sweep and recovery. No safe targets produces an explicit state instead of selecting another hunting area. Owned movement does not use the legacy offscreen coordinate-warp shortcut.
+Castellan (stock C4 appearance, server identity `90002`) stands beside Bella in Gludio at `-12500, 122816, -3114`. Speak to him for Lord enrollment, clan creation/eligibility, vassal creation, the paginated owned roster and orders, supplies and clan storage. Actions require physical NPC contact and server-side eligibility checks.
 
-Only the owner can invite/control a vassal. Party admission preserves the gather order and area. Separation, dismissal, party dissolution or owner disconnect starts **60 seconds of safe seated rest**, then resumes that same area. Threats pause the countdown; death/restart repeats the full minute if resumption is pending. Re-invitation cancels the live countdown, and a new explicit order invalidates old continuations. Return/service ends party play; a new gather order in party waits for separation. Non-gathering companions return to Castellan after separation. Bow/Dagger preferences govern mixed-class tactics/equipment/supplies and select the matching legal level-40 profession; specialized classes then govern normally.
+- **Lord enrollment is once per character.** It raises the character to at least level 20, selects a legal first profession only for a base-class character, and adds a full top-D kit, starter supplies and 1,000,000 Adena. Higher levels/professions, existing skills and items are preserved; reward equipment is added **unequipped**. Level-20 lineage skills are granted without SP/books; later paid learning is unchanged.
+- **Free clan eligibility is one-time.** A Lord may create a level-1 clan or raise their existing level-0 clan to level 1. Higher upgrades retain normal rules. Vassal creation requires the Lord to lead an active level-1+ clan without the applicable clan penalties/cooldowns.
+- **A new vassal is free**, level 20, with equipped mid-D gear, legal starter skills, supplies and 100,000 Adena. Choose race, sex, base class and first profession; the name is generated. Creation consumes a normal clan slot. There is **no extra vassal cap beyond clan capacity**: a level-1 clan containing only its Lord has room for 14 vassals. Ordinary members also consume slots.
+- **Confirmations are replayable.** Retrying the same successful creation confirmation returns the same character, including after a live-publication failure. Only a new explicit confirmation creates another vassal. Reopening enrollment or relogging never repeats the Lord gift. Clan capacity is enforced in SQLite for both creation and ordinary joins.
+- **Bow/Dagger** is available for Rogue, Elven Scout and Assassin without changing their first profession. A vassal's saved choice governs tactics, equipment and supplies, then selects the matching legal level-40 profession. The specialized class governs normally afterwards.
+- Ownership is character-based: only the owner can invite/control/order the vassal. A Lord who still owns vassals cannot be deleted. Creation, grants and duty persistence live in `src/GameServer/Lord/`.
 
-Town visits buy affordable standard supplies by priority, then atomically deposit eligible loot/spare equipment and Adena above 100,000 into the original bound clan warehouse. Working gear/supplies remain; there is no clan cash top-up, personal storage, automatic resource sale or premium-potion substitution. Bow attacks consume real arrows/MP; potions and charges consume actual inventory. Cures apply only to eligible debuffs, stronger speed buffs are preserved, and Quick Healing Potions remain emergency healing even during an active healing-over-time effect. Missing optional stock does not force repeated town trips; an unaffordable required supply has an explicit waiting state. Return uses a normal escape-scroll cast or walking, deposits when eligible, then walks to Castellan. Lost clan eligibility cancels gathering, retains cargo and returns to service without an impossible deposit or automatic rebinding.
+Both equipment tiers include a compatible weapon, shield where appropriate, full armor coverage, a necklace, two rings and two earrings, without enchants. Starter quantities for both Lords and vassals are:
 
-P3 has syntax/source verification only: physical routes, client dialogs, combat outcomes and the timed rest still need user-run gameplay checks. Geodata preparation/final delivery (P4) remains pending. No server has been started/restarted or live database migration applied during development; migration runs on the next separately authorized server startup.
+| Supply | Initial quantity |
+| --- | ---: |
+| Healing Potion / Quick Healing Potion | 100 / 10 |
+| Antidote / Bandage / Haste Potion (movement) | 20 each |
+| Scroll of Escape / Scroll of Resurrection | 20 / 10 |
+| Potion of Alacrity (physical) or Magic Haste Potion (caster) | 20 |
+| D Soulshots (physical) or D Blessed Spiritshots (caster) | 5,000 |
+| Bone Arrows (bow kits only) | 5,000 |
+
+Spirit Ore, Soul Ore and D crystals are granted/retained/restocked only when learned skills require them, not as a universal bundle. Recurring restock minima/targets are separate from these one-time starter counts.
+
+#### Orders and party play
+
+Gathering uses only the selected authored Gludio/Gludin spawn polygons: Ruins of Agony, Ruins of Despair, Abandoned Camp, Langk Lizardmen and Wasteland. The menu shows monster levels and disables unsuitable areas. Existing target safety, combat, Spoil/Sweep and recovery remain in use. No safe targets produces an explicit state rather than switching areas. Duty travel uses real pathfinding, not legacy offscreen coordinate warps.
+
+Owner party invitations retain normal companion combat/support roles and **preserve the gather order and area**. Separation, dismissal, party dissolution or owner disconnect starts **60 seconds of safe seated rest at the current location**, without a town/warehouse trip, then resumes the same area. Threats pause the countdown; death or restart repeats the full minute if resumption is pending. Re-invitation cancels the live countdown; the next separation starts a fresh minute. Failed admission does not change the duty or start a rest.
+
+A new explicit order wins over old travel/rest continuations. Return/service ends party play; a new gather order in party waits for separation and rest. Non-gathering companions return to Castellan after separation; an interrupted return resumes rather than becoming free hunting. Orders and ownership survive restart. Ordinary gatherers resume normally; interrupted gatherers repeat the full safe minute without reconstructing the old party.
+
+#### Supplies and clan cargo
+
+Castellan's paid shop sells all starter supplies, D soulshots/blessed spiritshots, Bone Arrows and skill reagents at normal progression-scaled template prices. Shop-only extras are Greater Healing Potion, Greater Antidote, Emergency Dressing, Greater Swift Attack Potion, Greater Magic Haste Potion, Blessed Scroll of Escape and Blessed Scroll of Resurrection. **Mana Potion is not included** in his shop or starter kits; its availability elsewhere is unchanged. Ordinary grocers still do not sell graded shots. Player purchases validate physical contact and the current quote; vassals physically approach Castellan and spend their own Adena, with no remote purchases.
+
+Town visits buy affordable standard supplies by priority, then atomically deposit eligible loot/spare equipment and **Adena above 100,000** at an ordinary warehouse keeper into the original bound clan warehouse. This is a retained cash limit at deposit, not a hunting-wallet cap or automatic top-up. Working gear/supplies remain; there is no clan withdrawal, personal-storage diversion, automatic resource sale or premium substitution. Clan viewing uses the existing privilege; only the leader can withdraw. Autonomous equipment distribution does not consume Lord-led clan stock.
+
+Bow attacks consume real arrows/MP; potions and charges consume inventory. Cures apply only to eligible debuffs, stronger speed buffs are preserved, and Quick Healing Potions remain emergency healing even during healing-over-time. Missing optional resurrection/speed supplies does not block a viable outing or force repeated town trips; unaffordable required supplies produce an explicit waiting state rather than free refills.
+
+Return uses a normal escape-scroll cast or walking, deposits when eligible, then walks to Castellan. Empty cargo/no excess cash needs no transfer. Losing the original clan membership/owner leadership or clan eligibility cancels gathering, retains cargo and returns the vassal to service with a reason, without an impossible-deposit loop or automatic clan rebinding. Restoring eligibility does not silently restart the cancelled gather order.
+
+#### Delivery and manual acceptance
+
+P1–P4 implementation/preparation is complete; geodata has been installed locally through the pinned-checksum bootstrap. **Gameplay acceptance is still pending user testing.** Syntax/source checks do not establish physical routes, client dialogs, combat, inventory effects or timing. No server start/restart or live-world migration was performed for these phases; migration runs on the next separately authorized startup.
+
+Before applying migration to an irreplaceable saved world, arrange a separately authorized stop of writers and a consistent, readable backup under `/data/!backups/L2Siege/`. Do not copy only a live SQLite main file while ignoring its WAL. A new empty world needs no backup.
+
+After a separately requested launch, manually verify:
+
+1. Castellan appears beside Bella with normal NPCs/mobs and no legacy bots, including delayed seeding or finder invitations.
+2. Two independent Lords receive correct one-time kits; replay/relogin grants nothing twice. Invalid/full-clan creation fails cleanly; duplicate confirmation creates exactly one vassal. Another Lord cannot control it.
+3. Caster/melee/Bow/Dagger/Scavenger gear, skills, supplies and paid physical purchases work; Mana Potion is absent. Consumables have the intended effects and spend actual items/Adena.
+4. Gathering stays in the chosen area, including offscreen/owner offline, and uses actual combat/Spoil/Sweep. Party roles work; separation rests for a safe minute before resuming. Re-invites, threats, death and new orders invalidate or pause the right actions.
+5. Restock/return physically reach the seller and warehouse, preserve working stock and deposit only eligible cargo/excess cash. Empty deposits succeed; interrupted/repeated operations do not duplicate items or revive stale orders. Lost clan eligibility retains cargo and returns with a reason.
+6. After an authorized restart, consumed grants, ownership, clan binding, inventory, loadout and duties persist; pending party interruptions repeat the full safe minute without downtime rewards. Owner deletion remains refused while vassals exist.
 
 The cold/hot/static descriptions and feature checklist below describe the upstream systems, not services enabled by this fork's owned-only startup.
 
@@ -210,7 +257,9 @@ On the first server start, L2Solo checks `data/Geodata`. If the region files are
 npm run geodata
 ```
 
-Custom mirrors and external geodata directories can be configured with `L2NODE_GEODATA_URL`, `L2NODE_GEODATA_SHA256`, and `L2NODE_GEODATA_DIR`.
+The default archive is pinned to SHA-256 `044e5507c3f0f55785a4698fec3ebd5e0e69bc9cce5bd5b669b8758c4a43f26d`. Preparation checks for at least 203 region files plus the expected sizes of three required files; a nonempty incomplete directory is rejected rather than overwritten. A complete directory is reused without downloading. Geodata stays local and is Git-ignored.
+
+`L2NODE_GEODATA_DIR` overrides the geodata directory for both preparation and runtime; it is not an INI setting. `L2NODE_GEODATA_URL` selects a mirror, while `L2NODE_GEODATA_SHA256` supplies an explicitly trusted alternate checksum. Leave them unset for the pinned default archive.
 
 ## Configuration
 
