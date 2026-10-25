@@ -379,12 +379,12 @@ function moveTo(session, actor, coords) {
         // A* synchronously stalls the game loop when several hot bots navigate
         // a city at once, so share the bounded companion worker pool for those
         // expensive autonomous routes as well.
-        const useWorkerPathfinding = isCompanion || pathMaxNodes > COMPANION_PATH_MAX_NODES;
+        const useWorkerPathfinding = isCompanion || !!session.vassal || pathMaxNodes > COMPANION_PATH_MAX_NODES;
         const useSegmentedTownRoute = pathMaxNodes > COMPANION_PATH_MAX_NODES;
         const townName = useSegmentedTownRoute && TownNavigation.enabled()
             ? TownTransitPolicy.routeTown({ locX: startX, locY: startY, locZ: startZ }, requestedTo) : null;
 
-        if (!townName && shouldUseLowLodWarp({
+        if (!session.vassal && !townName && shouldUseLowLodWarp({
             startDistance: distanceToPlayer,
             destinationDistance: destinationDistanceToPlayer,
             isCompanion,

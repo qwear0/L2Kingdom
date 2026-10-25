@@ -32,9 +32,15 @@ function townFor(actor) {
 }
 function clearQuote(playerSession) { quotes.delete(id(playerSession)); }
 
+function ownedProviderAllowed(playerSession, providerSession) {
+    return !providerSession?.vassal || providerSession.partyCompanion === true
+        && providerSession.followPlayerSession === playerSession
+        && require('../../Lord/VassalService').owns(id(playerSession), id(providerSession));
+}
 function buildQuote(playerSession, providerSession, { trade = null } = {}) {
     const player = playerSession?.actor, provider = providerSession?.actor;
     if (!player || !provider || !id(playerSession) || !id(providerSession)) return { ok: false, reason: 'Select a nearby buffer.' };
+    if (!ownedProviderAllowed(playerSession, providerSession)) return { ok: false, reason: 'This vassal only takes requests from its Lord in party.' };
     if (player.isDead?.() || provider.isDead?.() || player.state?.fetchCombats?.() || provider.state?.fetchCombats?.()) {
         return { ok: false, reason: 'Buff service is unavailable during combat.' };
     }
@@ -117,6 +123,7 @@ function waitForCast(milliseconds) {
 
 function castInterrupted(playerSession, providerSession, player, provider, skill) {
     return playerSession.actor !== player || providerSession.actor !== provider
+        || !ownedProviderAllowed(playerSession, providerSession)
         || player.isDead?.() || provider.isDead?.()
         || player.state?.fetchCombats?.() || provider.state?.fetchCombats?.()
         || !skillInRange(provider, player, skill)
@@ -125,6 +132,7 @@ function castInterrupted(playerSession, providerSession, player, provider, skill
 
 async function castPaidBuff(playerSession, providerSession, skill, wait = waitForCast) {
     const player = playerSession.actor, provider = providerSession.actor;
+    const vassalEpoch = providerSession.vassalEpoch;
     const calculated = provider.attack?.calculatedSkillHitTime?.(provider, skill, skill.fetchSpell?.());
     if (Number.isFinite(calculated)) skill.setCalculatedHitTime?.(calculated);
     const reported = Number(skill.fetchCalculatedHitTime?.() ?? skill.fetchHitTime?.());
@@ -133,7 +141,8 @@ async function castPaidBuff(playerSession, providerSession, skill, wait = waitFo
     if (invoke('GameServer/Bot/Population/PopulationConfig').developerDiagnostics === true) console.info('BuffService :: cast started player=%s provider=%s skill=%d castMs=%d',
         player.fetchName?.() || player.fetchId(), provider.fetchName?.() || provider.fetchId(), skill.fetchSelfId(), castMs);
     await wait(castMs);
-    if (castInterrupted(playerSession, providerSession, player, provider, skill)) {
+    if (providerSession.vassal && providerSession.vassalEpoch !== vassalEpoch
+        || castInterrupted(playerSession, providerSession, player, provider, skill)) {
         if (invoke('GameServer/Bot/Population/PopulationConfig').developerDiagnostics === true) console.info('BuffService :: cast interrupted player=%s provider=%s skill=%d',
             player.fetchName?.() || player.fetchId(), provider.fetchName?.() || provider.fetchId(), skill.fetchSelfId());
         return { effect: null, interrupted: true };

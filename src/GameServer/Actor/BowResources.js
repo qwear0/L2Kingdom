@@ -11,9 +11,10 @@ function reject(session, actor, message) {
     return false;
 }
 
-// Player inventory costs only: bot ammunition provisioning is not implemented.
+// Owned vassals use the same physical ammunition/MP contract as players.
+// Historical ambient bots retain their old provisioning policy.
 function consume(session, actor, rng = Math.random) {
-    if (session.botSession) return true;
+    if (session.botSession && !session.vassal) return true;
     const backpack = actor.backpack;
     const weapon = backpack.fetchEquippedWeapon?.();
     const arrowId = ARROWS[String(weapon?.fetchRank?.() || '').toLowerCase()];
@@ -31,4 +32,4 @@ function consume(session, actor, rng = Math.random) {
     return true;
 }
 
-module.exports = { consume };
+module.exports = { consume, ARROWS };

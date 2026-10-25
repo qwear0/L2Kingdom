@@ -246,14 +246,18 @@ function actorInventory(actor) {
 function tryUseInCombat(session, actor, target, options = {}) {
     if (!session || !actor || !targetAlive(target) || actor.state?.fetchDead?.()) return null;
     const activeHot = activePotionHot(actor);
-    if (actor.state?.fetchCasts?.() || (activeHot && !options.pvp)) return null;
+    if (actor.state?.fetchCasts?.()) return null;
+    const quickEmergency = session.vassal && Number(actor.fetchHp()) / Math.max(1, Number(actor.fetchMaxHp())) <= QUICK_USE_HP_RATIO
+        && amountInInventory(actorInventory(actor), 1540) > 0;
+    if (activeHot && !options.pvp && !quickEmergency) return null;
 
     const targetId = Number(target.fetchId?.() ?? target.id ?? 0);
     const encounter = session.healingPotionEncounter?.targetId === targetId
         ? session.healingPotionEncounter
         : { targetId, used: 0 };
     session.healingPotionEncounter = encounter;
-    if (encounter.used >= Number(options.pvp ? Infinity : options.maxUses ?? MAX_USES_PER_ENCOUNTER)) return null;
+    if (!(quickEmergency && session.vassal)
+        && encounter.used >= Number(options.pvp ? Infinity : options.maxUses ?? MAX_USES_PER_ENCOUNTER)) return null;
 
     const inventory = actorInventory(actor);
     const potion = selectPotion(inventory, actor.fetchHp?.(), actor.fetchMaxHp?.(), actor, { ...options, activeHot });

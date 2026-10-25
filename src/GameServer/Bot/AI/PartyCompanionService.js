@@ -876,6 +876,7 @@ function detachState(companionSession, plan = 'hunting', preserveTakeover = fals
     companionSession.partyPuller = false;
     companionSession.roleDecision = null;
     companionSession.actor?.unselect?.();
+    if (companionSession.vassal) require('./VassalOrders').separated(companionSession);
 }
 
 function clearPullerIfDetached(leaderSession, companionSession) {
@@ -1072,6 +1073,9 @@ const PartyCompanionService = {
         if (roster.length < 2 || roster.length > MAX_COMPANIONS || new Set(roster).size !== roster.length) {
             return { ok: false, reason: 'invalid_party_roster' };
         }
+        if (roster.some(member => require('../../Lord/VassalService').find(member?.actor?.fetchId?.()))) {
+            return { ok: false, reason: 'owned_roster_requires_individual_admission' };
+        }
         const expectedPartyId = options.expectedBackgroundPartyId || null;
         for (const companionSession of roster) {
             const bot = companionSession?.actor;
@@ -1163,16 +1167,47 @@ const PartyCompanionService = {
         return { ok: true, reason: 'party_taken_over', count: roster.length };
     },
 
-    attach(leaderSession, companionSession, options = {}) {
+    async attach(leaderSession, companionSession, options = {}) {
         const leader = leaderSession?.actor;
         const bot = companionSession?.actor;
-        if (!leader || !bot) return false;
+        if (!leader || !bot || leader.isDead?.() || bot.isDead?.() || leader.fetchIsOnline?.() === false) return false;
+        const Registry = require('../../Lord/VassalService');
+        const owned = Registry.find(bot.fetchId());
+        if (owned && (!Registry.owns(leader.fetchId(), bot.fetchId()) || !require('./VassalOrders').clanEligible(companionSession)
+            || companionSession.vassalAdmission
+            || companionSession.vassalOperation || companionSession.vassalReceipt || companionSession.activeTrade
+            || companionSession.trade || companionSession.activeNegotiation
+            || companionSession.partyCompanion || companionSession.followPlayerSession)) return false;
         if (!require('../../AfkTrade/TradeMeetingService').canJoinParty(bot.fetchId(), companionSession.coldLifeState, companionSession)) return false;
         // An autonomous hot roster has one lifecycle owner. Do not leave its
         // other actors orphaned by attaching a single member to a player.
         if (companionSession.hotBackgroundPartyId || companionSession.hotCompetitionCommit) return false;
         const reservation = options.capacityReservation || companionSession;
         if (!hasCapacity(leaderSession, companionSession, reservation)) return false;
+        if (owned) {
+            const valid = () => {
+                if (leaderSession.actor !== leader || companionSession.actor !== bot || leader.isDead() || bot.isDead()
+                    || leader.fetchIsOnline?.() === false || companionSession.partyCompanion || companionSession.followPlayerSession
+                    || companionSession.vassalOperation || companionSession.activeTrade || companionSession.trade
+                    || companionSession.activeNegotiation || !require('./VassalOrders').clanEligible(companionSession)
+                    || !hasCapacity(leaderSession, companionSession, reservation)) throw Error('vassal_admission_changed');
+            };
+            companionSession.vassalAdmission = true;
+            let marked = null;
+            try {
+                if (owned.order === 'gather' && !owned.gatherResumePending) {
+                    marked = await Registry.resumeMarker(owned, true, valid);
+                    if (!marked) return false;
+                    valid();
+                } else valid();
+                require('./VassalOrders').invalidate(companionSession);
+            } catch (error) {
+                if (marked && marked.gatherResumePending !== owned.gatherResumePending)
+                    await Registry.resumeMarker(marked, owned.gatherResumePending);
+                utils.infoWarn('Vassal', 'party admission rejected: %s', error.message);
+                return false;
+            } finally { companionSession.vassalAdmission = false; }
+        }
         releaseCapacity(leaderSession, reservation);
 
         const previousLeader = companionSession.followPlayerSession;
@@ -1190,6 +1225,7 @@ const PartyCompanionService = {
         }
 
         restoreJoiningCompanion(companionSession, bot);
+        if (owned) companionSession.vassalStatus = 'in_owner_party';
         companionSession.plan = 'following';
         companionSession.followPlayerSession = leaderSession;
         companionSession.partyCompanion = true;

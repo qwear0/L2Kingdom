@@ -27,6 +27,9 @@ function nextClass(classId, level, seed) {
         return pick(ClassProgression.firstProfMap[current], seed, 'first', current);
     }
     if (currentLevel >= 40 && ClassProgression.secondProfMap[current]) {
+        const preference = require('../Lord/VassalService').find(seed)?.loadoutPreference;
+        const branch = ({ 7: { dagger: 8, bow: 9 }, 22: { dagger: 23, bow: 24 }, 35: { dagger: 36, bow: 37 } })[current];
+        if (preference && branch) return branch[preference];
         return pick(ClassProgression.secondProfMap[current], seed, 'second', current);
     }
     if (currentLevel >= 76) {

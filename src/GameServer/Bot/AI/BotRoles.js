@@ -91,6 +91,11 @@ function isCrafterClass(value) {
 
 function inferRole(value) {
     const classId = roleClassId(value);
+    if ([7, 22, 35].includes(classId)) {
+        const id = value?.fetchId?.() ?? value?.characterId;
+        const preference = id && require('../../Lord/VassalService').find(id)?.loadoutPreference;
+        if (preference) return preference === 'bow' ? 'archer' : 'dagger';
+    }
     if (classId === null || classId === undefined) return 'dps';
 
     if (isSpoiler(value)) return 'spoiler';
@@ -108,6 +113,7 @@ function isRole(value, role) {
     if (role === 'spoiler') return isSpoiler(value);
     if (role === 'crafter' && isSpoiler(value)) return false;
     const classId = roleClassId(value);
+    if ([7, 22, 35].includes(classId) && ['archer', 'dagger'].includes(role)) return inferRole(value) === role;
     const classes = ROLE_CLASSES[role];
     return !!classes && classes.includes(classId);
 }

@@ -698,7 +698,7 @@ const World = {
             return false;
         }
 
-        const attachCompanion = (withdrawal = null) => {
+        const attachCompanion = async (withdrawal = null) => {
             const attachOptions = {};
             // A delayed invite must not overwrite a newer client setting.
             if (!session.clientPartyLootDistributionKnown && distribution !== undefined && distribution !== null) {
@@ -706,7 +706,7 @@ const World = {
             }
             attachOptions.capacityReservation = capacityReservation;
 
-            if (!PartyCompanionService.attach(session, targetSession, attachOptions)) {
+            if (!await PartyCompanionService.attach(session, targetSession, attachOptions)) {
                 PartyCompanionService.releaseCapacity(session, capacityReservation);
                 BotSocialMemory.recordEvent(session, targetSession, 'party_refused', 'party_full');
                 session.dataSendToMe(ServerResponse.joinParty(0));
@@ -1004,6 +1004,8 @@ const World = {
         }
         return LifeState.findByName(name).then((state) => {
             if (!state) return false;
+            const Registry = require('../Lord/VassalService');
+            if (Registry.find(state.characterId) && !Registry.owns(actor.fetchId(), state.characterId)) return false;
             return BotFriendship.isFriend(session, state.characterId).then((friend) => {
                 if (!friend) return false;
                 const hotSession = BotManager.findSessionByName(name);

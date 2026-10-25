@@ -125,6 +125,11 @@ function beginEscape(session, bot, town, options = {}) {
 
     setTimeout(() => {
         if (session.townEscape?.token !== token) return;
+        if (options.isCurrent && !options.isCurrent()) {
+            session.townEscape = undefined;
+            bot.state.setCasts(false);
+            return;
+        }
         if (bot.isDead() || hasCombatThreat(session, bot) || !bot.state.fetchCasts()) {
             bot.state.setCasts(false);
             session.townEscape = undefined;
@@ -210,7 +215,8 @@ function request(session, bot, BotAI, reason, options = {}) {
 
     bot.moveTo({
         from: { locX: bot.fetchLocX(), locY: bot.fetchLocY(), locZ: bot.fetchLocZ() },
-        to: { locX: town.x, locY: town.y, locZ: town.z }
+        to: { locX: town.x, locY: town.y, locZ: town.z },
+        ...(session.vassal ? { pathMaxNodes: 120000 } : {})
     });
     return 'walk';
 }

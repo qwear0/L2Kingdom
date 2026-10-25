@@ -52,6 +52,7 @@ function hideForSupply(session, bot) {
 }
 
 function request(session, playerSession, itemSelfId, requestedAmount) {
+    if (session?.vassal) return { ok: false, reason: 'physical_vassal_seller_required' };
     const bot = session?.actor;
     const player = playerSession?.actor;
     const selfId = Number(itemSelfId || 0);

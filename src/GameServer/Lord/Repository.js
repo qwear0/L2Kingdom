@@ -168,7 +168,8 @@ function repository({ one, all, write, run, inTransaction, withCharacterFlush })
                 }
                 const result = write(`UPDATE vassals SET "order" = ?, areaId = ?, gatherResumePending = ?,
                     orderRevision = orderRevision + 1, updatedAt = ? WHERE characterId = ? AND ownerCharacterId = ? AND orderRevision = ?`,
-                [order, areaId, gatherResumePending ? 1 : 0, Date.now(), characterId, ownerCharacterId, revision]);
+                [order, areaId, (typeof gatherResumePending === 'function' ? gatherResumePending() : gatherResumePending) ? 1 : 0,
+                    Date.now(), characterId, ownerCharacterId, revision]);
                 return result.affectedRows ? one('SELECT * FROM vassals WHERE characterId = ?', [characterId]) : null;
             }, 'vassal:duty');
         }

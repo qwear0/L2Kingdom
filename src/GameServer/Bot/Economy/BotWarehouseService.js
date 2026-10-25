@@ -127,6 +127,7 @@ async function learnActorRecipes(actor, state = null, session = null, { recipeId
 }
 
 async function depositActorUnlocked(actor, state = null, session = null) {
+    if (require('../../Lord/VassalService').find(actor?.fetchId?.())) throw Error('vassal_clan_warehouse_required');
     const backpack = actor?.backpack;
     if (!backpack || !actor?.fetchId) return { count: 0, items: [] };
 
@@ -153,6 +154,7 @@ function depositActor(actor, state = null, session = null) {
 // The actor's warehouse candidates and the amount of each that may be stored:
 // what the town visit sells to the NPC (npcSale, by selfId) stays in the bag for that sale.
 function storableActorItems(actor, state = null, npcSale = null) {
+    if (require('../../Lord/VassalService').find(actor?.fetchId?.())) return [];
     if (state && invoke('GameServer/Bot/AI/PersonalGearProgression').adventurer(state)) return [];
     const selling = new Map(npcSale || []);
     const rows = [];
@@ -196,6 +198,7 @@ function depositActorAtWarehouse(actor, state, session, target) {
 }
 
 function hasActorWithdrawalCandidates(actor, state) {
+    if (require('../../Lord/VassalService').find(actor?.fetchId?.())) return false;
     return invoke('GameServer/Bot/AI/PersonalGearProgression').adventurer(state)
         && Object.keys(invoke('GameServer/Bot/Economy/PersonalWarehouseIndex').inventory({ characterId: actor?.fetchId?.() })).length > 0;
 }

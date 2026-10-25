@@ -232,6 +232,9 @@ function executeLegacy(session, decision, visiblePlayers) {
 
     const action = decision.action;
     const targetSession = responseTargetSession(decision, visiblePlayers);
+    if (session.vassal && !NON_MUTATING_ACTIONS.has(action)
+        && (!targetSession || !require('../../Lord/VassalService').owns(targetSession.actor.fetchId(), bot.fetchId())
+            || !isPartyCompanionOf(session, targetSession))) return { applied: false, reason: 'not_owned_companion' };
 
     // A chaotic character remains autonomous.  Chat may make it talk, but may
     // never turn it into a callable companion or redirect its hunting route.
@@ -952,6 +955,8 @@ function registerTools() {
             mutating: !['none', 'say', 'list_safe_loadouts', 'list_party_candidates'].includes(name),
             available(session) {
                 if (!session) return true;
+                if (session.vassal && (['shop', 'fetch_resources', 'move_to_spot', 'request_player_join_party'].includes(name)
+                    || !session.partyCompanion && !NON_MUTATING_ACTIONS.has(name))) return false;
                 if (session.plan === 'merchant') {
                     return ['none', 'say'].includes(name) || economyActions.has(name) && economyActionAvailable(session, name);
                 }
@@ -974,10 +979,16 @@ function registerTools() {
                 }
                 return true;
             },
-            authorize: controlActions.has(name)
-                ? isAuthorizedPartyLeader
-                : economyActions.has(name) ? isAuthorizedNegotiationParticipant
-                    : partyJoinActions.has(name) ? isAuthorizedPartyJoinRequester : undefined,
+            authorize(context) {
+                if (context.session?.vassal && !NON_MUTATING_ACTIONS.has(name)) {
+                    const player = context.requestContext?.playerSession;
+                    if (!isAuthorizedPartyLeader(context)
+                        || !require('../../Lord/VassalService').owns(player?.actor?.fetchId(), context.session.actor?.fetchId())) return false;
+                }
+                return controlActions.has(name) ? isAuthorizedPartyLeader(context)
+                    : economyActions.has(name) ? isAuthorizedNegotiationParticipant(context)
+                        : partyJoinActions.has(name) ? isAuthorizedPartyJoinRequester(context) : true;
+            },
             execute(context) {
                 if (executors[name]) return executors[name](context);
                 return executeLegacy(context.session, context.decision, context.visiblePlayers || []);

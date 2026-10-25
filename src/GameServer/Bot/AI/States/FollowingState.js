@@ -886,6 +886,10 @@ const FollowingState = {
         }
 
         if (!playerSession || !playerSession.actor || !playerSession.actor.fetchIsOnline()) {
+            if (session.vassal) {
+                PartyCompanionService.clearCompanion(session, { source: 'owner_disconnected' });
+                return true;
+            }
             session.plan = 'hunting';
             session.roleDecision = null;
             BotAI.say(session, "My companion has disconnected. Heading back to hunt.");
@@ -1303,6 +1307,10 @@ const FollowingState = {
         const { session, bot, BotAI, playerSession, player, role, pulling, partyThreat, currentPartyAggroMonsters, leaderTargetId, hotTownRebuffVisit } = ctx;
         let acted = false;
         let keepRoleDecision = false;
+        if (session.vassal) {
+            Object.assign(ctx, { acted, keepRoleDecision });
+            return false;
+        }
 
         const buffsNeedRefresh = BotBuffs.needsNewbieRefresh(bot);
         if (buffsNeedRefresh) {

@@ -220,6 +220,12 @@ function createTrade(playerSession, botSession, direction, metadata = {}) {
 
 function canStart(playerSession, botSession, { allowMerchant = false } = {}) {
     if (!isRealPlayerSession(playerSession) || !isBotSession(botSession) || !botSession.actor) return 'invalid_target';
+    if (botSession.vassal) {
+        if (!require('../Lord/VassalService').owns(playerSession.actor.fetchId(), botSession.actor.fetchId())) return 'not_owned_vassal';
+        if (botSession.vassalOperation || botSession.vassalReceipt || botSession.vassalAdmission) return 'vassal_busy';
+        if (botSession.actor.isDead() || botSession.currentTargetId || botSession.actor.state.fetchHits()
+            || botSession.actor.state.fetchCasts()) return 'unsafe_combat_state';
+    }
     if (botSession.plan === 'merchant' && !allowMerchant) return 'merchant_store';
     if (actorDistance(playerSession.actor, botSession.actor) > TRADE_RANGE) return 'too_far';
     if (committingTrade(playerSession) || committingTrade(botSession)) return 'trade_committing';

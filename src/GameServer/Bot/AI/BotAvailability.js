@@ -28,6 +28,8 @@ function reasonText(reason) {
         bot_dead: 'dead',
         already_grouped: 'already grouped',
         merchant_duty: 'merchant duty',
+        not_owned_vassal: 'this vassal serves another Lord',
+        vassal_busy: 'finishing a duty transaction',
         relationship_unloaded: 'give me a moment before we decide',
         relationship_hostile: 'we still have a conflict to settle',
         recently_abandoned: 'recently abandoned',
@@ -122,6 +124,17 @@ const BotAvailability = {
         const timestamp = Number(options.timestamp ?? Date.now());
 
         if (!player || !bot) return result;
+        const Registry = require('../../Lord/VassalService');
+        const owned = Registry.find(bot.fetchId());
+        if (owned) {
+            result.distance = distance(actorLocation(player), actorLocation(bot));
+            result.clanmate = sameClan(player, bot);
+            const reason = !Registry.owns(player.fetchId(), bot.fetchId()) ? 'not_owned_vassal'
+                : player.isDead() ? 'player_dead' : bot.isDead() ? 'bot_dead'
+                : botSession.partyCompanion || botSession.followPlayerSession ? 'already_grouped'
+                : botSession.vassalOperation || botSession.vassalAdmission ? 'vassal_busy' : 'available';
+            return { ...result, available: reason === 'available', reason, reasonText: reasonText(reason) };
+        }
         const refusal = options.forceFriend ? null : socialRefusal(result.memory, timestamp);
 
         result.distance = distance(actorLocation(player), actorLocation(bot));
@@ -158,6 +171,9 @@ const BotAvailability = {
         const result = emptyResult(playerSession, state, options);
         const timestamp = Number(options.timestamp ?? Date.now());
         if (!player || !state) return result;
+        const Registry = require('../../Lord/VassalService');
+        if (Registry.find(state.characterId) && !Registry.owns(player.fetchId(), state.characterId))
+            return { ...result, reason: 'not_owned_vassal', reasonText: reasonText('not_owned_vassal') };
         const refusal = options.forceFriend ? null : socialRefusal(result.memory, timestamp);
 
         // With honest travel a trip is no "busy" reason (design 5.9): the

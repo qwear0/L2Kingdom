@@ -268,6 +268,8 @@ function playerLocation(playerSession) {
 }
 
 function activateNearPlayer(playerSession, state) {
+    if (require('../../Lord/VassalService').find(state.characterId))
+        return Promise.resolve({ ok: false, reason: 'owned_vassal_requires_party_invite' });
     const actor = playerSession.actor;
     const run = () => {
         const PopulationService = invoke('GameServer/Bot/Population/PopulationService');

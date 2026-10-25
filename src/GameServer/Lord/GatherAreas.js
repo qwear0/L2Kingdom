@@ -1,6 +1,6 @@
 // Explicit mainland destinations, using authored spawn polygons rather than
-// town-distance/name matching. P3 must also constrain spots and targets to
-// these zones; menu eligibility alone is not a combat-safety decision.
+// town-distance/name matching. Both travel destinations and offensive targets
+// stay in these zones; menu eligibility alone is not a combat-safety decision.
 const AREAS = Object.freeze([
     { id: 'ruins_of_agony', name: 'Ruins of Agony', spawnIds: ['gludio_t18_21_015', 't18_21_028', 'gludio_t18_21_030'] },
     { id: 'ruins_of_despair', name: 'Ruins of Despair', spawnIds: ['gludio_t19_22_062', 'gludio_t19_22_063', 'gludio_t19_22_064'] },
@@ -22,7 +22,24 @@ function list() {
     });
 }
 function find(id) { return list().find(area => area.id === id) || null; }
+function pointOf(actor) {
+    return { locX: Number(actor.fetchLocX?.() ?? actor.locX), locY: Number(actor.fetchLocY?.() ?? actor.locY),
+        locZ: Number(actor.fetchLocZ?.() ?? actor.locZ) };
+}
+function containsZone(zone, value) {
+    const p = pointOf(value), bounds = zone.bounds;
+    if (!bounds?.length || !Object.values(p).every(Number.isFinite)
+        || p.locZ < Math.min(...bounds.map(v => v.minZ)) || p.locZ > Math.max(...bounds.map(v => v.maxZ))) return false;
+    let inside = false;
+    for (let i = 0, j = bounds.length - 1; i < bounds.length; j = i++) {
+        const a = bounds[i], b = bounds[j];
+        if ((a.locY > p.locY) !== (b.locY > p.locY)
+            && p.locX < (b.locX - a.locX) * (p.locY - a.locY) / (b.locY - a.locY) + a.locX) inside = !inside;
+    }
+    return inside;
+}
+function contains(area, value) { return !!area?.zones.some(zone => containsZone(zone, value)); }
 function suitable(area, level) {
     return !!area && Number.isFinite(Number(level)) && area.minLevel <= Number(level) + 3 && area.maxLevel >= Number(level) - 7;
 }
-module.exports = { list, find, suitable };
+module.exports = { list, find, suitable, contains, containsZone, pointOf };

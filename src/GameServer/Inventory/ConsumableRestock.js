@@ -60,6 +60,7 @@ function ensureActorStock(actor, line) {
 // Pays the line's cost from the Adena row, then adds the items. Resolves
 // { ok, nextAdena, nextAmount } or { ok: false, reason: 'missing_adena' }.
 function buyForActor(actor, line) {
+    if (actor.session?.vassal) return Promise.resolve({ ok: false, reason: 'physical_vassal_seller_required' });
     const adenaItem = actor.backpack.fetchItemFromSelfId(57);
     if (!adenaItem) return Promise.resolve({ ok: false, reason: 'missing_adena' });
     if (actor.session?.actor === actor

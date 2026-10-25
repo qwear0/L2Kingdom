@@ -31,6 +31,7 @@ function clear(session, reason = 'cleared') {
 }
 
 function start(session, targetSession, options = {}) {
+    if (session?.vassal) return false;
     if (!session?.actor || !online(targetSession)) return false;
     session.chatArrivalActive = true;
     session.chatArrivalTargetSession = targetSession;

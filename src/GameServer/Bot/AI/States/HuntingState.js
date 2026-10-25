@@ -204,6 +204,7 @@ function findPreferredMonster(session, bot, radius, options = {}) {
     // multiply the expensive claim scan by every NPC in a dense spawn cell.
     const eligibleNearbyNpcs = allNearbyNpcs
         .filter((npc) => !options.excludeTargetId || npc.fetchId() !== options.excludeTargetId)
+        .filter((npc) => !session.vassal || require('../VassalOrders').targetAllowed(session, npc))
         .filter((npc) => !BotRaidSafety.isProtectedRaidEntity(npc))
         .filter((npc) => !invoke('GameServer/Bot/AI/HotResourceCompetition').blockedTarget(session, npc))
         .filter((npc) => BotHuntingTargetPolicy.canHunt(npc))
@@ -599,29 +600,29 @@ module.exports = {
     limitTargetCandidates,
     claimedTargetIds,
     tick(session, bot, Generics, BotAI) {
-        if (session.pendingTownTrip) {
+        if (!session.vassal && session.pendingTownTrip) {
             const trip = startShopping(session, bot, BotAI, session.pendingTownTrip.reason);
             if (trip !== 'deferred') return;
         }
 
         const floor = SurvivalFloor.forActor(bot);
-        if (isSoloHunter(session)) DecisionEvents.observe(session, bot);
-        if (floor?.action === 'rest') {
+        if (!session.vassal && isSoloHunter(session)) DecisionEvents.observe(session, bot);
+        if (floor?.action === 'rest' && !(session.vassal && PartyAwareness.npcThreateningActor(session))) {
             TownNpcApproach.reset(session);
             bot.automation.abortAll(bot);
             session.plan = 'resting';
             return;
         }
-        if (floor?.action === 'unload' && isSoloHunter(session)) {
+        if (!session.vassal && floor?.action === 'unload' && isSoloHunter(session)) {
             const trip = startShopping(session, bot, BotAI, `Inventory ${floor.reason}. Heading to town.`);
             if (trip !== 'deferred') return;
         }
 
-        if (leaveShop(session, bot)) return;
+        if (!session.vassal && leaveShop(session, bot)) return;
 
         // 1. Expire buffs check for hunting bots. A hot bot already in a
         // starter town also refreshes once per visit before going back out.
-        if (!session.followPlayerSession) {
+        if (!session.vassal && !session.followPlayerSession) {
             const townBuffVisit = HotTownRebuff.syncVisit(session, bot, BotAI);
             const townVisitNeedsRebuff = HotTownRebuff.needsVisit(session, townBuffVisit)
                 && Number(session.newbieGuideRetryAt || 0) <= Date.now();
@@ -641,7 +642,7 @@ module.exports = {
             }
         }
 
-        if (isSoloHunter(session) && Number(session.companionEquipmentRetryAt || 0) <= Date.now()) {
+        if (!session.vassal && isSoloHunter(session) && Number(session.companionEquipmentRetryAt || 0) <= Date.now()) {
             const economy = economyForHunt(session, bot);
             const wealthCraft = require('../../Economy/HotWealthCraftService');
             if (wealthCraft.canStart(session, economy.network.activity)) {
@@ -843,7 +844,7 @@ module.exports = {
         // Recovery above intentionally wins so a bot cannot walk while dying.
         if (tickSpotRelocation(session, bot)) return;
 
-        if (isSoloHunter(session)) {
+        if (!session.vassal && isSoloHunter(session)) {
             const currentGround = currentHuntingGround(session, bot);
             const groundSafety = currentGround
                 ? BotHuntingGroundPolicy.evaluate(currentGround, { level: bot.fetchLevel() }, {
@@ -875,7 +876,7 @@ module.exports = {
 
         if (invoke('GameServer/Bot/AI/PendingSweep').tick(session, bot, Generics, BotAI)) return;
 
-        if (sellTripDue(session, bot)) {
+        if (!session.vassal && sellTripDue(session, bot)) {
             const closestTown = BotAI.getClosestTown(bot.fetchLocX(), bot.fetchLocY(), bot.fetchLocZ());
             pauseSelling(session);
             const trip = startShopping(session, bot, BotAI, `My bags are full of loot. Heading to ${closestTown.name} to sell and restock.`);
@@ -885,8 +886,9 @@ module.exports = {
         // 5. Hunt/Attack Combat execution
         if (session.currentTargetId) {
             const targetId = session.currentTargetId;
+            const dutyCurrent = session.vassal ? require('../VassalOrders').executionFence(session) : () => true;
             World.fetchUser(targetId).then((targetActor) => {
-                if (session.currentTargetId !== targetId) return;
+                if (!dutyCurrent() || session.currentTargetId !== targetId) return;
                 if (targetActor && targetActor.fetchIsOnline() && !targetActor.state.fetchDead()) {
                     if (bot.state.fetchTowards() || bot.state.fetchHits() || bot.state.fetchCasts()) {
                         return;
@@ -897,7 +899,12 @@ module.exports = {
                 }
             }).catch(() => {
                 World.fetchNpc(targetId).then((npc) => {
-                    if (session.currentTargetId !== targetId) return;
+                    if (!dutyCurrent() || session.currentTargetId !== targetId) return;
+                    if (session.vassal && !require('../VassalOrders').targetAllowed(session, npc)) {
+                        bot.automation.abortAll(bot);
+                        clearTarget(session, bot, targetId);
+                        return;
+                    }
                     if (BotRaidSafety.isProtectedRaidEntity(npc)) {
                         clearTarget(session, bot, targetId);
                         session.lastDecision = {
@@ -975,11 +982,11 @@ module.exports = {
                         BotAI.executeCombat(session, bot, npc, Generics);
                     }
                 }).catch(() => {
-                    clearTarget(session, bot, targetId);
+                    if (dutyCurrent()) clearTarget(session, bot, targetId);
                 });
             });
         } else {
-            reconcilePhysicalSpot(session, bot);
+            if (!session.vassal) reconcilePhysicalSpot(session, bot);
             // Prefer unclaimed mobs so solo bots do not form accidental trains.
             const closestMonster = findPreferredMonster(session, bot, 2500, {
                 readyOnly: isSoloHunter(session)
@@ -1003,6 +1010,7 @@ module.exports = {
                 }
                 BotAI.executeCombat(session, bot, closestMonster, Generics);
             } else {
+                if (session.vassal) { require('../VassalOrders').noTarget(session); return; }
                 if (session.huntTargetScanPending) return;
                 if (isSoloHunter(session) && session.lastEncounterReadiness?.ready === false) {
                     beginVoluntaryRecovery(session, bot, BotAI, session.lastEncounterReadiness);

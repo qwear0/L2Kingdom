@@ -1198,6 +1198,24 @@ const BotManager = {
     applyPlayerSpeechRules(speech, session, distance, directCommandTarget) {
         const { playerSession, rawText, text, player } = speech;
         const bot = session.actor;
+        if (session.vassal && directCommandTarget) {
+            const Registry = require('../Lord/VassalService');
+            const command = /follow|за мной|помоги/.test(text) ? 'follow_player'
+                : /stop|стой|wait/.test(text) ? 'stay_here'
+                : /hunt|иди качайся|кач/.test(text) ? 'hunt'
+                : /heal|хил/.test(text) ? 'heal_target' : /buff|бафф/.test(text) ? 'buff_target' : null;
+            if (command) {
+                if (!Registry.owns(player.fetchId(), bot.fetchId()) || !session.partyCompanion
+                    || session.followPlayerSession !== playerSession) {
+                    this.botTell(session, playerSession, 'Only my Lord can command me in party. Use Castellan for duties.');
+                    return true;
+                }
+                invoke('GameServer/Bot/AI/BotAgentTools').execute(session, {
+                    action: command, confidence: 1, targetPlayerName: player.fetchName()
+                }, [{ id: player.fetchId(), name: player.fetchName() }], { playerSession });
+                return true;
+            }
+        }
         let handledByRule = false;
         if (directCommandTarget && INSULT_PATTERN.test(rawText)) {
             handledByRule = true;
@@ -1300,6 +1318,8 @@ const BotManager = {
         const bot = botSession?.actor;
         const player = playerSession?.actor;
         if (!bot || !player) return false;
+        if (botSession.vassal && (!require('../Lord/VassalService').owns(player.fetchId(), bot.fetchId())
+            || !botSession.partyCompanion || botSession.followPlayerSession !== playerSession)) return false;
 
         if (distance > DIRECT_SUPPORT_RANGE) {
             this.botTell(botSession, playerSession, `You're too far for me to cast safely.`);

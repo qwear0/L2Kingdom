@@ -35,7 +35,7 @@ const ERRORS = {
     invalid_loadout: 'Select a legal weapon preference.',
     not_owned_vassal: 'That vassal does not belong to this character.',
     vassal_order_changed: 'The order changed. Reopen the roster before issuing a new order.',
-    vassal_in_party: 'Dismiss this vassal from its party before changing its duty.',
+    vassal_busy: 'The vassal is finishing a transaction or party admission. Reopen and retry.',
     vassal_clan_ineligible: 'Owner and vassal must still belong to the original active level-1+ clan led by the owner.',
     unsuitable_gather_area: 'This area is not suitable for the vassal level.',
     invalid_vassal_order: 'Invalid order.',
@@ -93,7 +93,7 @@ function home(session) {
         + link('Create / raise clan to level 1', 'clan')
         + link('Create a vassal', 'create') + link('My vassals', 'roster')
         + link('Clan warehouse', 'warehouse') + link('Buy supplies', 'shop')
-        + '<br>Physical duties and party integration arrive in P3. Orders saved here do not yet start autonomous travel or gathering.';
+        + '<br>Gathering continues while the server runs. Party play preserves the assigned area; separation starts one minute of safe seated rest.';
 }
 function enrollment(session, target = null, loadout = null) {
     const source = Number(session.actor.fetchClassId());
@@ -138,7 +138,7 @@ async function vassal(session, id) {
     const row = owned(session, id), character = (await characters(session)).find(entry => Number(entry.id) === id);
     if (!character) throw Error('not_owned_vassal');
     const bot = live(id), level = bot?.actor?.fetchLevel() ?? character.level;
-    const busy = !!(bot?.partyCompanion || bot?.hotBackgroundPartyId || bot?.followPlayerSession);
+    const busy = !!(bot?.vassalOperation || bot?.vassalAdmission || bot?.pendingActorTeleport);
     const classId = bot?.actor?.fetchClassId() ?? character.classId;
     return `${Html.esc(character.name)} - Lv ${level} ${Html.esc(className(classId))}<br>`
         + `Role: ${Html.esc(roleName(classId, row))}<br>`
@@ -146,11 +146,12 @@ async function vassal(session, id) {
         + (row.areaId ? `Area: ${Html.esc(Areas.find(row.areaId)?.name || row.areaId)}<br>` : '')
         + (row.loadoutPreference ? `Weapon: ${Html.esc(row.loadoutPreference)}<br>` : '')
         + (row.gatherResumePending ? 'Gather resumption pending after party interruption.<br>' : '')
-        + (busy ? 'Dismiss from the party before issuing a duty.<br>' : '<br>'
+        + (bot?.vassalStatus ? `State: ${Html.esc(bot.vassalStatus)}<br>` : '')
+        + (busy ? 'Finishing a transaction or teleport; reopen to issue a duty.<br>' : '<br>'
             + link('Gather resources...', `areas ${id} ${row.orderRevision}`)
             + link('Return to Castellan', `order ${id} ${row.orderRevision} return`)
             + link('End gathering / stay in service', `order ${id} ${row.orderRevision} service`))
-        + '<br>Physical execution is pending P3.<br>' + link('My vassals', 'roster') + back();
+        + '<br>Return/service ends party play. A new gather order in party applies after separation and rest.<br>' + link('My vassals', 'roster') + back();
 }
 async function areas(session, id, revision) {
     const row = owned(session, id);
@@ -160,7 +161,7 @@ async function areas(session, id, revision) {
     return `Gather destination (vassal level ${Number(level)}):<br>` + Areas.list().map(area => {
         const label = `${area.name} (monsters ${area.minLevel}-${area.maxLevel})`;
         return Areas.suitable(area, level) ? link(label, `order ${id} ${revision} gather ${area.id}`) : `${Html.esc(label)} - unsuitable<br>`;
-    }).join('') + '<br>Only the selected territory is authorized. Target safety and physical travel are implemented in P3.<br>'
+    }).join('') + '<br>Only the selected territory is authorized. If no safe target exists, the vassal will not switch to another area.<br>'
         + link('Vassal', `vassal ${id}`) + back();
 }
 async function warehouse(session, page = null) {
@@ -248,7 +249,7 @@ async function handle(session, parts) {
             case 'order': {
                 arity(3, 4);
                 const row = await Registry.issueOrder(session, { characterId: number(args[0]), revision: number(args[1]), order: args[2], areaId: args[3] ?? null });
-                body = 'Order saved. Physical duty execution is pending P3.<br>' + link('Vassal', `vassal ${row.characterId}`) + back(); break;
+                body = 'Order saved. The vassal will execute it when safe.<br>' + link('Vassal', `vassal ${row.characterId}`) + back(); break;
             }
             case 'warehouse': arity(0); body = await warehouse(session); break;
             case 'warehouse-view': arity(0, 1); body = await warehouse(session, pageNumber(args[0])); break;

@@ -43,14 +43,29 @@ const Service = {
         const validate = () => {
             Access.requireContact(session, actor);
             const bot = invoke('GameServer/Bot/BotManager').sessions.find(entry => Number(entry.actor?.fetchId()) === row.characterId);
-            if (bot?.partyCompanion || bot?.hotBackgroundPartyId || bot?.followPlayerSession) throw Error('vassal_in_party');
+            if (bot?.vassalAdmission || bot?.vassalOperation || bot?.vassalReceipt || bot?.pendingActorTeleport || bot?.hotBackgroundPartyId) throw Error('vassal_busy');
             if (order === 'gather' && !Areas.suitable(Areas.find(areaId), bot?.actor?.fetchLevel() ?? character?.level)) throw Error('unsuitable_gather_area');
         };
         validate();
+        const bot = invoke('GameServer/Bot/BotManager').sessions.find(entry => Number(entry.actor?.fetchId()) === row.characterId);
         const updated = await Database.updateVassalDuty({ characterId: row.characterId, ownerCharacterId: ownerId,
-            revision, order, areaId, accountId: session.accountId, beforeWrite: validate });
+            revision, order, areaId, gatherResumePending: () => order === 'gather' && bot?.partyCompanion === true,
+            accountId: session.accountId, beforeWrite: validate });
         if (!updated) throw Error('vassal_order_changed');
-        return publish(updated);
+        const value = publish(updated);
+        if (bot) {
+            require('../Bot/AI/VassalOrders').invalidate(bot);
+            if (order === 'gather' && bot.partyCompanion) bot.plan = 'following';
+            if (order !== 'gather' && bot.partyCompanion && bot.followPlayerSession)
+                invoke('GameServer/Bot/AI/PartyCompanionService').detach(bot.followPlayerSession, bot, { source: 'vassal_order' });
+            invoke('GameServer/Bot/BotAI').wakeup(bot, { urgent: true });
+        }
+        return value;
+    },
+    async resumeMarker(row, pending, beforeWrite = null) {
+        const updated = await Database.updateVassalDuty({ characterId: row.characterId, ownerCharacterId: row.ownerCharacterId,
+            revision: row.orderRevision, order: row.order, areaId: row.areaId, gatherResumePending: pending, beforeWrite });
+        return updated ? publish(updated) : null;
     },
     async replaceNonGatherOrder(ownerId, characterId, revision, order) {
         if (!['return', 'service'].includes(order) || !this.owns(ownerId, characterId)) throw Error('invalid_vassal_order');

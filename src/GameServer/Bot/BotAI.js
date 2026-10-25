@@ -261,7 +261,10 @@ const BotAI = {
     calculateNextTickDelay(session) {
         const bot = session.actor;
         if (!bot) return 3000;
-        if (session.vassal && !session.partyCompanion) return 3000;
+        if (session.vassal && !session.partyCompanion) {
+            return ['waiting_at_castellan', 'post_party_rest', 'clan_ineligible_cargo_retained', 'no_safe_targets_in_assigned_area']
+                .includes(session.vassalStatus) ? 3000 : 1000;
+        }
         const World = invoke('GameServer/World/World');
         const context = HotActorLodPolicy.evaluate(session, ActorQueries.native(World) ? World : realPlayerSessions(World) || []);
         const lodDelay = HotActorLodPolicy.nextTickDelay(session, context);
@@ -399,13 +402,12 @@ const BotAI = {
         if (session.pendingActorTeleport || session.followPlayerSession?.pendingActorTeleport) return;
         const bot = session.actor;
         if (!bot) return;
-        if (session.vassal && !session.partyCompanion && !bot.isDead()) {
-            // Ownership startup must not turn a durable service/duty record
-            // into an ambient hunt. P3 attaches the physical duty executor
-            // here; idle actors retain threat wakeups without economy scans.
-            invoke('GameServer/Bot/AI/BotPvpDefense').tick(session, bot, invoke(path.actor), this);
+        if (session.vassal && session.partyCompanion && !bot.isDead()) require('./AI/VassalOrders').enforceClan(session);
+        if (session.vassal && !session.partyCompanion) {
+            require('./AI/VassalOrders').tick(session, invoke(path.actor), this);
             return;
         }
+        if (session.vassal && !bot.isDead()) require('./AI/VassalOrders').useSupplies(session);
         invoke('GameServer/Bot/AI/BotClanChat').flush();
         invoke('GameServer/Bot/Economy/BotTradeChat').flush();
         const tickStartedAt = Date.now();
@@ -451,7 +453,7 @@ const BotAI = {
         // combat and death still release that hold and retain their priority.
         if (invoke('GameServer/Bot/AI/BotTownTravel').holdMeeting(session, bot, botDead || defendingPvp)) return;
 
-        if (!botDead && !defendingPvp
+        if (!session.vassal && !botDead && !defendingPvp
             && invoke('GameServer/Bot/AI/ClanAllianceSupportAI').tick(session, bot, invoke(path.actor))) return;
 
         if (!botDead && !defendingPvp && session.clanAllianceQuest
@@ -462,7 +464,7 @@ const BotAI = {
         if (!botDead && !defendingPvp
             && BotTradeService.activeTradeSummary(session)) return;
 
-        if (!botDead && !defendingPvp) {
+        if (!session.vassal && !botDead && !defendingPvp) {
             const BuffServiceChat = invoke('GameServer/Bot/Economy/BuffServiceChat');
             if (BuffServiceChat.onDuty(session, tickStartedAt)) {
                 BuffServiceChat.maybeAnnounce(session, tickStartedAt);
@@ -498,7 +500,7 @@ const BotAI = {
             return;
         }
 
-        if (!botDead && invoke('GameServer/Bot/Economy/BuffService').maybeAutoBuy(session, tickStartedAt)) return;
+        if (!session.vassal && !botDead && invoke('GameServer/Bot/Economy/BuffService').maybeAutoBuy(session, tickStartedAt)) return;
 
         const isCompanion = !!session.followPlayerSession && session.partyCompanion === true;
         const visibleRealPlayers = this.visibleRealPlayers(session, bot, World);
@@ -534,6 +536,7 @@ const BotAI = {
         if (botDead) {
             const wasCompanion = session.partyCompanion === true && !!session.followPlayerSession;
             if (!session.deathTimerStart) {
+                if (session.vassal) require('./AI/VassalOrders').died(session);
                 session.deathTimerStart = Date.now();
                 if (session.hotBackgroundPartyId) {
                     invoke('GameServer/Bot/Population/HotPartyLifecycle')
@@ -675,11 +678,11 @@ const BotAI = {
 
         // 3. Dynamic State Machine Routing
         if (isCompanion) invoke('GameServer/Bot/AI/PlayerPartyRaidChatter').tick(session.followPlayerSession, tickStartedAt);
-        if (!defendingPvp && invoke('GameServer/ClanHall/BotVisit').tick(session, bot)) return;
-        if (invoke('GameServer/Bot/AI/HotResourceCompetition').tick(session)) return;
+        if (!session.vassal && !defendingPvp && invoke('GameServer/ClanHall/BotVisit').tick(session, bot)) return;
+        if (!session.vassal && invoke('GameServer/Bot/AI/HotResourceCompetition').tick(session)) return;
         if (session.hotBackgroundPartyId && invoke('GameServer/Bot/AI/HotBackgroundParty').tick(session, bot, Generics, this)) return;
         const state = States[session.plan];
-        if (!['resting', 'shopping'].includes(session.plan)) {
+        if (!session.vassal && !['resting', 'shopping'].includes(session.plan)) {
             invoke('GameServer/Bot/Economy/HotBoardReviewService').naturalBreak(session, 0);
         }
         if (state) {
@@ -741,7 +744,7 @@ const BotAI = {
             }
             return false;
         }
-        if (!options.pvp && invoke('GameServer/Bot/AI/HotResourceCompetition').beforeAttack(session, npc)) return false;
+        if (!session.vassal && !options.pvp && invoke('GameServer/Bot/AI/HotResourceCompetition').beforeAttack(session, npc)) return false;
         if (options.emergencyFinisher && !options.pvp) {
             const finish = invoke('GameServer/Bot/AI/BotEmergencyFinisher').evaluate(session, bot, npc);
             if (!finish) return false;

@@ -99,6 +99,7 @@ function promote(session, reason = 'player_interaction', now = Date.now()) {
 function playerContext(session, realPlayers, now, World = null) {
     const bot = session?.actor;
     if (!bot) return null;
+    if (session.vassal) return 'owned_vassal';
     if (session.clanAllianceQuest) return 'player_clan_quest';
     if (session.partyCompanion === true && session.followPlayerSession) return 'player_party';
     if (session.hotBackgroundPartyId) {

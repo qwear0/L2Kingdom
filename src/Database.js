@@ -2149,6 +2149,28 @@ function syncPlayerManagedClanUnsafe(clanId) {
     };
 }
 
+// Owned actors commit only the currently admitted duty. Clan cargo must stay
+// bound to its original owner/clan even if membership changes while walking.
+function assertVassalDutyUnsafe(characterId, expected, clanId = null) {
+    const row = one('SELECT * FROM vassals WHERE characterId = ?', [characterId]);
+    const life = one('SELECT phase FROM bot_life_state WHERE characterId = ?', [characterId]);
+    if (!row || row.orderRevision !== expected.orderRevision || row.ownerCharacterId !== expected.ownerCharacterId
+        || life?.phase !== 'hot') throw Error('vassal_order_changed');
+    if (clanId !== null) {
+        const clan = one('SELECT * FROM clans WHERE id = ?', [clanId]);
+        const owner = one('SELECT clanId FROM characters WHERE id = ?', [row.ownerCharacterId]);
+        if (row.boundClanId !== clanId || clan?.leaderId !== row.ownerCharacterId || clan.level < 1
+            || clan.dissolvingExpiryTime > Date.now() || owner?.clanId !== clanId) throw Error('vassal_clan_ineligible');
+    }
+}
+
+function syncVassalInventoryUnsafe(characterId) {
+    const life = one('SELECT * FROM bot_life_state WHERE characterId = ?', [characterId]);
+    const items = all('SELECT * FROM items WHERE characterId = ?', [characterId]);
+    const ids = [...Object.keys(jsonObject(life.inventorySummary)), ...items.map(item => item.selfId)].map(Number);
+    return { coldLifeRow: writeColdInventorySnapshotUnsafe(characterId, life, ids), items };
+}
+
 // Economic operations must commit their cold projection with the physical
 // inventory. A later failure or restart must not replay pre-purchase balances.
 function syncEconomySnapshotUnsafe(characterId, state, changedIds, mp = null) {
@@ -7351,7 +7373,7 @@ const Database = {
         }, { operation: 'warehouse:withdrawal-record' });
     },
 
-    transferPlayerInventoryBatchToClanWarehouse({ clanId, characterId, transfers = [] } = {}) {
+    transferPlayerInventoryBatchToClanWarehouse({ clanId, characterId, transfers = [], vassalDuty = null, validate = null } = {}) {
         const clan = Number(clanId);
         const character = Number(characterId);
         const normalized = (transfers || []).map((transfer) => ({
@@ -7374,6 +7396,8 @@ const Database = {
             const clanRow = one('SELECT id, leaderId FROM clans WHERE id = ?', [clan]);
             const member = one('SELECT id, clanId FROM characters WHERE id = ?', [character]);
             if (!clanRow || !member || Number(member.clanId) !== clan) throw new Error('character is no longer in this clan');
+            validate?.();
+            if (vassalDuty) assertVassalDutyUnsafe(character, vassalDuty, clan);
             const prepared = normalized.map((transfer) => {
                 const source = one(`SELECT id, selfId, name, amount, enchant, petData
                     FROM items WHERE id = ? AND characterId = ?`, [transfer.sourceItemId, character]);
@@ -7431,6 +7455,7 @@ const Database = {
                 state.warehouseRevision = warehouseRevision;
                 write('UPDATE clan_simulation_clans SET updatedAt = ?, stateJson = ? WHERE clanId = ?', [timestamp, JSON.stringify(state), clan]);
             }
+            if (vassalDuty) Object.assign(results, syncVassalInventoryUnsafe(character));
             return results;
         }, 'clan-warehouse:player-deposit')).then(results => {
             if (normalized.some(transfer => transfer.selfId === 57)) require('./GameServer/Clan/ClanReviewEvents').changed(clan, 'warehouse');
@@ -7817,6 +7842,7 @@ const Database = {
             }
 
             validate?.();
+            if (details.vassalDuty) assertVassalDutyUnsafe(characterId, details.vassalDuty);
             const seen = new Set(), lines = [];
             let total = 0, units = 0, errandCount = 0;
             for (const line of captured) {
@@ -7976,9 +8002,11 @@ const Database = {
                         remaining: applied?.affectedRows ? Number(next.target?.amount) : undefined });
             }
             const receipt = { units, spent: total, nativeId: Number(seller?.sourceId || lines[0].selfId) };
+            const vassalResult = details.vassalDuty ? syncVassalInventoryUnsafe(characterId) : null;
             const row = step ? completeEconomyStepUnsafe(characterId, step, receipt, [...changed], null, null, patch)
-                : syncEconomySnapshotUnsafe(characterId, coldState, [...changed]);
+                : vassalResult?.coldLifeRow || syncEconomySnapshotUnsafe(characterId, coldState, [...changed]);
             return { ok: true, committed: true, ...receipt, amount: units, lines,
+                ...vassalResult,
                 goalRow: goalRow(), ...(row ? { coldLifeRow: row, economyCommit: jsonObject(row.statsJson).economyCommit } : {}) };
         }, 'bot:npc-purchase'));
     },

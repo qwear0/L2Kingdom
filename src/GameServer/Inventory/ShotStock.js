@@ -225,6 +225,10 @@ function planForKind(kind, rank = 'none') {
 }
 
 function planForActor(actor) {
+    if (actor?.session?.vassal) {
+        const profile = require('../Lord/VassalService').loadout(actor.fetchId(), actor.fetchClassId());
+        return planForKind(profile.caster ? 'blessedSpiritshot' : 'soulshot', weaponRankFromActor(actor));
+    }
     return planFor({
         classId: actorClassId(actor),
         rank: weaponRankFromActor(actor)
@@ -291,6 +295,14 @@ function enableAutoShot(actor, options = {}) {
     if (!actor?.backpack) return null;
 
     const plan = planForActor(actor);
+    if (actor.session?.vassal) {
+        const enabled = actor.autoSoulshots instanceof Set ? actor.autoSoulshots : new Set(actor.autoSoulshots || []);
+        SHOT_IDS.forEach(id => enabled.delete(id));
+        if (Number(actor.backpack.fetchItemFromSelfId(plan.selfId)?.fetchAmount() || 0) > 0) enabled.add(plan.selfId);
+        actor.autoSoulshots = enabled;
+        autoUse.set(actor, options.inputs || autoInputs(actor));
+        return enabled.has(plan.selfId) ? plan : null;
+    }
     const enabled = actor.autoSoulshots instanceof Set
         ? actor.autoSoulshots
         : new Set(actor.autoSoulshots || []);
@@ -507,6 +519,7 @@ async function purchaseActorRestock(actor, options = {}) {
         return { ok: false, reason: 'missing_actor' };
     }
 
+    if (actor.session?.vassal) return { ok: false, reason: 'physical_vassal_seller_required' };
     const plan = options.plan || planForActor(actor);
     const AfkTrade = invoke('GameServer/AfkTrade/AfkTradeService');
     // The board's lines of the town the bot stands in (б5: a deal is made in
@@ -587,6 +600,7 @@ async function purchaseActorRestock(actor, options = {}) {
 // A weapon change can switch the shot grade and kind: buy the restock with the
 // bot's own adena and re-enable auto shots. Other slots leave the shots alone.
 function restockAfterWeaponChange(actor, slots = [], logTag = 'BotGear') {
+    if (actor.session?.vassal) { module.exports.enableAutoShot(actor); return Promise.resolve(null); }
     if (!slots.some((slot) => WEAPON_SLOTS.has(Number(slot)))) return Promise.resolve(null);
     // Through the module object, as the callers did before: tests replace these.
     const shots = module.exports;

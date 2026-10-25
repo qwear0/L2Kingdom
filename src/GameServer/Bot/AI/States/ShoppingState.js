@@ -417,6 +417,10 @@ async function craftAtWorkshop(session, bot, target) {
 module.exports = {
     workshopTarget, stockWorkshopTarget, craftAtWorkshop,
     tick(session, bot, Generics, BotAI) {
+        if (session.vassal) {
+            session.plan = session.partyCompanion ? 'following' : 'hunting';
+            return;
+        }
         // The receipt/return callback owns the rest of this visit. Rejoining
         // the counter queue during its delay steals time from real shoppers.
         if (session.shoppingDoneAnnounced) {
