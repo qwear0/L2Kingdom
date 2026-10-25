@@ -8,7 +8,7 @@ const Approach = invoke('GameServer/Bot/AI/TownNpcApproach');
 const Catalog = invoke('GameServer/Bot/Economy/TownServiceCatalog');
 const Rest = invoke('GameServer/Bot/AI/RestPolicy');
 const Travel = invoke('GameServer/Bot/AI/BotTownTravel');
-const SAFE_REST_MS = 60000;
+const SAFE_REST_MS = 10 * 60 * 1000;
 const TOWN_RETRY_MS = 5 * 60 * 1000;
 
 function rowFor(session) { return Registry.find(session.actor?.fetchId()); }
