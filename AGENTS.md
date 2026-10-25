@@ -34,6 +34,14 @@ Key entry points and areas:
 
 At the end of a task, check whether `README.md`, these instructions, or other affected documentation needs updating. Do not introduce documentation infrastructure solely to mirror another repository.
 
+## Documentation Maintenance
+
+- Use the `l2siege-doc-maintainer` skill for repository orientation, documentation audits and impact checks, and changes to code layout, runtime entrypoints, documented gameplay, ownership boundaries, packets, persistence, WorldObserver, AI integrations, authored resources, configuration, verification workflows, skills, agent instructions, or documentation itself.
+- The canonical skill is `skills/l2siege-doc-maintainer/SKILL.md`. If skill discovery is unavailable, read that file directly. Local installation uses `~/.agents/skills/l2siege-doc-maintainer` as a symlink to the canonical directory.
+- Read the affected navigation map and relevant feature docs before deep implementation when they exist. Until a maintained documentation tree is introduced, use `README.md` and relevant source-adjacent docs; verify historical `planning/` material and legacy subsystem descriptions against current source and configuration.
+- Keep documentation changes proportionate. Update affected maps, links, and feature docs in the same task when their claims change; installing the skill alone does not require creating a documentation tree.
+- Validate changed claims, paths, and links and inspect `git diff --check`. There is no bundled documentation auditor; do not import QSD-specific commands or create test infrastructure merely to mirror its workflow.
+
 ## Code Intelligence Retrieval
 
 Use CodeGraph or an equivalent semantic/code graph for bounded cross-file discovery.
@@ -42,6 +50,7 @@ Use CodeGraph or an equivalent semantic/code graph for bounded cross-file discov
 - Treat graph relationships as candidates, not proof of completeness.
 - Verify negative, exhaustive, dynamic, and high-risk conclusions against source, runtime configuration, or targeted `rg` searches.
 - Fall back to `rg` and direct reads when the index is unavailable, stale, ambiguous, or conflicting.
+- For documentation impact decisions, follow `skills/l2siege-doc-maintainer/references/semantic-retrieval-policy.md`.
 
 ## Verification and Tests
 
