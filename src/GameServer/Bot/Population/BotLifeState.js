@@ -786,6 +786,9 @@ function setSessionSnapshotsPhase(session, phase) {
 }
 
 function save(row, options = {}) {
+    if (Config.ownedOnly && (!invoke('GameServer/Lord/VassalService').find(row.characterId) || row.phase !== 'hot')) {
+        return Promise.reject(Error('owned_only_hot_lifecycle'));
+    }
     // ARCH-NOTE: strip retired counters even when an old caller supplies them on a new row.
     const proposedStats = parseJson(row.statsJson, {});
     if (proposedStats.marketTrades || proposedStats.priceBeliefs) {
@@ -1621,6 +1624,18 @@ const BotLifeState = {
         if (initStarted) return initPromise;
         initStarted = true;
 
+        if (Config.ownedOnly) {
+            // Retain lifecycle persistence without legacy repairs, ownership
+            // lease recovery, markets, clan supply policy or craft registration.
+            initPromise = Database.execute([`SELECT states.* FROM ${TABLE} states
+                JOIN vassals ON vassals.characterId = states.characterId`, []], 'vassal:life-load').then(rows => {
+                for (const row of rows) cache.set(Number(row.characterId), normalize(row));
+                initialized = true;
+                return true;
+            }).catch(error => { initStarted = false; initPromise = null; throw error; });
+            return initPromise;
+        }
+
         initPromise = Database.execute(['SELECT 1', []], 'schema:bot-life')
             .then(() => Database.fetchBotMarketCounts()).then((rows) => {
                 marketCounts.clear();
@@ -1964,6 +1979,7 @@ const BotLifeState = {
     findByCharacterId(characterId) {
         const id = Number(characterId);
         if (!Number.isSafeInteger(id) || id <= 0) return Promise.resolve(null);
+        if (Config.ownedOnly && !invoke('GameServer/Lord/VassalService').find(id)) return Promise.resolve(null);
         const cached = cache.get(id);
         if (cached) return Promise.resolve(cached);
         if (!initialized) return Promise.resolve(null);
@@ -1987,7 +2003,8 @@ const BotLifeState = {
 
         if (!initialized || !lookup) return Promise.resolve(null);
         return Database.execute([
-            `SELECT * FROM ${TABLE} WHERE LOWER(characterName) = ? LIMIT 1`,
+            `SELECT * FROM ${TABLE} WHERE LOWER(characterName) = ?
+                ${Config.ownedOnly ? 'AND characterId IN (SELECT characterId FROM vassals)' : ''} LIMIT 1`,
             [lookup]
         ]).then((rows) => {
             if (!rows[0]) return null;

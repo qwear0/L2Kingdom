@@ -1120,6 +1120,18 @@ function clearBoard() {
 // (Database.migrateBoardWorld); then every record comes back into memory.
 async function init() {
     clearBoard();
+    if (invoke('GameServer/Bot/Population/PopulationConfig').ownedOnly) {
+        // Keep the human board, but leave historical bot ads/custody untouched.
+        // Its old startup migrations and meeting replay assign bot work.
+        const shops = (await Database.fetchAfkTradeShops(null, { activeOnly: true }))
+            .filter(shop => !String(shop.ownerAccount || '').startsWith('bot_'));
+        await require('./GiranShopDistribution').restore(shops);
+        shops.forEach(shop => kindOf(shop) === 'shop' ? spawnProjection(shop) : refreshRecord(shop));
+        boardReady = true;
+        notifyBoardChange({ ready: true });
+        startTimers();
+        return shops.length;
+    }
     const migrated = await Database.migrateBoardWorld();
     // A cached bot state follows the bags and states the migration changed.
     const LifeState = invoke('GameServer/Bot/Population/BotLifeState');

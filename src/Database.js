@@ -1707,6 +1707,7 @@ function applySchemaMigrations() {
     }]);
     migrations.push([66, () => require('./DatabasePartyCandidateProjection').upgradeRecruitment(connection)]);
     migrations.push([67, () => require('./DatabasePlayerWarehouse').migrate(connection)]);
+    migrations.push([68, () => require('./GameServer/Lord/Repository').migrate(connection)]);
     const applied = new Set(connection.prepare('SELECT version FROM schema_migrations').all().map((row) => Number(row.version)));
     migrations.forEach(([version, apply]) => {
         if (applied.has(version)) return;
@@ -4178,6 +4179,7 @@ function publishClanMembership(result) {
 
 const Database = {
     ...require('./DatabasePlayerWarehouse').create({ one, all, write, inTransaction, withCharacterFlush }),
+    ...require('./GameServer/Lord/Repository').repository({ one, all, write, run, inTransaction, withCharacterFlush }),
     openClanRaidPartyAtImpact(request) {
         // The offensive callback cannot await our queue: its registered roster
         // could change meanwhile. Abort this native action when another write
@@ -6952,6 +6954,7 @@ const Database = {
         return inTransaction(() => {
             const character = one('SELECT id FROM characters WHERE username=? COLLATE NOCASE AND name=? COLLATE NOCASE', [username, name]);
             if (!character) return { affectedRows: 0 };
+            if (one('SELECT 1 FROM vassals WHERE ownerCharacterId = ? LIMIT 1', [character.id])) throw Error('character_owns_vassals');
             for (const meeting of TradeMeetings.active(character.id, true)) {
                 const result = TradeMeetings.terminal(meeting.id, false, 'character_deleted');
                 const row = result.meeting;
@@ -10923,11 +10926,28 @@ const Database = {
     createClanCrest(clanId, kind, data) { return insert('clan_crests', { clanId, kind, data, createdAt: now() }, 'clan:crest-create'); },
     fetchClanCrest(id) { return selectOne('clan_crests', ['*'], 'id = ?', [id], 'clan:crest'); },
     createClan(data) { return insert('clans', { name: data.name, leaderId: data.leaderId }, 'clan:create'); },
+    createPlayerClan(characterId, name) {
+        const Rules = require('./GameServer/Clan/ClanRules');
+        const valid = Rules.validateClanName(name);
+        if (!valid.ok) return Promise.reject(Error(valid.code));
+        return withCharacterFlush(characterId, () => inTransaction(() => {
+            const owner = one('SELECT level, clanId, clanCreateExpiryTime FROM characters WHERE id = ?', [characterId]);
+            if (!owner || owner.level < 10 || owner.clanId || owner.clanCreateExpiryTime > now()) throw Error('clan_creation_ineligible');
+            // Ordinary creation must not straddle a Castellan clan grant.
+            // Membership and the clan row are one durable eligibility change.
+            const clanId = write('INSERT INTO clans(name,leaderId) VALUES(?,?)', [valid.name, characterId]).insertId;
+            write('UPDATE characters SET clanId = ?, clanPrivileges = ?, clanJoinExpiryTime = 0, clanCreateExpiryTime = 0 WHERE id = ?',
+                [clanId, Rules.CP_ALL, characterId]);
+            return { ok: true, clanId, nextClanId: clanId, membershipRepair: ClanMembership.repairUnsafe([characterId]) };
+        }, 'clan:player-create')).then(publishClanMembership).then(ClanMembership.publish);
+    },
     updateClanCrest(id, crestId) { return update('clans', { crestId }, 'id = ?', [id], 'clan:crest'); },
     updateClanLevel(id, level) { return update('clans', { level }, 'id = ?', [id], 'clan:level'); },
     updateCharacterClan(id, clanId, clanPrivileges, clanJoinExpiryTime, clanCreateExpiryTime) {
         return withCharacterFlush(id, () => inTransaction(() => {
             const previousClanId = Number(one('SELECT clanId FROM characters WHERE id = ?', [id])?.clanId || 0);
+            const vassal = one('SELECT boundClanId FROM vassals WHERE characterId = ?', [id]);
+            if (vassal && Number(clanId) && Number(vassal.boundClanId) !== Number(clanId)) throw Error('vassal_bound_clan');
             const result = write(`UPDATE characters SET clanId = ?, clanPrivileges = ?, clanJoinExpiryTime = ?, clanCreateExpiryTime = ? WHERE id = ?`,
                 [clanId, clanPrivileges, clanJoinExpiryTime, clanCreateExpiryTime, id]);
             return { ...result, previousClanId, nextClanId: Number(clanId), membershipRepair: ClanMembership.repairUnsafe([id]) };

@@ -1100,6 +1100,11 @@ const PopulationService = {
     init() {
         if (Config.enabled === false) return;
         if (this.initialized) return this.lifeReadyPromise;
+        if (Config.ownedOnly) {
+            this.lifeReadyPromise = LifeState.init();
+            this.initialized = true;
+            return this.lifeReadyPromise;
+        }
 
         Metrics.init();
         Metrics.startEventLoopMonitor();
@@ -1124,6 +1129,21 @@ const PopulationService = {
         if (!this.initialized) this.init();
 
         this.started = true;
+        if (Config.ownedOnly) {
+            // Only hot snapshot persistence and WAL maintenance survive here.
+            // No worker, job registry, board review, seeder, legacy repair,
+            // warehouse distribution or party/clan/director events are started.
+            this.ownedSnapshotTimer = setInterval(() => {
+                this.persistOwnedActors().catch(error => utils.infoWarn('Vassal', 'snapshot failed: %s', error.message));
+            }, 30000);
+            this.ownedSnapshotTimer.unref?.();
+            if (Number(options.default.Database?.checkpointResetWalBytes) > 0) {
+                this.walResetTimer = setInterval(() => this.runAdaptiveWalReset(),
+                    Math.max(1000, Number(options.default.Database?.checkpointResetIntervalMs) || 5000));
+                this.walResetTimer.unref?.();
+            }
+            return;
+        }
         Promise.resolve(this.lifeReadyPromise).then(() => ClanActionService.startEvents(() => { this.nextClanActionAt = 0; }))
             .catch(error => utils.infoWarn('ClanReview', 'startup: %s', error.message));
         if (Config.developerDiagnostics) this.initialSummaryTimer = setTimeout(() => {
@@ -1212,7 +1232,29 @@ const PopulationService = {
         Director.start();
     },
 
+    async persistOwnedActors() {
+        if (this.ownedSnapshotRunning) return;
+        this.ownedSnapshotRunning = true;
+        try {
+            const Registry = invoke('GameServer/Lord/VassalService');
+            const Writes = invoke('GameServer/Persistence/CharacterWriteQueue');
+            const Status = invoke('GameServer/Actor/CharacterStatus');
+            const Database = invoke('Database');
+            for (const session of invoke('GameServer/Bot/BotManager').sessions) {
+                const actor = session.actor;
+                if (!actor || !Registry.find(actor.fetchId())) continue;
+                Writes.location(actor.fetchId(), { locX: actor.fetchLocX(), locY: actor.fetchLocY(), locZ: actor.fetchLocZ() });
+                Writes.experience(actor.fetchId(), actor.fetchLevel(), actor.fetchExp(), actor.fetchSp());
+                await Writes.flushCharacter(actor.fetchId());
+                await Database.updateCharacterStatus(actor.fetchId(), Status.persistenceRecord(actor));
+                if (session.actor === actor && !await LifeState.markHot(session, 'owned_snapshot')) throw Error('owned_snapshot_failed');
+            }
+        } finally { this.ownedSnapshotRunning = false; }
+    },
+
     stop() {
+        if (this.ownedSnapshotTimer) clearInterval(this.ownedSnapshotTimer);
+        this.ownedSnapshotTimer = null;
         ClanActionService.stopEvents();
         this.stopPartyAssemblyEvents();
         this.stopLifecycleSafetySweep();
@@ -1437,6 +1479,7 @@ const PopulationService = {
 
     markHot(session, reason = 'hot') {
         if (Config.enabled === false) return Promise.resolve(null);
+        if (Config.ownedOnly && !invoke('GameServer/Lord/VassalService').find(session?.actor?.fetchId?.())) return Promise.resolve(null);
         return LifeState.markHot(session, reason);
     },
 

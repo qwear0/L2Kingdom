@@ -388,6 +388,18 @@ const PopulationConfig = applyOverrides(
     applyOverrides({ ...DEFAULTS }, fileOverrides),
     envOverrides()
 );
+// Owned-only is the server's execution boundary, not an optional flag bundle.
+// Apply it after file/environment overrides so old local.ini files cannot
+// restart ambient actors or silently prohibit paid D-grade shot purchases.
+Object.assign(PopulationConfig, {
+    ownedOnly: true, enabled: true, staticShotsDisabled: false, staticBuyersDisabled: true,
+    maxPlayingPopulation: 0, starterBotsPerRace: 0, generatedColdBatchSize: 0,
+    backgroundResolverEnabled: false, backgroundPartyEnabled: false, phasePolicyEnabled: false,
+    directorEnabled: false, backgroundGovernorEnabled: false, ambientScenesEnabled: false,
+    warehouseCleanupEnabled: false, stateRetentionEnabled: false,
+    coldCompetitionObserveEnabled: false, coldCompetitionActionsEnabled: false,
+    coldCompetitionConflictsEnabled: false, coldCompetitionPvpEnabled: false
+});
 PopulationConfig.maxPlayingPopulation = Math.max(0, Math.min(2000, Math.floor(Number(PopulationConfig.maxPlayingPopulation) || 0)));
 PopulationConfig.pvpAggression = require('../../Social/PvpAggression').normalize(PopulationConfig.pvpAggression);
 

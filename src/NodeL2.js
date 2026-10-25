@@ -82,7 +82,8 @@ console.info(
 // Startup procedure, init `World` & `Data`, then `AuthServer`, finally `GameServer`
 Database.init(() => {
     DataCache.init();
-    invoke('GameServer/Clan/ClanPlanningCoordinator').start();
+    // Owned-only startup does not start the autonomous clan planner.
+    if (!invoke('GameServer/Bot/Population/PopulationConfig').ownedOnly) invoke('GameServer/Clan/ClanPlanningCoordinator').start();
     const stackableItemIds = (DataCache.items || [])
         .filter((item) => item.etc?.stackable === true)
         .map((item) => Number(item.selfId));
@@ -121,10 +122,10 @@ Database.init(() => {
             return new GameSession(socket);
         });
 
-        BotManager.init();
+        await BotManager.init();
         WorldObserver.init();
         DevConsole.init();
-        if (process.env.L2NODE_HOT_LOAD_TEST === '1') {
+        if (!invoke('GameServer/Bot/Population/PopulationConfig').ownedOnly && process.env.L2NODE_HOT_LOAD_TEST === '1') {
             invoke('GameServer/Bot/LoadTest/HotBotLoadTest').start();
         }
     });

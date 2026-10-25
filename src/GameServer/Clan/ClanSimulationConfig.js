@@ -152,4 +152,7 @@ config.actionBatchSize = Math.max(1, Math.floor(config.actionBatchSize));
 config.actionLeaseMs = Math.max(1000, Math.floor(config.actionLeaseMs));
 config.actionRetryMs = Math.max(1000, Math.floor(config.actionRetryMs));
 
+// Historical clan data remains readable, but owned vassals must never be
+// recruited, equipped or assigned duties by the autonomous clan scheduler.
+config.enabled = false;
 module.exports = config;

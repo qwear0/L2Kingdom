@@ -225,7 +225,7 @@ const BotAI = {
             invoke('GameServer/Npc/SummonControl').restoreFromCold(session, session.actor, session.coldSummon);
             session.coldSummon = null;
         }
-        if (session.actor?.fetchClanId?.()) invoke('GameServer/Clan/ClanAllianceService').resume(session)
+        if (!session.vassal && session.actor?.fetchClanId?.()) invoke('GameServer/Clan/ClanAllianceService').resume(session)
             .catch(error => utils.infoWarn('ClanQuest', 'resume failed: %s', error.message));
         this.scheduleTick(session, 1000 + Math.random() * 2000);
     },
@@ -261,6 +261,7 @@ const BotAI = {
     calculateNextTickDelay(session) {
         const bot = session.actor;
         if (!bot) return 3000;
+        if (session.vassal && !session.partyCompanion) return 3000;
         const World = invoke('GameServer/World/World');
         const context = HotActorLodPolicy.evaluate(session, ActorQueries.native(World) ? World : realPlayerSessions(World) || []);
         const lodDelay = HotActorLodPolicy.nextTickDelay(session, context);
@@ -396,10 +397,17 @@ const BotAI = {
         // Position changes only when TeleportTo completes. Damage wakeups in
         // that interval must not restart actions in the previous raid region.
         if (session.pendingActorTeleport || session.followPlayerSession?.pendingActorTeleport) return;
-        invoke('GameServer/Bot/AI/BotClanChat').flush();
-        invoke('GameServer/Bot/Economy/BotTradeChat').flush();
         const bot = session.actor;
         if (!bot) return;
+        if (session.vassal && !session.partyCompanion && !bot.isDead()) {
+            // Ownership startup must not turn a durable service/duty record
+            // into an ambient hunt. P3 attaches the physical duty executor
+            // here; idle actors retain threat wakeups without economy scans.
+            invoke('GameServer/Bot/AI/BotPvpDefense').tick(session, bot, invoke(path.actor), this);
+            return;
+        }
+        invoke('GameServer/Bot/AI/BotClanChat').flush();
+        invoke('GameServer/Bot/Economy/BotTradeChat').flush();
         const tickStartedAt = Date.now();
         invoke('GameServer/Bot/AI/PendingSweep').prune(session, bot, tickStartedAt);
         let lodContext = { tier: 'preload' };

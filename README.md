@@ -5,10 +5,19 @@
 
 # L2Solo (C4: Scions of Destiny)
 
-Old-school Lineage 2 solo play, locally in a live world with over 1700 bot population.
+A private local Lineage II C4 fork of L2Solo, transitioning from an ambient bot population to player-owned vassals.
 
-L2Solo is a local-first Lineage II C4 server emulator, tuned for a solo MMO experiment: one real player, a live world, and bots with AI that makes the server feel alive.
-Nothing is auto-generated. Everything in the world is the result of a player's or a bot's actions.
+### Current fork: ownership foundation (P1)
+
+Startup now restores only characters registered in `vassals`. Historical bots, clans and inventories remain in SQLite but are not spawned or cold-simulated. Static merchant bots, ambient seeding, autonomous clan planning, legacy population repairs and bot market replay are not started. Ordinary world NPCs and the human market board remain available.
+
+The retained bot services are registry/lifecycle loading, hot-actor snapshot persistence (every 30 seconds), buffered character writes and existing SQLite checkpoint maintenance. Registered vassals are pinned hot. The effective policy is applied **after** local/environment overrides: population persistence stays enabled; cold/background party/director/ambient jobs and `ClanSimulation` stay off; `staticShotsDisabled` stays false. An old `config/local.ini` cannot restore the previous population.
+
+`src/GameServer/Lord/` provides atomic, once-per-character Lord enrollment, one-time free level-1 clan eligibility, and owner-authenticated, replayable vassal creation confirmations. Starter skills are a one-time level-20 lineage grant without SP/books; later paid learning is unchanged. Lord equipment is additive and unequipped to preserve existing gear; new vassals receive equipped mid-D kits. Successful confirmations survive publication failures and can be replayed without new rewards or characters. Clan capacity is enforced in SQLite for both vassal creation and ordinary joins. A Lord with vassals cannot be deleted.
+
+This is the storage/startup phase, **not the complete Castellan feature**: NPC dialogs/shop integration (P2) and physical duties/party interruption/loadout consumers (P3) are still pending. Services already require physical contact with Castellan's reserved identity; no NPC is installed by P1. Unattached vassals idle instead of entering ambient hunting/economy AI. No migration has been applied to the live database as part of development; it runs on the next separately authorized server startup.
+
+The cold/hot/static descriptions and feature checklist below describe the upstream systems, not services enabled by this fork's owned-only startup.
 
 **Project status:** PUBLIC ALPHA
 
@@ -79,7 +88,7 @@ See the full update log on our [Discord](https://discord.gg/dXsQ8SJA7k) server.
 
 ## Game Checklist
 
-### ✅ What's done
+### ✅ Upstream capabilities
 
 **Server:**
 - Server launcher

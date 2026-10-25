@@ -94,6 +94,20 @@ const HotActivation = {
 
         return loadState.then((state) => {
             if (!state) return { ok: false, reason: 'missing_state' };
+            if (invoke('GameServer/Bot/Population/PopulationConfig').ownedOnly) {
+                const Registry = invoke('GameServer/Lord/VassalService');
+                if (!Registry.find(state.characterId)) return { ok: false, reason: 'owned_only_activation' };
+                const Manager = invoke('GameServer/Bot/BotManager');
+                const active = Manager.findSessionById(state.characterId);
+                if (active) return { ok: false, reason: 'already_hot', state };
+                // Restore at the saved physical position. Remote invitations
+                // cannot resurrect legacy bots or choose an activation offset.
+                return invoke('Database').fetchOwnedVassalCharacters().then(rows => {
+                    const character = rows.find(row => Number(row.id) === Number(state.characterId));
+                    if (!character) return { ok: false, reason: 'missing_owned_character' };
+                    return Manager.restoreOwnedVassal(character).then(session => ({ ok: !!session, session, state }));
+                });
+            }
             const encounter = invoke('GameServer/Bot/Population/PvpEncounterRuntime').active(state);
             if (encounter) return invoke('GameServer/Bot/Population/PvpEncounterLifecycle').activate(encounter, reason, options);
             if (state.stats?.coldCompetition?.wait?.combat && state.stats.coldCompetition.wait.until > Date.now()) {

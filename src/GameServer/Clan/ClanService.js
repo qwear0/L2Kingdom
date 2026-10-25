@@ -153,6 +153,7 @@ const ClanService = {
     CREATE_COOLDOWN_MS,
 
     init() {
+        if (invoke('GameServer/Bot/Population/PopulationConfig').ownedOnly) return this.reload();
         return ensureSchema()
             .then(() => Database.migrateAutonomousClanNames().catch((err) => {
                 utils.infoWarn('Clan', 'name migration deferred: %s', err.message);
@@ -221,24 +222,19 @@ const ClanService = {
         const allowed = this.canCreate(actor, name);
         if (!allowed.ok) return Promise.resolve(allowed);
 
-        return Database.createClan({
-            name: allowed.name,
-            leaderId: actor.fetchId()
-        }).then((result) => {
-            const clanId = number(result.insertId);
-            return Database.updateCharacterClan(actor.fetchId(), clanId, ClanRules.CP_ALL, 0, 0).then(() => {
-                const clan = normalizeClan({
-                    id: clanId,
-                    name: allowed.name,
-                    level: 0,
-                    leaderId: actor.fetchId()
-                }, [actorMember(actor)]);
-                state.clans.set(clanId, clan);
-                setActorClan(actor, clanId, ClanRules.CP_ALL);
-                actor.setClanJoinExpiryTime?.(0);
-                actor.setClanCreateExpiryTime?.(0);
-                return { ok: true, clan };
-            });
+        return Database.createPlayerClan(actor.fetchId(), allowed.name).then((result) => {
+            const clanId = number(result.clanId);
+            setActorClan(actor, clanId, ClanRules.CP_ALL);
+            actor.setClanJoinExpiryTime?.(0);
+            actor.setClanCreateExpiryTime?.(0);
+            const clan = normalizeClan({
+                id: clanId,
+                name: allowed.name,
+                level: 0,
+                leaderId: actor.fetchId()
+            }, [actorMember(actor)]);
+            state.clans.set(clanId, clan);
+            return { ok: true, clan };
         });
     },
 
@@ -255,6 +251,8 @@ const ClanService = {
     },
 
     addMember(clan, actor, privileges = 0) {
+        // The SQL trigger is the final capacity fence; a cached invitation
+        // can race Castellan creation while awaiting the target's answer.
         return Database.updateCharacterClan(actor.fetchId(), clan.id, privileges, 0, 0).then(() => {
             setActorClan(actor, clan.id, privileges);
             actor.setClanJoinExpiryTime?.(0);
@@ -569,6 +567,17 @@ const ClanService = {
 
     onlineSessionByActorId,
     onlineSessions: clanOnlineSessions,
+    publishCommittedRoster(clanId) {
+        const clan = this.findById(clanId);
+        if (!clan) return;
+        const Response = invoke('GameServer/Network/Response');
+        for (const session of clanOnlineSessions(clan)) {
+            session.dataSendToMe(Response.pledgeShowMemberListDeleteAll());
+            session.dataSendToMe(Response.pledgeShowMemberListAll(this.refreshOnlineMembers(clan), session.actor));
+            session.dataSendToMe(Response.pledgeShowInfoUpdate(clan));
+        }
+        broadcastClanAppearance(clan);
+    },
     broadcastAppearance: broadcastClanAppearance
 };
 

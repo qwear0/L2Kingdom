@@ -321,45 +321,29 @@ const BotManager = {
         playerSession.dataSendToMe(ServerResponse.npcHtml(playerSession.actor.fetchId(), html));
     },
 
-    init() {
-        if (invoke('GameServer/Bot/Population/PopulationConfig').developerDiagnostics === true) console.info("BotManager :: Initializing automated bots...");
-        BotFriendship.init();
-        PopulationService.init();
-        GoalService.init();
-        SimulationKernel.init({ population: PopulationService });
-        SimulationKernel.register({
-            id: 'population',
-            register: (registry) => registry.statusProvider(() => PopulationService.summary?.() || null)
-        });
-        SimulationKernel.register({
-            id: 'goals',
-            requires: ['population'],
-            register: (registry) => registry.statusProvider(() => ({ initialized: GoalService.initialized }))
-        });
-        
-        // Adventurers now belong exclusively to the persistent population
-        // seeder. Keeping the old static starters here doubled the fresh-world
-        // population before wave one had even begun.
-        const bots = process.env.L2NODE_HOT_LOAD_TEST === '1' ? [] : [...MERCHANT_BOTS];
-        if (invoke('GameServer/Bot/Population/PopulationConfig').developerDiagnostics === true) console.info('BotManager :: Static services: merchants=%d; adventure population is seeder-managed', bots.length);
-        
-        // Wait 5 seconds after startup to let world finish loading
-        setTimeout(() => {
-            bots.forEach((botData, idx) => {
-                this.provisionAndSpawn(botData, idx);
-            });
-            // PK encounter profiles were part of the old static population as
-            // well. Do not introduce high-level hunters into a newly seeded
-            // level-one world; they can be reintroduced as a later population
-            // phase with an explicit lifecycle rule.
-            this.pkEncounterBots = [];
-            Promise.resolve().finally(() => {
-                this.startDynamicScalingMonitor();
-                this.startStatusLogMonitor();
-                PopulationService.start();
-                SimulationKernel.start();
-            });
-        }, 5000);
+    async init() {
+        await invoke('GameServer/Lord/VassalService').init();
+        await PopulationService.init();
+        PopulationService.start();
+        const characters = await Database.fetchOwnedVassalCharacters();
+        for (const character of characters) {
+            try { await this.restoreOwnedVassal(character); }
+            catch (error) { utils.infoWarn('Vassal', 'restore failed for %s: %s', character.name, error.message); }
+        }
+    },
+
+    restoreOwnedVassal(character, { created = false } = {}) {
+        const Registry = invoke('GameServer/Lord/VassalService');
+        if (!Registry.find(character?.id) || !String(character.username).startsWith('bot_')) return Promise.reject(Error('unregistered_vassal'));
+        const active = this.findSessionById(character.id);
+        if (active) return Promise.resolve(active);
+        this.ownedRestores ||= new Map();
+        if (this.ownedRestores.has(character.id)) return this.ownedRestores.get(character.id);
+        const pending = this.loadAndSpawnBot(character.username, {
+            ownedCharacterId: character.id, spawnReady: false, readyOnActivation: created, plan: 'service'
+        }).finally(() => this.ownedRestores.delete(character.id));
+        this.ownedRestores.set(character.id, pending);
+        return pending;
     },
 
     bindPkAnchorToCharacter(botData, character) {
@@ -433,6 +417,7 @@ const BotManager = {
     },
 
     provisionAndSpawn(botData, idx) {
+        if (invoke('GameServer/Bot/Population/PopulationConfig').ownedOnly) return Promise.resolve(null);
         const username = (botData.username || ("bot_" + botData.name.toLowerCase())).slice(0, 16);
         
         // 1. Ensure Bot Account exists
@@ -458,6 +443,7 @@ const BotManager = {
     },
 
     provisionCharacter(username, botData, idx) {
+        if (invoke('GameServer/Bot/Population/PopulationConfig').ownedOnly) return Promise.resolve(null);
         Database.fetchCharacters(username).then((characters) => {
             if (characters[0]) {
                 const existing = characters[0];
@@ -587,12 +573,15 @@ const BotManager = {
         return Shared.fetchCharacters(username).then((characters) => {
             const firstCharacter = characters[0];
             if (!firstCharacter) return null;
+            const Registry = invoke('GameServer/Lord/VassalService');
+            if (invoke('GameServer/Bot/Population/PopulationConfig').ownedOnly
+                && (!Registry.find(firstCharacter.id) || Number(botData.ownedCharacterId) !== Number(firstCharacter.id))) throw Error('owned_only_activation');
 
             const firstStoreCfg = merchantConfigFor(botData, firstCharacter.name);
             // Cold-generated characters may have been created before their
             // profile skills were persisted. Reconcile them before loading the
             // runtime actor so active companions never keep a level-one kit.
-            const skillsReady = this.awardProfileSkills(firstCharacter.id, {
+            const skillsReady = Registry.find(firstCharacter.id) ? Promise.resolve() : this.awardProfileSkills(firstCharacter.id, {
                 classId: firstCharacter.classId,
                 level: firstCharacter.level
             }, firstCharacter.classId);
@@ -622,6 +611,7 @@ const BotManager = {
                     session.setActor({
                         ...character, ...utils.crushOb(classInfo)
                     });
+                    session.vassal = Registry.find(character.id);
                     // Persona generation is intentionally independent from
                     // spawning. Static shop/craft services represent a fixed
                     // service surface, while every other bot is modelled as a

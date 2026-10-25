@@ -36,6 +36,7 @@ const Cooldown = {
     removeFromClientWorld,
     transitionToColdState(session, state, reason = 'transition') {
         if (!session || !session.actor || !state) return Promise.resolve({ ok: false, reason: 'missing_state' });
+        if (invoke('GameServer/Lord/VassalService').find(session.actor.fetchId())) return Promise.resolve({ ok: false, reason: 'owned_vassal_pinned' });
         const BotManager = invoke('GameServer/Bot/BotManager');
         try { invoke('GameServer/Bot/BotTradeService').cleanup(session, 'cold_transition'); } catch (_) { /* optional hot trade modules */ }
         try { invoke('GameServer/Bot/AI/BotAmbientDirector').cleanup(session, 'cold_transition'); } catch (_) { /* optional ambient module */ }
@@ -72,6 +73,7 @@ const Cooldown = {
 
     canCooldown(session, options = {}) {
         if (!session || !session.actor) return { ok: false, reason: 'missing_actor' };
+        if (invoke('GameServer/Lord/VassalService').find(session.actor.fetchId())) return { ok: false, reason: 'owned_vassal_pinned' };
         if (session.hotCompetitionCommit) return { ok: false, reason: 'social_party_commit' };
         const encounterHandoff = options.encounterKey && session.pvpEncounter?.key === options.encounterKey;
         if (!encounterHandoff && (session.pvpDefense || session.pvpRevenge || session.pendingPvpProvocation)) return { ok: false, reason: 'pvp_active' };
@@ -87,6 +89,7 @@ const Cooldown = {
     },
 
     cooldown(session, reason = 'cooldown', options = {}) {
+        if (invoke('GameServer/Lord/VassalService').find(session?.actor?.fetchId?.())) return Promise.resolve({ ok: false, reason: 'owned_vassal_pinned' });
         const encounter = session?.pvpEncounter || session?.coldLifeState?.stats?.pvpEncounter;
         if (encounter) return invoke('GameServer/Bot/Population/PvpEncounterLifecycle').cooldown(encounter, reason, options);
         if (session?.hotBackgroundPartyId) {

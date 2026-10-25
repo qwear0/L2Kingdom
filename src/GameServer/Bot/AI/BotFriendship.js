@@ -34,7 +34,9 @@ function staticServiceSql(alias = 'l') {
     const configuredMerchantClause = staticMerchantNames.length
         ? `AND ${alias}.characterName COLLATE NOCASE NOT IN (${staticMerchantPlaceholders})`
         : '';
-    return `AND ${falsyJsonMarker(alias, '$.craftStationId')}
+    const ownedClause = invoke('GameServer/Bot/Population/PopulationConfig').ownedOnly
+        ? `AND EXISTS(SELECT 1 FROM vassals WHERE characterId = ${alias}.characterId)` : '';
+    return `${ownedClause} AND ${falsyJsonMarker(alias, '$.craftStationId')}
         AND ${falsyJsonMarker(alias, '$.craftShop')}
         ${configuredMerchantClause}`;
 }
