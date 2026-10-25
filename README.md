@@ -17,7 +17,7 @@ The retained bot services are registry/lifecycle loading, hot-actor snapshot per
 
 #### Castellan, Lord enrollment and creation
 
-Castellan (stock C4 appearance, server identity `90002`) stands beside Bella in Gludio at `-12500, 122816, -3114`. Speak to him for Lord enrollment, clan creation/eligibility, vassal creation, the paginated owned roster and orders, supplies and clan storage. Actions require physical NPC contact and server-side eligibility checks.
+Castellan (stock C4 appearance, server identity `90002`) stands beside Bella in Gludio at `-12500, 122816, -3114`. New player characters of every race start beside him at `-12500, 122916, -3114`, within dialog range without overlapping the NPC. Existing characters keep their saved locations; death/escape destinations are unchanged. Speak to him for Lord enrollment, clan creation/eligibility, vassal creation, the paginated owned roster and orders, supplies and clan storage. Actions require physical NPC contact and server-side eligibility checks.
 
 - **Lord enrollment is once per character.** It raises the character to at least level 20, selects a legal first profession only for a base-class character, and adds a full top-D kit, starter supplies and 1,000,000 Adena. Higher levels/professions, existing skills and items are preserved; reward equipment is added **unequipped**. Level-20 lineage skills are granted without SP/books; later paid learning is unchanged.
 - **Free clan eligibility is one-time.** A Lord may create a level-1 clan or raise their existing level-0 clan to level 1. Higher upgrades retain normal rules. Vassal creation requires the Lord to lead an active level-1+ clan without the applicable clan penalties/cooldowns.

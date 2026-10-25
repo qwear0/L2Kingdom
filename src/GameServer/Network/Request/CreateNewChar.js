@@ -1,6 +1,7 @@
 const StarterItemCatalog = invoke('GameServer/Knowledge/StarterItemCatalog');
 const ClassProgression = invoke('GameServer/ClassProgression');
 const ItemTemplateIndex = require('../../Item/ItemTemplateIndex');
+const { loc: castellanLoc } = require('../../Lord/CastellanAccess');
 const ServerResponse = invoke('GameServer/Network/Response');
 const Shared         = invoke('GameServer/Network/Shared');
 const DataCache      = invoke('GameServer/DataCache');
@@ -46,8 +47,8 @@ function consume(session, data) {
         }
 
         return Shared.fetchClassInformation(data.classId).then((classInfo) => {
-            const spawns = fetchSpawnPoints(data.classId);
-            const coords = spawns[utils.randomNumber(utils.size(spawns))];
+            // Stay within dialog range without overlapping Castellan's spawn.
+            const coords = { ...castellanLoc, locY: castellanLoc.locY + 100 };
 
             data = {
                 ...data, ...classInfo.vitals, ...coords
@@ -82,10 +83,6 @@ function consume(session, data) {
             ServerResponse.charCreateFail(0x00)
         );
     });
-}
-
-function fetchSpawnPoints(classId) {
-    return ClassProgression.firstClassRow(DataCache.newbieSpawns, classId, 'strict')?.spawns;
 }
 
 function awardBaseSkills(id, classId) {
