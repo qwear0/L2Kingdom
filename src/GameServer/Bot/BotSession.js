@@ -1,6 +1,7 @@
 const Actor = invoke('GameServer/Actor/Actor');
 const World = invoke('GameServer/World/World');
 const NpcVisibility = invoke('GameServer/World/NpcVisibility');
+const ActorVisibility = require('../World/ActorVisibility');
 
 class BotSession {
     constructor(username) {
@@ -46,6 +47,7 @@ class BotSession {
         recipients.forEach((user) => {
             if (user.socket && typeof user.socket.write === 'function') {
                 NpcVisibility.trackNpcPacket(user, data);
+                ActorVisibility.trackPacket(World, user, data);
                 if (user.recordOutboundPacket) {
                     user.recordOutboundPacket(data);
                 }

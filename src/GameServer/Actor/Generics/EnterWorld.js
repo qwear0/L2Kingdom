@@ -66,6 +66,8 @@ async function enterWorld(session, actor) {
     actor.automation.setRevMp(DataCache.revitalize.mp[actor.fetchLevel()]);
     if (!session.populationStaging) actor.automation.replenishVitals(actor);
 
+    // Publish only after the actor's inventory, effects and initial stats exist.
+    require('../../World/ActorVisibility').publish(actor);
     // Show NPCs based on radius
     if (!session.populationStaging) Generics.updatePosition(session, actor, {
         locX: actor.fetchLocX(),

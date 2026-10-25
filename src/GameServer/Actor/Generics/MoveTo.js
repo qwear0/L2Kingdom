@@ -133,7 +133,7 @@ function shouldSkipInitialWaypoint(index, path, distance, dz) {
         Math.abs(dz) <= ACTIVE_GOAL_Z_TOLERANCE;
 }
 
-function startPathMovement({ session, actor, path, isClose, approachingObservers, moveGoal }) {
+function startPathMovement({ session, actor, path, isClose, moveGoal }) {
     const moveAlongPath = (index) => {
         if (moveGoal && session.activeMoveGoal !== moveGoal) return;
         if (index >= path.length) {
@@ -167,19 +167,10 @@ function startPathMovement({ session, actor, path, isClose, approachingObservers
             return;
         }
 
+        if (moveGoal) moveGoal.waypoint = { ...nextLoc };
         const segmentCoords = { from: currentLoc, to: nextLoc };
         const movePacket = ServerResponse.moveToLocation(actor.fetchId(), segmentCoords);
         session.dataSendToMeAndOthers(movePacket, actor);
-        approachingObservers.forEach((observer) => {
-            const observerSession = observer.session;
-            if (!observerSession?.actor?.fetchIsOnline?.() || !observerSession.dataSendToMe) return;
-            if (distance2d(observerSession.actor, currentLoc) <= CLIENT_VISIBILITY_RADIUS) return;
-            if (!observer.announced) {
-                observerSession.dataSendToMe(ServerResponse.charInfo(actor));
-                observer.announced = true;
-            }
-            observerSession.dataSendToMe(movePacket);
-        });
 
         const speed = actor.fetchCollectiveRunSpd() || 120;
         const duration = Math.max(1, (distance / speed) * 1000);
@@ -362,17 +353,9 @@ function moveTo(session, actor, coords) {
             locY: startY
         });
         const destinationDistanceToPlayer = distanceToClosestPlayer(onlinePlayers, requestedTo);
-        // Movement packets are normally broadcast from the bot's current
-        // coordinates. A player who is just outside that radius would miss
-        // the first packet and only discover the bot through a later refresh,
-        // which looks like a teleport. Prime that observer before the route
-        // crosses into their visible area.
-        const approachingObservers = onlinePlayerSessions
-            .filter((playerSession) => shouldPreannounceVisibleMove(
-                distance2d(playerSession.actor, { locX: startX, locY: startY }),
-                distance2d(playerSession.actor, requestedTo)
-            ))
-            .map((playerSession) => ({ session: playerSession, announced: false }));
+        // ActorVisibility announces boundary crossings from live coordinates
+        // and replays the current segment. Do not introduce offscreen actors
+        // early: a cancelled route could otherwise leave another client ghost.
 
         const isCompanion = !!session.followPlayerSession && session.partyCompanion === true;
         // Town errands explicitly request a larger search budget. Running that
@@ -457,7 +440,6 @@ function moveTo(session, actor, coords) {
                     actor,
                     path: egress.path,
                     isClose,
-                    approachingObservers,
                     moveGoal
                 });
                 return session.lastPathfinding;
@@ -549,7 +531,7 @@ function moveTo(session, actor, coords) {
                 };
                 if (movementPath.length) {
                     rememberTownNpcEgress(session, requestedTo, pathTarget, movementPath);
-                    startPathMovement({ session, actor, path: movementPath, isClose, approachingObservers, moveGoal });
+                    startPathMovement({ session, actor, path: movementPath, isClose, moveGoal });
                 } else {
                     clearMoveGoal(session, moveGoal);
                 }
@@ -729,7 +711,7 @@ function moveTo(session, actor, coords) {
         }
         if (path.length > 0) {
             rememberTownNpcEgress(session, requestedTo, pathTarget, path);
-            startPathMovement({ session, actor, path, isClose, approachingObservers, moveGoal });
+            startPathMovement({ session, actor, path, isClose, moveGoal });
         } else {
             clearMoveGoal(session, moveGoal);
         }

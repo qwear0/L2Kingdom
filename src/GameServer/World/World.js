@@ -8,6 +8,7 @@ const RaidBossMinionManager = invoke('GameServer/World/RaidBossMinionManager');
 const RaidEntityIndex = invoke('GameServer/World/RaidEntityIndex');
 const NpcObjectIndex = require('./NpcObjectIndex');
 const CharacterLocationRuntime = require('./CharacterLocationRuntime');
+const ActorVisibility = require('./ActorVisibility');
 const PvpPartyMembershipKeys = require('./PvpPartyMembershipKeys');
 const PlayerActivitySignal = require('../Bot/Population/PlayerActivitySignal');
 const userLocationIndexes = new WeakMap();
@@ -170,7 +171,11 @@ function removeIndexedSession(runtime, session) {
             runtime.retiredActors.add(registered.actor);
         }
         runtime.sessions.delete(session);
-        if (registered) notifyUserChange(registered.id);
+        if (registered) {
+            ActorVisibility.removeActor(registered.actor);
+            notifyUserChange(registered.id);
+        }
+        ActorVisibility.clearViewer(session);
     } finally {
         if (removed) notifyActorPublication(runtime, 'remove', registered, 'remove');
     }
@@ -410,8 +415,8 @@ const World = {
         const runtime = userLocationIndexes.get(this.user);
         const membership = runtime?.sessions.get(session);
         if (!membership || !actor || session.actor !== actor) return false;
-        // A session owns one actor registration. Ordinary moves need no token
-        // receipt and no allocation; cells retain a pointer to the live actor.
+        // A session owns one actor registration; cells retain its live actor.
+        // Client visibility must still follow moves within an unchanged cell.
         const record = membership.actor === actor ? membership.registered
             : attachRegisteredActor(runtime, session, membership);
         if (!record || record.retired || runtime.index.getSource(record.id, 'actor') !== record) return false;
@@ -426,7 +431,10 @@ const World = {
         const cellX = Math.floor(x / runtime.index.cellSize), cellY = Math.floor(y / runtime.index.cellSize);
         const spotId = session.currentSpot?.id ?? null;
         if (membership.cellX === cellX && membership.cellY === cellY && membership.spotId === spotId
-            && membership.online === online && membership.usable === usable && membership.indexed === indexed) return online && usable;
+            && membership.online === online && membership.usable === usable && membership.indexed === indexed) {
+            ActorVisibility.sync(this, session, actor);
+            return online && usable;
+        }
         const changed = membership.online !== online || membership.usable !== usable;
         membership.online = online; membership.usable = usable; membership.indexed = indexed;
         membership.spotId = spotId;
@@ -436,9 +444,10 @@ const World = {
         membership.actor = actor; membership.id = record.id;
         membership.cellX = cellX; membership.cellY = cellY;
         if (changed) notifyUserChange(record.id);
-        // ARCH-NOTE: actor location publications had only the cold stream as a
-        // reader. It has no worker consumer, so moves publish nothing. Attach,
-        // retirement and removal continue to publish their ownership changes.
+        ActorVisibility.sync(this, session, actor);
+        // ARCH-NOTE: the cold stream has no worker consumer, so moves emit no
+        // actor-publication events. Client visibility above is independent;
+        // attach, retirement and removal still publish ownership changes.
         return online && usable;
     },
 
@@ -464,6 +473,8 @@ const World = {
             membership.actor = null;
             membership.id = null;
             membership.cellX = membership.cellY = undefined;
+            ActorVisibility.removeActor(actor);
+            ActorVisibility.clearViewer(session);
             return true;
         } finally {
             if (accepted) notifyActorPublication(runtime, 'upsert', retired, 'retire');
