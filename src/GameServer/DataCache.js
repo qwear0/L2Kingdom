@@ -88,6 +88,7 @@ const DataCache = {
             ...C4LateTownGatekeepers.npcs,
             ...require('./World/GiranMammon').npcs,
             ...require('./World/GiranCrystallizationStation').npcs,
+            ...require('./World/GludioCastellan').npcs,
             ...validateModel(path + 'Npcs/clan_halls'),
             ...C4SevenSignsDungeonTeleports.npcs
         ], npcAiTypes);
@@ -145,6 +146,7 @@ const DataCache = {
             ...C4LateTownGatekeepers.spawns,
             ...require('./World/GiranMammon').spawns,
             ...require('./World/GiranCrystallizationStation').spawns,
+            ...require('./World/GludioCastellan').spawns,
             ...validateModel(path + 'Npcs/Spawns/clan_halls'),
             ...C4SevenSignsDungeonTeleports.spawns,
             ...require('../../data/Pets/c4-quest-npcs.json').spawns,

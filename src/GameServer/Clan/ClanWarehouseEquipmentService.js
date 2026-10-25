@@ -146,6 +146,10 @@ async function resolve(clanId, options) {
 
 function resolveClan(clanId, options = {}) {
     const id = Number(clanId);
+    // Player-owned clan stock is cargo, not an autonomous equipment pool.
+    // Depositing through any warehouse must not immediately consume it.
+    const clan = invoke('GameServer/Clan/ClanService').findById(id);
+    if (require('../Lord/VassalService').isLord(clan?.leaderId)) return Promise.resolve({ exchanged: 0 });
     if (running.has(id)) return running.get(id);
     const work = resolve(id, options).finally(() => running.delete(id));
     running.set(id, work);

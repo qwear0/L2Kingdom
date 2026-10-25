@@ -7,7 +7,7 @@
 
 A private local Lineage II C4 fork of L2Solo, transitioning from an ambient bot population to player-owned vassals.
 
-### Current fork: ownership foundation (P1)
+### Current fork: ownership and Castellan services (P1–P2)
 
 Startup now restores only characters registered in `vassals`. Historical bots, clans and inventories remain in SQLite but are not spawned or cold-simulated. Static merchant bots, ambient seeding, autonomous clan planning, legacy population repairs and bot market replay are not started. Ordinary world NPCs and the human market board remain available.
 
@@ -15,7 +15,9 @@ The retained bot services are registry/lifecycle loading, hot-actor snapshot per
 
 `src/GameServer/Lord/` provides atomic, once-per-character Lord enrollment, one-time free level-1 clan eligibility, and owner-authenticated, replayable vassal creation confirmations. Starter skills are a one-time level-20 lineage grant without SP/books; later paid learning is unchanged. Lord equipment is additive and unequipped to preserve existing gear; new vassals receive equipped mid-D kits. Successful confirmations survive publication failures and can be replayed without new rewards or characters. Clan capacity is enforced in SQLite for both vassal creation and ordinary joins. A Lord with vassals cannot be deleted.
 
-This is the storage/startup phase, **not the complete Castellan feature**: NPC dialogs/shop integration (P2) and physical duties/party interruption/loadout consumers (P3) are still pending. Services already require physical contact with Castellan's reserved identity; no NPC is installed by P1. Unattached vassals idle instead of entering ambient hunting/economy AI. No migration has been applied to the live database as part of development; it runs on the next separately authorized server startup.
+Castellan (stock C4 appearance, server identity `90002`) is permanently registered beside Bella in Gludio at `-12500, 122816, -3114`. His NPC dialogs offer Lord enrollment, the free level-1 clan grant, race/sex/base-class/first-profession vassal selection (Bow/Dagger for mixed classes), replayable creation confirmation, a paginated owned roster, saved duty orders and clan storage. Clan viewing uses the existing privilege; only the leader can withdraw. Autonomous equipment distribution does not consume stock from Lord-led clans. His paid NPC shop sells the starter consumables, D soulshots/blessed spiritshots, Bone Arrows, skill reagents, the approved upgraded healing/cure/speed potions and blessed escape/resurrection scrolls at normal progression-scaled template prices (no Mana Potion); ordinary grocers still do not sell graded shots. Player shop opening and purchase validate physical Castellan contact and the current quote. The common seller/warehouse catalog includes his real spawn for later bot travel.
+
+This is **not the complete vassal feature**: physical duties, territory-constrained targeting, party interruption and loadout consumers (P3) are still pending. The dialog explicitly labels saved orders as awaiting P3; unattached vassals still idle instead of starting ambient hunting/economy AI. The initial order menu uses authored mainland Gludio/Gludin spawn polygons (Ruins of Agony/Despair, Abandoned Camp, Langk Lizardmen and Wasteland), shows monster levels and disables level-inappropriate destinations. These menu checks do not replace P3 target safety. No migration has been applied to the live database as part of development; it runs on the next separately authorized server startup.
 
 The cold/hot/static descriptions and feature checklist below describe the upstream systems, not services enabled by this fork's owned-only startup.
 

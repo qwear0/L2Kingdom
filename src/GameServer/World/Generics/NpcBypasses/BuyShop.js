@@ -4,6 +4,18 @@ const DataCache      = invoke('GameServer/DataCache');
 const NpcShopBuyLists = invoke('GameServer/World/Generics/NpcShopBuyLists');
 
 module.exports = function(session, parts) {
+    const Castellan = require('../../../Lord/CastellanAccess');
+    const castellanShop = Number(session.activeNpcTalk?.selfId) === Castellan.npcId;
+    if (castellanShop) {
+        try {
+            Castellan.requireContact(session);
+            if (parts.length !== 2 || parts[1] !== 'npc') throw Error('invalid_castellan_shop');
+        } catch (_) {
+            session.activeNpcShop = null;
+            session.dataSendToMe(ServerResponse.actionFailed());
+            return;
+        }
+    }
     session.activeMerchantTrade = null;
     session.activeAdminShop = null;
     session.activeNpcShop = null;
@@ -41,6 +53,7 @@ module.exports = function(session, parts) {
 
     session.activeNpcShop = {
         npcSelfId: session.activeNpcTalk?.selfId,
+        ...(castellanShop ? { npcObjectId: session.activeNpcTalk.objectId } : {}),
         itemIds,
         prices
     };

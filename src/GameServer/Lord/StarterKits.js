@@ -37,6 +37,10 @@ const SUPPLIES = Object.freeze([
     { itemId: 1341, appliesTo: 'bow', starterCount: 5000, restockMin: 100, restockTarget: 1000, priority: 1 }
 ].map(Object.freeze));
 
+// Upgraded variants and blessed scrolls are paid shop stock only, not
+// starter rewards or automatic standard-restock targets.
+const SHOP_ONLY_ITEM_IDS = Object.freeze([1539, 1832, 1834, 1375, 6036, 1538, 3936]);
+
 function loadout(classId, preference = null) {
     const id = Number(classId);
     if (preference != null && (!MIXED_CLASSES.has(id) || !['bow', 'dagger'].includes(preference))) throw Error('invalid_loadout');
@@ -118,4 +122,4 @@ function prepare(classId, tier, preference = null) {
     items.push(item(57, tier === 'high' ? 1000000 : 100000));
     return { classId: Number(classId), items, skills, exp: Number(Data.experience[19]) };
 }
-module.exports = { prepare, loadout, skillsFor, reagentsFor, SUPPLIES, MIXED_CLASSES };
+module.exports = { prepare, loadout, skillsFor, reagentsFor, SUPPLIES, SHOP_ONLY_ITEM_IDS, MIXED_CLASSES };

@@ -17,6 +17,10 @@ function npcTalk(session, npc) {
         title
     };
 
+    if (Number(npc.fetchSelfId()) === require('../../Lord/CastellanAccess').npcId) {
+        return invoke('GameServer/World/Generics/NpcBypasses/Castellan')(session, ['castellan']);
+    }
+
     const ClanHallNpc = require('../../ClanHall/Npc');
     if (ClanHallNpc.handles(npc.fetchSelfId())) {
         ClanHallNpc.render(session).catch(error => utils.infoWarn('ClanHall', 'NPC dialog failed: %s', error.message));

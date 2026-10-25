@@ -40,7 +40,8 @@ function rolesFor(npcSelfId, title, sellerIds, gatekeeperIds) {
         roles.push(ROLES.SELLER);
         if (GENERIC_MERCHANT_TITLES.has(title)) roles.push(ROLES.GENERIC_MERCHANT);
     }
-    if (/^Warehouse (Keeper|Chief|Freightman)$/i.test(title)) roles.push(ROLES.WAREHOUSE);
+    if (/^Warehouse (Keeper|Chief|Freightman)$/i.test(title)
+        || npcSelfId === require('../../Lord/CastellanAccess').npcId) roles.push(ROLES.WAREHOUSE);
     if (gatekeeperIds.has(npcSelfId)) roles.push(ROLES.GATEKEEPER);
     return roles;
 }

@@ -15,7 +15,13 @@ function isWarehouseNpc(session) {
     const active = session.activeNpcTalk;
     const actor = session.actor;
     const npc = (World.npc?.spawns || []).find((entry) => Number(entry.fetchId?.()) === Number(active?.objectId));
-    if (!npc || !actor || !/^Warehouse (Keeper|Chief|Freightman)$/i.test(npc.fetchTitle?.() || '')) return false;
+    if (!npc || !actor) return false;
+    const Castellan = require('../Lord/CastellanAccess');
+    if (Number(npc.fetchSelfId?.()) === Castellan.npcId) {
+        try { Castellan.requireContact(session); return true; }
+        catch (_) { return false; }
+    }
+    if (!/^Warehouse (Keeper|Chief|Freightman)$/i.test(npc.fetchTitle?.() || '')) return false;
     if (Number(npc.fetchSelfId?.()) !== Number(active?.selfId)) return false;
     const dx = Number(actor.fetchLocX?.()) - Number(npc.fetchLocX?.());
     const dy = Number(actor.fetchLocY?.()) - Number(npc.fetchLocY?.());

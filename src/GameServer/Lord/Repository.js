@@ -151,8 +151,21 @@ function repository({ one, all, write, run, inTransaction, withCharacterFlush })
                 return resultFor(id);
             }, 'vassal:create'));
         },
-        updateVassalDuty({ characterId, ownerCharacterId, revision, order, areaId = null, gatherResumePending = false }) {
+        updateVassalDuty({ characterId, ownerCharacterId, revision, order, areaId = null, gatherResumePending = false,
+            accountId = null, beforeWrite = null }) {
             return inTransaction(() => {
+                beforeWrite?.();
+                if (accountId !== null) {
+                    const owner = authenticate(ownerCharacterId, accountId);
+                    const owned = one('SELECT * FROM vassals WHERE characterId = ? AND ownerCharacterId = ?', [characterId, ownerCharacterId]);
+                    if (!lord(ownerCharacterId) || !owned) throw Error('not_owned_vassal');
+                    if (order === 'gather') {
+                        const clan = one('SELECT * FROM clans WHERE id = ?', [owned.boundClanId]);
+                        const member = character(characterId);
+                        if (!clan || clan.leaderId !== ownerCharacterId || clan.level < 1 || clan.dissolvingExpiryTime > Date.now()
+                            || Number(owner.clanId) !== Number(clan.id) || Number(member?.clanId) !== Number(clan.id)) throw Error('vassal_clan_ineligible');
+                    }
+                }
                 const result = write(`UPDATE vassals SET "order" = ?, areaId = ?, gatherResumePending = ?,
                     orderRevision = orderRevision + 1, updatedAt = ? WHERE characterId = ? AND ownerCharacterId = ? AND orderRevision = ?`,
                 [order, areaId, gatherResumePending ? 1 : 0, Date.now(), characterId, ownerCharacterId, revision]);

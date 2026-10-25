@@ -624,6 +624,10 @@ const GIRAN_PET_SUPPLY_BASE = [
 ];
 
 const LISTS = {
+    castellanSupplies: [...new Set([
+        ...require('../../Lord/StarterKits').SUPPLIES.map(row => row.itemId),
+        ...require('../../Lord/StarterKits').SHOP_ONLY_ITEM_IDS, 1458, 1785, 3031
+    ])],
     ...Object.fromEntries(Object.entries(require('../../../../data/Npcs/c4_goddard_rune_shops.json'))
         .map(([npcId, entries]) => [`elmore${npcId}`, entries])),
     ...Object.fromEntries(Object.entries(require('../../../../data/Npcs/c4_heine_shops.json'))
@@ -1026,6 +1030,7 @@ const LISTS = {
 };
 
 const NPC_LISTS = {
+    [require('../../Lord/CastellanAccess').npcId]: ['castellanSupplies'],
     ...Object.fromEntries(Object.keys(require('../../../../data/Npcs/c4_goddard_rune_shops.json'))
         .map(npcId => [npcId, [`elmore${npcId}`]])),
     7890: ['heine7890'],
@@ -1127,13 +1132,14 @@ const FALLBACKS = {
     orc_amulets: ['orcAmulets']
 };
 
-// No-grade shots belong to ordinary grocers. D+ production belongs to
-// crafters; configured bot fallback is controlled by the production switch.
+// Ordinary grocers retain no-grade shots only. Castellan alone sells the
+// accepted D-grade supplies; do not globally reopen graded NPC production.
 const SHOT_IDS = new Set([1835, 2509, 3947, 1463, 1464, 1465, 1466, 1467,
     2510, 2511, 2512, 2513, 2514, 3948, 3949, 3950, 3951, 3952]);
-function allowedEntry(entry) {
+function allowedEntry(entry, listName) {
     const id = Number(typeof entry === 'number' ? entry : entry.selfId);
-    return !SHOT_IDS.has(id) || [1835, 2509, 3947].includes(id);
+    return !SHOT_IDS.has(id) || [1835, 2509, 3947].includes(id)
+        || listName === 'castellanSupplies' && [1463, 3948].includes(id);
 }
 
 // Lists are rebuilt on every lookup, so the rate is read once per build;
@@ -1164,7 +1170,7 @@ function flatten(listNames) {
     const rows = [];
 
     (listNames || []).forEach((listName) => {
-        (LISTS[listName] || []).filter(allowedEntry).map((entry) => normalizeEntry(entry, rate)).forEach((entry) => {
+        (LISTS[listName] || []).filter(entry => allowedEntry(entry, listName)).map((entry) => normalizeEntry(entry, rate)).forEach((entry) => {
             if (seen.has(entry.selfId)) return;
             seen.add(entry.selfId);
             rows.push(entry);
@@ -1309,7 +1315,7 @@ module.exports = {
         // cheapest offer, not the first NPC's price retained by flatten().
         const names = new Set([...Object.values(NPC_LISTS).flat(), ...Object.values(FALLBACKS).flat()]);
         const rate = progressionMultiplier();
-        return [...names].flatMap((name) => (LISTS[name] || []).filter(allowedEntry)
+        return [...names].flatMap((name) => (LISTS[name] || []).filter(entry => allowedEntry(entry, name))
             .map((entry) => normalizeEntry(entry, rate)));
     }
 };

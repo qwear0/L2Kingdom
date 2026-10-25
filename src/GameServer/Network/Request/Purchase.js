@@ -129,7 +129,27 @@ async function consume(session, data) {
     }
 
     if (session.activeNpcShop) {
-        const allowed = data.list.every((item) => session.activeNpcShop.itemIds.has(item.selfId));
+        const shop = session.activeNpcShop;
+        const Castellan = require('../../Lord/CastellanAccess');
+        if (Number(shop.npcSelfId) === Castellan.npcId) {
+            try {
+                Castellan.requireContact(session);
+                const Lists = invoke('GameServer/World/Generics/NpcShopBuyLists');
+                const seen = new Set();
+                if (shop.npcObjectId !== session.activeNpcTalk.objectId || !data.list.length
+                    || !data.list.every(item => {
+                        const quote = Lists.rowForNpc(Castellan.npcId, item.selfId);
+                        if (!quote || seen.has(item.selfId) || Number(quote.price) !== Number(shop.prices.get(item.selfId))) return false;
+                        seen.add(item.selfId);
+                        return Number.isSafeInteger(quote.price * item.amount) && quote.price > 0;
+                    }) || !Number.isSafeInteger(data.list.reduce((sum, item) => sum + shop.prices.get(item.selfId) * item.amount, 0))) throw Error('castellan_shop_changed');
+            } catch (_) {
+                session.activeNpcShop = null;
+                session.dataSendToMe(ServerResponse.actionFailed());
+                return;
+            }
+        }
+        const allowed = data.list.every((item) => shop.itemIds.has(item.selfId));
         if (!allowed) {
             session.activeNpcShop = null;
             session.dataSendToMe(ServerResponse.actionFailed());

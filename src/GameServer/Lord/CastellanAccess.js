@@ -1,11 +1,12 @@
-// P2 registers this identity as a permanent NPC; mutation services already
-// require the real object and physical contact, never a client-supplied ID.
+// Mutation services require the spawned object and physical contact, never
+// just a client-supplied template ID or a previously opened dialog.
 const npcId = 90002;
 const loc = Object.freeze({ locX: -12500, locY: 122816, locZ: -3114 });
 function requireContact(session, expectedActor = session?.actor) {
     const actor = session?.actor, active = session?.activeNpcTalk;
-    if (!actor || actor !== expectedActor || actor.isDead?.() || actor.state?.fetchCasts?.()
-        || session.trade || session.activeTrade || String(session.accountId).startsWith('bot_')) throw Error('lord_actor_unavailable');
+    if (!actor || actor !== expectedActor || actor.isDead?.() || actor.state?.fetchCasts?.() || actor.state?.fetchHits?.()
+        || actor.fetchPrivateStoreType?.() || session.trade || session.activeTrade || session.activeNegotiation
+        || String(session.accountId).startsWith('bot_')) throw Error('lord_actor_unavailable');
     const World = invoke('GameServer/World/World');
     const npc = World.npc?.spawns?.find(row => Number(row.fetchId?.()) === Number(active?.objectId));
     if (!npc || Number(npc.fetchSelfId?.()) !== npcId || Number(active?.selfId) !== npcId) throw Error('castellan_required');

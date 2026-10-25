@@ -30,6 +30,28 @@ const Service = {
         return Kits.loadout(classId, preference);
     },
     current(characterId, revision) { return this.find(characterId)?.orderRevision === Number(revision); },
+    async issueOrder(session, { characterId, revision, order, areaId = null }) {
+        await this.init();
+        const Access = require('./CastellanAccess');
+        const Areas = require('./GatherAreas');
+        const actor = Access.requireContact(session), ownerId = Number(actor.fetchId());
+        const row = this.find(characterId);
+        if (!this.isLord(ownerId) || !row || row.ownerCharacterId !== ownerId) throw Error('not_owned_vassal');
+        if (!Number.isSafeInteger(revision) || row.orderRevision !== revision) throw Error('vassal_order_changed');
+        if (!['gather', 'return', 'service'].includes(order) || order !== 'gather' && areaId !== null) throw Error('invalid_vassal_order');
+        const character = (await Database.fetchOwnedVassalCharacters()).find(entry => Number(entry.id) === row.characterId);
+        const validate = () => {
+            Access.requireContact(session, actor);
+            const bot = invoke('GameServer/Bot/BotManager').sessions.find(entry => Number(entry.actor?.fetchId()) === row.characterId);
+            if (bot?.partyCompanion || bot?.hotBackgroundPartyId || bot?.followPlayerSession) throw Error('vassal_in_party');
+            if (order === 'gather' && !Areas.suitable(Areas.find(areaId), bot?.actor?.fetchLevel() ?? character?.level)) throw Error('unsuitable_gather_area');
+        };
+        validate();
+        const updated = await Database.updateVassalDuty({ characterId: row.characterId, ownerCharacterId: ownerId,
+            revision, order, areaId, accountId: session.accountId, beforeWrite: validate });
+        if (!updated) throw Error('vassal_order_changed');
+        return publish(updated);
+    },
     async replaceNonGatherOrder(ownerId, characterId, revision, order) {
         if (!['return', 'service'].includes(order) || !this.owns(ownerId, characterId)) throw Error('invalid_vassal_order');
         const row = await Database.updateVassalDuty({ characterId, ownerCharacterId: ownerId, revision, order });
