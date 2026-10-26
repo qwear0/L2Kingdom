@@ -886,6 +886,15 @@ class Attack {
         if (magicSkill) {
             const autoShot = actor.backpack?.fetchAutoSpiritshot?.(actor);
             const shotKind = autoShot?.kind || actor.backpack?.fetchAutoSpiritshotKind?.(actor);
+            if (session.botSession === true && shotKind === 'blessedSpiritshot'
+                && !invoke('GameServer/Bot/Population/PopulationConfig').useBssdOutOfCombat
+                && !['enemy', 'corpse_mob'].includes(skill?.fetchTargetKind?.())
+                && actor.state?.fetchCombats?.() !== true
+                && !invoke('GameServer/Bot/AI/PartyCombatState').isActive(session.followPlayerSession || session, { ignoreLeaderSelection: true })) {
+                // The opening attack precedes combat flags; support casters may
+                // never be hit themselves. Keep both offensive and party-combat casts charged.
+                return;
+            }
             if (!actor.spiritshotLoaded && shotKind && typeof actor.backpack.consumeSpiritshot === 'function') {
                 actor.backpack.consumeSpiritshot(session, (success, shot = {}) => {
                     if (success) {

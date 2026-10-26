@@ -20,6 +20,8 @@ Read this to distinguish active vassal execution from retained population machin
 
 WorldObserver Bot settings describes **player-owned vassal behavior and optional AI dialogue**. Owned-only is read-only. `pvpAggression` (0..1) and `knowledgeErrorsEnabled` remain restart settings because `PopulationConfig` snapshots file/environment overrides; knowledge is not erased. PvP is initiation/risk/retreat behavior, not a probability of attacking every encounter, and self-defense remains at zero. Population environment ownership locks the relevant controls.
 
+`useBssdOutOfCombat` is a restart setting, disabled by default: bots do not automatically charge blessed spiritshots for peaceful buffs/heals/other magic. Offensive casts (including the opening cast), the bot's own combat state and active party combat still permit charging; merely selecting a hostile leader target is not combat. WorldObserver renders **Use BSSD outside combat** as a checkbox; `BOT_USE_BSSD_OUT_OF_COMBAT` can own the setting. Player auto-shot preferences, ordinary spiritshots and soulshots are unchanged.
+
 Inactive ambient counts/seeders, cold travel, background services, autonomous clans and static-shot restrictions are not offered as functional controls. Diagnostics remain restart settings under Server management with master/detail dependency. AI enabled/model/router/concurrency have a separate live dispatch contract; see [AI](ai-social.md) and [Settings](world-observer.md). Saving a configuration never starts workers or restarts gameplay.
 
 ## Live bot lifecycle
