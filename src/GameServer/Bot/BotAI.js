@@ -254,7 +254,7 @@ const BotAI = {
 
         // Even urgent damage/player-interaction reactions must leave the
         // network callback before AI work starts. The dispatcher prioritizes
-        // them, coalesces duplicate wakes, and runs one actor per turn.
+        // them, coalesces duplicate wakes, and runs short bounded batches per turn.
         this.scheduleTick(session, 0, { urgent });
     },
 

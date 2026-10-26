@@ -15,15 +15,22 @@ function wait(ms = 10) {
 async function main() {
     Dispatcher.resetForTest();
     const order = [];
-    const first = {};
-    const second = {};
-    Dispatcher.enqueue(first, () => {
-        order.push('actor-1');
-        setTimeout(() => order.push('player-timer'), 0);
+    const finished = new Promise((resolve) => {
+        for (let id = 0; id < 40; id += 1) {
+            Dispatcher.enqueue({}, () => {
+                order.push(id);
+                if (id === 0) setTimeout(() => order.push('player-timer'), 0);
+                if (id === 39) resolve();
+            });
+        }
     });
-    Dispatcher.enqueue(second, () => order.push('actor-2'));
-    await wait(20);
-    assert.deepStrictEqual(order, ['actor-1', 'player-timer', 'actor-2'], 'dispatcher must yield to timers between actors');
+    assert.deepStrictEqual(order, [], 'enqueue must enter asynchronously');
+    await finished;
+    const beforeTimer = order.indexOf('player-timer');
+    assert(beforeTimer > 0 && beforeTimer <= 16, 'dispatcher must yield before an over-cap queue is exhausted');
+    assert.deepStrictEqual(order.filter(Number.isInteger), Array.from({ length: 40 }, (_, id) => id), 'normal lane must stay FIFO');
+    assert(Dispatcher.snapshot().batches >= 3);
+    assert(Dispatcher.snapshot().yields >= 2);
 
     Dispatcher.resetForTest();
     let duplicateRuns = 0;
@@ -42,6 +49,82 @@ async function main() {
     assert.strictEqual(Dispatcher.snapshot().completed, 0);
 
     Dispatcher.resetForTest();
+    const priority = [];
+    const promoted = {};
+    Dispatcher.enqueue({}, () => priority.push('normal-1'));
+    Dispatcher.enqueue(promoted, () => priority.push('promoted'));
+    Dispatcher.enqueue({}, () => priority.push('normal-2'));
+    Dispatcher.enqueue(promoted, () => assert.fail('promotion must retain the original task'), { urgent: true });
+    Dispatcher.enqueue({}, () => priority.push('urgent'), { urgent: true });
+    await wait(20);
+    assert.deepStrictEqual(priority, ['promoted', 'urgent', 'normal-1', 'normal-2']);
+    assert.strictEqual(Dispatcher.snapshot().started, 4, 'stale promotion copies must not execute');
+
+    Dispatcher.resetForTest();
+    const { performance } = require('perf_hooks');
+    const clockDescriptor = Object.getOwnPropertyDescriptor(performance, 'now');
+    let clock = 0;
+    // Advancing the clock on reads makes tombstone-budget checks deterministic,
+    // without asserting exact wall-clock timing on a loaded machine.
+    Object.defineProperty(performance, 'now', { configurable: true, value: () => (clock += 0.25) });
+    try {
+        for (let index = 0; index < 80; index += 1) {
+            const key = {};
+            Dispatcher.enqueue(key, () => assert.fail('canceled queue copies must not execute'));
+            Dispatcher.cancel(key);
+        }
+        const staleOrder = [];
+        const key = {};
+        Dispatcher.enqueue(key, () => {
+            staleOrder.push('urgent');
+            setTimeout(() => staleOrder.push('timer'), 0);
+        });
+        Dispatcher.enqueue(key, () => {}, { urgent: true });
+        await new Promise((resolve) => Dispatcher.enqueue({}, () => { staleOrder.push('tail'); resolve(); }));
+        assert.deepStrictEqual(staleOrder, ['urgent', 'timer', 'tail'], 'stale traversal must also yield to timers');
+        assert(Dispatcher.snapshot().batches > 2, 'canceled entries must consume slice time');
+        assert.strictEqual(Dispatcher.snapshot().depth, 0);
+        assert.strictEqual(Dispatcher.snapshot().started, 2);
+
+        Dispatcher.resetForTest();
+        const slowOrder = [];
+        Dispatcher.enqueue({}, () => {
+            slowOrder.push('slow');
+            clock += 10;
+            setTimeout(() => slowOrder.push('timer'), 0);
+        });
+        await new Promise((resolve) => Dispatcher.enqueue({}, () => { slowOrder.push('next'); resolve(); }));
+        assert.deepStrictEqual(slowOrder, ['slow', 'timer', 'next'], 'a slow task must end its batch');
+    } finally {
+        if (clockDescriptor) Object.defineProperty(performance, 'now', clockDescriptor);
+        else delete performance.now;
+        Dispatcher.resetForTest();
+    }
+
+    const failures = [];
+    const originalError = console.error;
+    console.error = (...args) => failures.push(args);
+    const recovered = [];
+    try {
+        Dispatcher.enqueue({}, () => {
+            Dispatcher.enqueue({}, () => recovered.push('enqueued-in-task'));
+            throw new Error('task failure');
+        }, { onError: () => { throw new Error('handler failure'); } });
+        Dispatcher.enqueue({}, () => recovered.push('remaining'));
+        await wait(20);
+        assert.deepStrictEqual(recovered, ['remaining', 'enqueued-in-task']);
+        assert.strictEqual(failures.length, 1, 'error-handler failure must be reported');
+        assert.strictEqual(Dispatcher.snapshot().errors, 1);
+        assert.strictEqual(Dispatcher.snapshot().started, 3);
+        assert.strictEqual(Dispatcher.snapshot().completed, 2);
+        Dispatcher.enqueue({}, () => recovered.push('later'));
+        await wait(20);
+        assert.strictEqual(recovered.at(-1), 'later', 'failure must clear draining state and permit later work');
+    } finally {
+        console.error = originalError;
+        Dispatcher.resetForTest();
+    }
+
     const originalTick = BotAI.tick;
     const originalDelay = BotAI.calculateNextTickDelay;
     let ticks = 0;

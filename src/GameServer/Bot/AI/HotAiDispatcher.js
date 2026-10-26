@@ -4,13 +4,17 @@ const DiagnosticConfig = require('../Population/PopulationConfig');
 const { performance } = require('perf_hooks');
 
 const SAMPLE_LIMIT = 1024;
+const BATCH_TASK_LIMIT = 16;
+const BATCH_BUDGET_MS = 2;
+const COMPACT_LIMIT = 1024;
 const PROCESS_STARTED_AT = Math.round(Date.now() - process.uptime() * 1000);
-const urgentQueue = [];
-const normalQueue = [];
+const urgentQueue = { entries: [], head: 0 };
+const normalQueue = { entries: [], head: 0 };
 const pending = new Map();
 const waitSamples = [];
 const runSamples = [];
 let drainTimer = null;
+let draining = false;
 
 const counters = {
     enqueued: 0,
@@ -21,6 +25,7 @@ const counters = {
     errors: 0,
     urgent: 0,
     yields: 0,
+    batches: 0,
     maxDepth: 0
 };
 
@@ -35,40 +40,71 @@ function percentile(values, fraction) {
     return Number(sorted[Math.min(sorted.length - 1, Math.ceil(sorted.length * fraction) - 1)].toFixed(2));
 }
 
-function nextEntry() {
-    for (;;) {
-        const entry = urgentQueue.shift() || normalQueue.shift();
-        if (!entry) return null;
-        if (!entry.canceled && pending.get(entry.key) === entry) return entry;
+function compact(queue) {
+    if (pending.size === 0 || queue.head === queue.entries.length) {
+        queue.entries.length = 0;
+        queue.head = 0;
+    } else if (queue.head >= COMPACT_LIMIT && queue.entries.length - queue.head <= COMPACT_LIMIT) {
+        // Copy at most a bounded tail, not the entire backlog on every turn.
+        queue.entries = queue.entries.slice(queue.head);
+        queue.head = 0;
     }
 }
 
+function nextEntry(deadline) {
+    // Canceled entries and the normal copies of promoted entries consume the
+    // same time budget as live work, otherwise a tombstone backlog can stall IO.
+    while (performance.now() < deadline) {
+        const queue = urgentQueue.head < urgentQueue.entries.length ? urgentQueue : normalQueue;
+        if (queue.head === queue.entries.length) return null;
+        const entry = queue.entries[queue.head++];
+        if (!entry.canceled && pending.get(entry.key) === entry) return entry;
+    }
+    return null;
+}
+
 function scheduleDrain() {
-    if (drainTimer || pending.size === 0) return;
-    // A zero-delay timer creates a macrotask boundary between actors. Timers
-    // that serve real players can therefore run before the next AI decision.
+    if (draining || drainTimer || pending.size === 0) return;
+    // Real-player timers get a macrotask boundary between bounded AI batches,
+    // not necessarily between actors. A single synchronous task cannot be preempted.
     drainTimer = setTimeout(drain, 0);
 }
 
 function drain() {
     drainTimer = null;
-    const entry = nextEntry();
-    if (!entry) return;
-    pending.delete(entry.key);
-    if (DiagnosticConfig.developerDiagnostics) {
-        counters.started += 1;
-        sample(waitSamples, performance.now() - entry.queuedAt);
-    }
-    const startedAt = DiagnosticConfig.developerDiagnostics ? performance.now() : 0;
+    draining = true;
+    const deadline = performance.now() + BATCH_BUDGET_MS;
+    DiagnosticConfig.developerDiagnostics && (counters.batches += 1);
     try {
-        entry.task();
-        DiagnosticConfig.developerDiagnostics && (counters.completed += 1);
-    } catch (error) {
-        DiagnosticConfig.developerDiagnostics && (counters.errors += 1);
-        if (typeof entry.onError === 'function') entry.onError(error);
-        else console.error('Hot AI dispatch error:', error);
+        for (let executed = 0; executed < BATCH_TASK_LIMIT; executed += 1) {
+            const entry = nextEntry(deadline);
+            if (!entry) break;
+            pending.delete(entry.key);
+            const startedAt = DiagnosticConfig.developerDiagnostics ? performance.now() : 0;
+            if (DiagnosticConfig.developerDiagnostics) {
+                counters.started += 1;
+                sample(waitSamples, startedAt - entry.queuedAt);
+            }
+            try {
+                entry.task();
+                DiagnosticConfig.developerDiagnostics && (counters.completed += 1);
+            } catch (error) {
+                DiagnosticConfig.developerDiagnostics && (counters.errors += 1);
+                if (typeof entry.onError === 'function') {
+                    try {
+                        entry.onError(error);
+                    } catch (handlerError) {
+                        console.error('Hot AI error handler failed:', handlerError, 'Original error:', error);
+                    }
+                } else console.error('Hot AI dispatch error:', error);
+            } finally {
+                if (DiagnosticConfig.developerDiagnostics) sample(runSamples, performance.now() - startedAt);
+            }
+        }
     } finally {
-        if (DiagnosticConfig.developerDiagnostics) sample(runSamples, performance.now() - startedAt);
+        compact(urgentQueue);
+        compact(normalQueue);
+        draining = false;
         if (pending.size > 0) {
             DiagnosticConfig.developerDiagnostics && (counters.yields += 1);
             scheduleDrain();
@@ -84,7 +120,7 @@ function enqueue(key, task, options = {}) {
         if (options.urgent === true && !existing.urgent) {
             existing.urgent = true;
             DiagnosticConfig.developerDiagnostics && (counters.urgent += 1);
-            urgentQueue.push(existing);
+            urgentQueue.entries.push(existing);
         }
         return false;
     }
@@ -97,7 +133,7 @@ function enqueue(key, task, options = {}) {
         canceled: false
     };
     pending.set(key, entry);
-    (entry.urgent ? urgentQueue : normalQueue).push(entry);
+    (entry.urgent ? urgentQueue : normalQueue).entries.push(entry);
     DiagnosticConfig.developerDiagnostics && (counters.enqueued += 1);
     if (entry.urgent) DiagnosticConfig.developerDiagnostics && (counters.urgent += 1);
     DiagnosticConfig.developerDiagnostics && (counters.maxDepth = Math.max(counters.maxDepth, pending.size));
@@ -151,8 +187,11 @@ function resetForTest() {
     if (drainTimer) clearTimeout(drainTimer);
     drainTimer = null;
     pending.clear();
-    urgentQueue.length = 0;
-    normalQueue.length = 0;
+    draining = false;
+    urgentQueue.entries.length = 0;
+    urgentQueue.head = 0;
+    normalQueue.entries.length = 0;
+    normalQueue.head = 0;
     waitSamples.length = 0;
     runSamples.length = 0;
     Object.keys(counters).forEach((key) => { counters[key] = 0; });
