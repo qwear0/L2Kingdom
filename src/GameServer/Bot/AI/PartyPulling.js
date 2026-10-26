@@ -180,11 +180,12 @@ function supportMembers(leaderSession, puller) {
     }));
 }
 
-// The human leader is a recipient, not an autonomous provider.  They may
-// know support skills, but only companion sessions run the support AI.
+// The connected leader participates only during its own eligible auto-fight
+// run. Every provider still dispatches through its own controller.
 function supportProviders(leaderSession) {
     return PartyAwareness.partySessions(leaderSession)
-        .filter((memberSession) => memberSession !== leaderSession)
+        .filter((memberSession) => memberSession !== leaderSession
+            || memberSession.actor?.playerAutoFight?.supportAvailable())
         .map((memberSession) => memberSession.actor)
         .filter(Boolean);
 }
@@ -192,7 +193,7 @@ function supportProviders(leaderSession) {
 function pauseReason(leaderSession, puller) {
     const state = pullState(leaderSession);
     const autoFight = invoke('GameServer/Actor/PlayerAutoFightPolicy').forLeader(leaderSession);
-    if (autoFight && (autoFight.run.recovery || autoFight.needsRecovery() || autoFight.run.wait
+    if (autoFight && (autoFight.run.recovery || autoFight.needsRecovery() || autoFight.run.wait || autoFight.capacityBlocked()
         || !['seeking', 'fighting'].includes(autoFight.run.state) || !autoFight.inside(leaderSession.actor))) {
         return 'player_auto_fight_recovery';
     }

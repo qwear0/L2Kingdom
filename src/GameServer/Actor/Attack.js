@@ -322,7 +322,7 @@ class Attack {
         const actor = session.actor;
         const owner = options.actionOwner;
         if (!invoke('GameServer/Actor/PlayerActionOwner').current(session, actor, owner)) return;
-        if (owner && (!owner.controller.legalTarget(creature) || !owner.controller.allowsSkill(skill))) return;
+        if (owner && (!owner.controller.legalActionTarget(creature, skill) || !owner.controller.allowsSkill(skill))) return;
         const raidParty = invoke('GameServer/Clan/ClanRaidRoster').offensiveParty(session);
         const corpseTarget = ['corpse_mob', 'corpse_player', 'corpse_pet', 'corpse_ally']
             .includes(skill.fetchTargetKind?.());
@@ -362,7 +362,9 @@ class Attack {
 
         const AutoFightPolicy = invoke('GameServer/Actor/PlayerAutoFightPolicy');
         const controller = AutoFightPolicy.forAction(session, actor, owner);
-        const offensive = skill.fetchTargetKind?.() === 'enemy' || skill.fetchTargetKind?.() === 'corpse_mob';
+        // Owned corpse casts are limited to validated corpse summons (Sweep
+        // uses its utility path). Offensive corpse explosions remain ineligible.
+        const offensive = skill.fetchTargetKind?.() === 'enemy' || (!owner && skill.fetchTargetKind?.() === 'corpse_mob');
         const acceptedTargets = controller && offensive ? this.resolveSkillTargets(session, actor, creature, skill) : null;
         if (acceptedTargets && !AutoFightPolicy.canStart(session, actor, acceptedTargets, owner)) return;
         if (controller && !offensive && (controller.run?.recovery || controller.needsRecovery())
@@ -425,7 +427,7 @@ class Attack {
 
     launchRemoteCast(session, actor, creature, skill, corpseTarget, cast = {}) {
         if (cast.actionOwner && (session.actor !== actor || this.activeCast !== cast.castState)) return;
-        if (cast.actionOwner ? (actor.state.fetchDead() || creature.state.fetchDead())
+        if (cast.actionOwner ? (actor.state.fetchDead() || (!corpseTarget && creature.state.fetchDead()))
             : (this.blockedPvpDefense(session, actor, creature, skill)
                 || this.checkParticipants(actor, creature, { allowDeadTarget: corpseTarget }))) {
             this.clearTimers();
@@ -454,7 +456,7 @@ class Attack {
         // can interleave before MP and effects resolve. Stop watching the
         // target before the authoritative cast work begins.
         HotPartyCastTracker.clear(actor);
-        if (actionOwner ? (actor.state.fetchDead() || creature.state.fetchDead())
+        if (actionOwner ? (actor.state.fetchDead() || (!corpseTarget && creature.state.fetchDead()))
             : (this.blockedPvpDefense(session, actor, creature, skill) || this.checkParticipants(actor, creature, { allowDeadTarget: corpseTarget }))) {
             if (actionOwner) actor.state.setCasts(false);
             invoke('GameServer/Bot/AI/BotSupportPlanner').cancelSupportCast(session, actor);

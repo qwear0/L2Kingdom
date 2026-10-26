@@ -1418,8 +1418,6 @@ const FollowingState = {
                 PartyPulling.supportProviders(playerSession)
             )
         ));
-        const routineHealCandidate = role === 'healer' ? BotSkillCapabilities.selectHealSkill(bot) : null;
-        const emergencyHealCandidate = role === 'healer' ? BotSkillCapabilities.selectHealSkill(bot, { emergency: true }) : null;
         const rechargeSkill = role === 'healer' ? BotSkillCapabilities.manaRechargeSkill(bot) : null;
         const woundedPartyMember = role === 'healer'
             ? weakestPartyMember(playerSession, bot, pulling.puller?.actor)
@@ -1427,14 +1425,11 @@ const FollowingState = {
         const woundedPartyCount = role === 'healer'
             ? partyMembersInSupportRange(playerSession, bot).filter((entry) => entry.hpRatio < 0.70).length
             : 0;
-        const groupHealCandidate = role === 'healer' && woundedPartyCount >= 2
-            ? BotSkillCapabilities.selectHealSkill(bot, { group: true })
-            : null;
-        const canAffordHeal = (skill) => !!skill && bot.canUseSkill?.(skill) !== false && bot.fetchMp() >= skill.fetchConsumedMp();
-        const routineHealSkill = routineHealCandidate;
-        const emergencyHealSkill = canAffordHeal(emergencyHealCandidate) ? emergencyHealCandidate : routineHealCandidate;
-        const groupHealSkill = canAffordHeal(groupHealCandidate) ? groupHealCandidate : null;
-        const topOffHealSkill = groupHealSkill || routineHealSkill;
+        const healing = role === 'healer'
+            ? invoke('GameServer/Bot/AI/BotHealingPolicy').select(bot, woundedPartyMember, woundedPartyCount, botVitals.hpRatio, botVitals.mpRatio)
+            : {};
+        const { routine: routineHealSkill, emergency: emergencyHealSkill, group: groupHealSkill, topOff: topOffHealSkill,
+            canAfford: canAffordHeal } = healing;
         const safeManaPartyMember = !recovering && role === 'healer' && rechargeSkill && !partyThreat && !leaderTargetId
             ? lowestManaPartyMember(playerSession, bot, pulling.puller?.actor)
             : null;
@@ -1449,11 +1444,7 @@ const FollowingState = {
         const manaPartyMember = emergencyTankManaMember || safeManaPartyMember;
         // Healing is the healer's first obligation.  Do not queue a regular
         // party buff and then overwrite it with a heal in this same AI tick.
-        const healerNeedsAction = role === 'healer' && (
-            (woundedPartyMember?.hpRatio < 0.45 && canAffordHeal(emergencyHealSkill)) ||
-            (woundedPartyMember?.hpRatio < 0.70 && botVitals.mpRatio >= 0.35 && canAffordHeal(topOffHealSkill)) ||
-            (botVitals.hpRatio < 0.55 && botVitals.mpRatio >= 0.25 && canAffordHeal(emergencyHealSkill))
-        );
+        const healerNeedsAction = !!healing.action;
         if (healerNeedsAction && !impairments.silenced) {
             preemptForPriorityHeal(session, bot);
         }

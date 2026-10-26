@@ -261,14 +261,15 @@ function randomMember(members) {
     return members[index];
 }
 
-function nextTurnMember(leaderSession, members) {
+function nextTurnMember(leaderSession, members, reservation = null) {
     if (members.length === 0) return null;
 
     const settings = settingsForLeader(leaderSession);
     const rawLastIndex = Number(settings.itemLastLootIndex);
     const lastIndex = Number.isFinite(rawLastIndex) ? rawLastIndex : -1;
     const nextIndex = (lastIndex + 1) % members.length;
-    settings.itemLastLootIndex = nextIndex;
+    if (reservation) reservation.commit = () => { settings.itemLastLootIndex = nextIndex; };
+    else settings.itemLastLootIndex = nextIndex;
     return members[nextIndex];
 }
 
@@ -369,13 +370,17 @@ function queuedGroundLootIds(leaderSession) {
         .filter(Boolean));
 }
 
+const groundPickupBackoff = new WeakMap();
+
 function availableGroundLoot(leaderSession) {
+    const rejected = groundPickupBackoff.get(leaderSession);
+    if (rejected) for (const [id, until] of rejected) if (until <= Date.now()) rejected.delete(id);
     const members = [leaderSession, ...membersForLeader(leaderSession)]
         .filter(isAliveOnline);
     const queuedIds = queuedGroundLootIds(leaderSession);
     return (world().items?.spawns || [])
         .filter((item) => item?.fetchId && item?.fetchLocX && item?.fetchLocY)
-        .filter((item) => !queuedIds.has(Number(item.fetchId())))
+        .filter((item) => !queuedIds.has(Number(item.fetchId())) && !rejected?.has(Number(item.fetchId())))
         .filter((item) => isOwnedPartyGroundLoot(leaderSession, item))
         .filter((item) => isInsidePartyGroundLootLeash(leaderSession, item))
         .filter((item) => members.some((memberSession) => distance2d(memberSession.actor, item) <= PARTY_GROUND_LOOT_LEASH_RADIUS))
@@ -554,8 +559,14 @@ function startQueuedGroundPickup(pickerSession) {
     }
     const Generics = invoke(path.actor);
     Generics.stopAutomation(pickerSession, picker);
-    Generics.pickupExec(pickerSession, picker, pickup, () => {
+    Generics.pickupExec(pickerSession, picker, pickup, (result) => {
         if (Number(pickerSession.partyGroundPickupAttempt) !== attempt) return;
+        // Capacity rejection leaves the drop in place. Do not immediately
+        // enqueue it again from this completion's reconciliation microtask.
+        if (result && result.status !== 'awarded') {
+            if (!groundPickupBackoff.has(leaderSession)) groundPickupBackoff.set(leaderSession, new Map());
+            groundPickupBackoff.get(leaderSession).set(Number(pickup.id), Date.now() + 30000);
+        }
         picker.state?.setPickinUp?.(false);
         if (queue[0]?.id === pickup.id) {
             queue.shift();
@@ -976,7 +987,7 @@ const PartyCompanionService = {
         return false;
     },
 
-    resolveLootSession(looterSession, selfId, target, { spoil = false } = {}) {
+    resolveLootSession(looterSession, selfId, target, { spoil = false, reservation = null } = {}) {
         const leaderSession = partyLeaderSession(looterSession);
         const members = lootMembersForLeader(leaderSession, target);
         if (!leaderSession || members.length <= 1) return looterSession;
@@ -989,7 +1000,7 @@ const PartyCompanionService = {
                 ? members.find(member => Number(member.actor.fetchId()) === Number(agreement.help.payerId)) : null;
             if (payer) return payer;
             if (spoil && agreement.spoil === 'spoiler') return looterSession;
-            if (agreement.mode === 'turn') return nextTurnMember(leaderSession, members) || looterSession;
+            if (agreement.mode === 'turn') return nextTurnMember(leaderSession, members, reservation) || looterSession;
             if (agreement.mode === 'random') return randomMember(members) || looterSession;
             if (agreement.mode === 'need') {
                 const Context = invoke('GameServer/Bot/Economy/EconomyContext');
@@ -1003,7 +1014,7 @@ const PartyCompanionService = {
             return randomMember(members) || looterSession;
         }
         if (distribution === 3 || distribution === 4) {
-            return nextTurnMember(leaderSession, members) || looterSession;
+            return nextTurnMember(leaderSession, members, reservation) || looterSession;
         }
         return members.includes(looterSession) ? looterSession : (leaderSession || looterSession);
     },
@@ -1035,6 +1046,7 @@ const PartyCompanionService = {
 
     reconcileGroundLoot,
     groundLootLeader: partyLeaderSession,
+    isOwnedPartyGroundLoot,
 
     bringToLeader(leaderSession, companionSession) {
         if (!isActiveCompanion(companionSession, leaderSession)) return false;

@@ -255,17 +255,17 @@ class Automation extends SelectedModel {
 
     scheduleAction(session, src, dst, radius, callback, options = {}) {
         const owner = options.actionOwner;
-        if (['attack', 'skill'].includes(options.action)
+        if (['attack', 'skill'].includes(options.action) && !(owner && options.skill?.fetchTargetKind?.() === 'corpse_mob')
             && !invoke('GameServer/Actor/PlayerAutoFightPolicy').canStart(session, src, [dst], owner)) return false;
         if (owner) {
             if (!invoke('GameServer/Actor/PlayerActionOwner').current(session, src, owner)
-                || !owner.controller.legalTarget(dst)) return false;
+                || !owner.controller.legalActionTarget(dst, options.skill)) return false;
             const range = options.collisionAware
                 ? AttackRange.effectiveRange(src, dst, radius) : Math.max(0, Number(radius) || 0);
             this.actionOwner = owner;
             const execute = () => {
                 if (!invoke('GameServer/Actor/PlayerActionOwner').current(session, src, owner)
-                    || !owner.controller.legalTarget(dst)) return;
+                    || !owner.controller.legalActionTarget(dst, options.skill)) return;
                 this.actionOwner = owner;
                 owner.run.dispatched = true;
                 const restrictions = invoke('GameServer/Effects/EffectRestrictions');
@@ -284,7 +284,7 @@ class Automation extends SelectedModel {
                 execute();
                 return true;
             }
-            return owner.approach(dst, range, execute);
+            return owner.approach(dst, range, execute, options.skill);
         }
         // MoveToPawn interpolates a straight line. Bot actions must not use
         // it to cross a wall, even when the target is already in hit range.

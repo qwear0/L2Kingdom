@@ -11,6 +11,14 @@ Read this before moving items/Adena, changing custody or reusing a transaction A
 
 A service must distinguish pending live state, committed durable state and response/UI publication. A response failure after commit does not justify issuing the economic operation again without its replay contract.
 
+## Ground pickup and award outcomes
+
+`World/Generics/PickupItem.js` serializes native ground claims, resolves party distribution once, then uses `PurchaseItem.serialize` to wait for all recipient backpack award queues. `Inventory/PickupCapacity.js` validates the same allocation against `InventoryLimits`, current stacks and projected native mass/load. Rejected/missing/ineligible drops remain on the ground; a rejected turn allocation does not advance `itemLastLootIndex` and is never redirected to a roomier recipient. Ordinary non-pickup awards share the queue but do not acquire a new universal capacity contract.
+
+Admission precedes canonical ground removal. Once claimed, native grants use `PurchaseItem.awardItem`; pickup completion returns `missing`, `ineligible`, `capacity`, `rejected`, `awarded` or `award_failed`. `Actor/Generics/PickupExec` forwards the result only after the award, not merely movement/animation. Success text is sent only for awarded allocations. Companion ground-queue completion consumes the outcome and suppresses failed items for 30 seconds, preventing immediate re-enqueue of a capacity-rejected drop. Presentation failure after a committed/live grant remains `awarded`, not permission to duplicate it.
+
+This is not one atomic ground/SQLite/multi-recipient transaction. A persistence/live-publication failure may leave a partially awarded, already claimed drop. It is logged and returned as `award_failed`; auto-fight latches a visible hunting/pickup pause and does not blindly respawn/retry the drop. Sweep and other non-ground grants retain their native custody rules; this phase does not redesign all economy operations. See [player auto-fight](world-combat.md#connected-player-auto-fight-p3-skills-support-and-pickup) for its 200-unit physical approach and capacity pause.
+
 ## Crafting
 
 `src/GameServer/Crafting/RecipeCrafting.js` validates recipe, skill, MP and materials; locks the crafter, flushes pending state, commits through Database, then publishes results. The database rechecks physical sources and atomically consumes materials, spends MP and creates output on success. A failed craft can consume its inputs; “transaction committed” does not mean “craft succeeded.”

@@ -94,7 +94,8 @@ function castUtilitySkill(session, actor, target, skill, effect, offensiveTarget
     HotPartyCastTracker.begin(session, actor, target, skill);
     // Utility casts bypass Attack.remoteHit. Track their accepted recipients
     // too, so recovery cannot overlook a companion's in-flight Spoil Festival.
-    const cast = autoFight ? { target, skill, autoFightTargets: offensiveTargets } : null;
+    const actionOwner = actor.playerAutoFight?.run?.owner;
+    const cast = autoFight || actionOwner ? { target, skill, autoFightTargets: offensiveTargets || [] } : null;
     if (cast) {
         actor.attack.activeCast = cast;
         autoFight.acceptTargets(offensiveTargets);
@@ -291,3 +292,4 @@ const SpoilSweep = {
 
 module.exports = SpoilSweep;
 module.exports.rollSpoils = rollSpoils;
+module.exports.hasSpoils = hasSpoils;

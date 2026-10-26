@@ -8,7 +8,8 @@ const PET_HEAL_IDS = new Set([1127, 1300]);
 const PET_BUFF_IDS = new Set([1139, 1140, 1141, 1144, 1145, 1146, 1299, 1301]);
 
 function skillsFor(actor) {
-    return actor?.skillset?.skills || actor?.skillset?.fetchSkills?.() || [];
+    return (actor?.skillset?.skills || actor?.skillset?.fetchSkills?.() || [])
+        .filter(skill => invoke('GameServer/Bot/AI/BotClassPolicy').skillAllowed(actor, skill));
 }
 
 function isSummonSkill(skill) {
@@ -117,11 +118,12 @@ function effectActive(summon, skill) {
     });
 }
 
-function cast(session, actor, summon, skill, Generics) {
+function cast(session, actor, summon, skill, Generics, options = {}) {
     Generics.skillExec(session, actor, {
         id: summon.fetchId(),
         selfId: skill.fetchSelfId(),
-        ctrl: true
+        ctrl: true,
+        actionOwner: options.actionOwner
     });
     return {
         handled: true,
@@ -130,10 +132,12 @@ function cast(session, actor, summon, skill, Generics) {
     };
 }
 
-function combatAction(session, actor, target, Generics) {
+function combatAction(session, actor, target, Generics, options = {}) {
     const isSummoner = BotRoles.isSummoner(actor);
     const isNecromancer = BotRoles.isNecromancer(actor);
-    if (!actor || (!isSummoner && !isNecromancer)) return { handled: false, reason: 'not_summoner' };
+    if (!actor || (!isSummoner && !isNecromancer && !(options.commandOwner && SummonControl.activeSummon(actor)))) {
+        return { handled: false, reason: 'not_summoner' };
+    }
 
     rememberNecromancerTarget(session, actor, target);
 
@@ -144,7 +148,8 @@ function combatAction(session, actor, target, Generics) {
             Generics.skillExec(session, actor, {
                 id: target.fetchId(),
                 selfId: corpseSkill.fetchSelfId(),
-                ctrl: true
+                ctrl: true,
+                actionOwner: options.actionOwner
             });
             return { handled: true, reason: 'summon_corpse', skill: corpseSkill, target };
         }
@@ -159,23 +164,29 @@ function combatAction(session, actor, target, Generics) {
         Generics.skillExec(session, actor, {
             id: actor.fetchId(),
             selfId: skill.fetchSelfId(),
-            ctrl: true
+            ctrl: true,
+            actionOwner: options.actionOwner
         });
         return { handled: true, reason: 'summon_servitor', skill };
     }
 
+    if (options.commandOwner && summon.state?.fetchCasts?.()) return { handled: false, reason: 'summon_casting', summon };
     const summonMaxHp = Number(summon.fetchMaxHp?.() || 0);
     const summonHp = Number(summon.fetchHp?.() || summonMaxHp);
     const heal = petSkill(actor, (skill) => PET_HEAL_IDS.has(Number(skill.fetchSelfId()))
         && summonMaxHp > 0 && summonHp / summonMaxHp < 0.7);
-    if (heal) return cast(session, actor, summon, heal, Generics);
+    if (heal) return cast(session, actor, summon, heal, Generics, options);
 
     if (target) {
+        if (options.commandOwner && Number(summon.fetchSummonSkillId?.()) === 301) {
+            return { handled: false, reason: 'summon_no_basic_attack', summon, target };
+        }
         const targetId = Number(target.fetchId?.() || 0);
         const selectedId = Number(summon.attackTargetId || 0);
         if (summon.controlMode !== 'attack' || selectedId !== targetId) {
-            actor.select?.({ id: targetId });
-            SummonControl.attack(session, actor, summon);
+            if (!options.commandOwner) actor.select?.({ id: targetId });
+            SummonControl.attack(session, actor, summon, { target: options.commandOwner ? target : null,
+                commandOwner: options.commandOwner });
             // The summon keeps its own attack loop. Starting that loop must
             // not consume the owner's combat tick: the summoner can cast an
             // offensive spell while the servitor is moving into melee range.
@@ -193,9 +204,9 @@ function combatAction(session, actor, target, Generics) {
     // servitor upkeep.
     const buff = petSkill(actor, (skill) => PET_BUFF_IDS.has(Number(skill.fetchSelfId()))
         && !effectActive(summon, skill));
-    if (buff) return cast(session, actor, summon, buff, Generics);
+    if (buff) return cast(session, actor, summon, buff, Generics, options);
 
-    if (summon.controlMode !== 'follow') SummonControl.startFollowOwner(session, actor, summon);
+    if (summon.controlMode !== 'follow') SummonControl.startFollowOwner(session, actor, summon, { commandOwner: options.commandOwner });
     return { handled: true, reason: 'summon_follow', summon };
 }
 

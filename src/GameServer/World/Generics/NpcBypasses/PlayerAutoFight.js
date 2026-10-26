@@ -12,14 +12,16 @@ function render(session, page = 0) {
     const prefix = `player-auto-fight ${session.nativeAutoFightEpoch} ${revision}`;
     const command = (label, action) => Html.link(label, `${prefix} ${action}`);
     const pointText = point => point ? Html.esc(`${point.locX}, ${point.locY}, ${point.locZ}`) : 'Not set';
-    let body = Html.font('P2 bounded hunting', Html.COLOR.warn) + '<br>'
-        + 'Connected player only. No pickup, auto-support or saved settings.<br>';
+    let body = Html.font('P3 connected-player hunting', Html.COLOR.warn) + '<br>'
+        + 'Learned native skills and physical pickup. Settings are not saved yet.<br>';
     body += Html.statusTable([
         ['Status', Html.esc(controller.reason)],
         ['State', Html.esc(controller.run?.state || 'Stopped / setup')],
         ['Recovery', controller.run?.recovery ? 'Latched' : 'No'],
         ['Combat target', Html.esc(controller.combatTargetId() || 'None')],
-        ['Skill', Html.esc(controller.allowedSkillId || 'Basic attacks only')],
+        ['Basic attacks only', controller.basicAttackOnly ? 'ON' : 'OFF'],
+        ['Allowed skills', Html.esc(controller.allowedSkillIds.size)],
+        ['Pickup', controller.pickup ? 'ON' : 'OFF'],
         ['Zone center', pointText(controller.center)],
         ['Radius', Html.esc(controller.radius)],
         ['Rest point', pointText(controller.point)]
@@ -33,14 +35,16 @@ function render(session, page = 0) {
             + Html.button('Start hunting', `${prefix} start`) + '<br>';
         body += 'Start requires both points. Stop preserves them; New session clears them.<br>'
             + 'Recovery: player HP &lt;35%; resume at 95%. MP: 20%/95% only for an allowed MP-cost skill or bow attack. Party recovery also pauses pulls.<br>'
-            + command('Use basic attacks only', 'allow 0') + '<br>';
-        body += Html.section('Allow one learned single-target skill', skills.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
-            .map(skill => command(`${skill.fetchSelfId() === controller.allowedSkillId ? 'ON' : 'OFF'} ${skill.fetchName()}`,
-                `allow ${skill.fetchSelfId()}`)).join('<br>') || 'No eligible skills.');
-        body += '<br>';
-        if (page > 0) body += command('Previous', `page ${page - 1}`) + ' ';
-        if (page + 1 < pages) body += command('Next', `page ${page + 1}`);
+            + command(`Basic attacks only: ${controller.basicAttackOnly ? 'ON' : 'OFF'} (toggle)`, 'allow 0') + '<br>'
+            + command(`Physical pickup: ${controller.pickup ? 'ON' : 'OFF'} (toggle)`, 'pickup') + '<br>';
     }
+    body += Html.section(controller.run ? 'Disable allowed skills' : 'Learned skill whitelist', skills.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
+            .map(skill => controller.run && !controller.allowedSkillIds.has(skill.fetchSelfId()) ? Html.esc(`OFF ${skill.fetchName()}`)
+                : command(`${controller.allowedSkillIds.has(skill.fetchSelfId()) ? 'ON' : 'OFF'} ${skill.fetchName()}`,
+                `allow ${skill.fetchSelfId()}`)).join('<br>') || 'No eligible skills.');
+    body += '<br>';
+    if (page > 0) body += command('Previous', `page ${page - 1}`) + ' ';
+    if (page + 1 < pages) body += command('Next', `page ${page + 1}`);
     body += '<br>' + command('Refresh', `page ${page}`);
     session.dataSendToMe(Response.npcHtml(0, Html.page(body, { title: 'Auto-fight' })));
 }
@@ -57,7 +61,7 @@ function handler(session, parts) {
     if (!session?.actor || !session.nativeAutoFightOpen || session.nativeAutoFightActor !== session.actor
         || parts[1] !== String(session.nativeAutoFightEpoch) || parts[2] !== String(session.nativeAutoFightRevision)) return;
     const action = parts[3];
-    if (!['stop', 'new', 'start', 'center', 'point', 'allow', 'radius', 'page'].includes(action)) return;
+    if (!['stop', 'new', 'start', 'center', 'point', 'allow', 'radius', 'page', 'pickup'].includes(action)) return;
     const hasArgument = ['allow', 'radius', 'page'].includes(action);
     if (parts.length !== (hasArgument ? 5 : 4) || (hasArgument && !/^\d{1,6}$/.test(parts[4]))) return;
     const controller = Controller.forActor(session.actor);
@@ -70,6 +74,7 @@ function handler(session, parts) {
     else if (action === 'point') controller.rememberPoint();
     else if (action === 'allow') controller.allowSkill(Number(parts[4]));
     else if (action === 'radius') controller.setRadius(Number(parts[4]));
+    else if (action === 'pickup') controller.setPickup(!controller.pickup);
     render(session, action === 'page' ? Number(parts[4]) : 0);
 }
 

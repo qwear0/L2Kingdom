@@ -1,5 +1,6 @@
 const C4SkillRules = invoke('GameServer/Skills/C4SkillRules');
 const BuffCatalog = invoke('GameServer/Effects/BuffCatalog');
+const ClassPolicy = invoke('GameServer/Bot/AI/BotClassPolicy');
 
 const FRIENDLY_HEAL_TYPES = new Set([
     C4SkillRules.HEAL,
@@ -15,11 +16,13 @@ const FRIENDLY_MANA_TYPES = new Set([
 ]);
 
 function activeSkills(actor) {
-    return (actor?.skillset?.skills || []).filter((skill) => skill && !skill.fetchPassive?.());
+    return (actor?.skillset?.skills || []).filter((skill) => skill && !skill.fetchPassive?.()
+        && ClassPolicy.skillAllowed(actor, skill));
 }
 
 function learnedSkill(actor, selfId) {
-    return actor?.skillset?.fetchSkill?.(selfId) || null;
+    const skill = actor?.skillset?.fetchSkill?.(selfId);
+    return skill && ClassPolicy.skillAllowed(actor, skill) ? skill : null;
 }
 
 function healSkills(actor) {
@@ -32,8 +35,9 @@ function healName(skill) {
     return String(skill?.fetchName?.() || skill?.model?.name || '').toLowerCase();
 }
 
-function selectHealSkill(actor, { emergency = false, group = false } = {}) {
-    const usable = healSkills(actor);
+function selectHealSkill(actor, { emergency = false, group = false, usableOnly = false } = {}) {
+    const usable = healSkills(actor).filter(skill => !usableOnly || (actor.canUseSkill?.(skill) !== false
+        && Number(actor.fetchMp?.()) >= Number(skill.fetchConsumedMp?.())));
     const pool = group
         ? usable.filter((skill) => skill.fetchTargetKind?.() === 'party')
         : usable.filter((skill) => skill.fetchTargetKind?.() === 'friendly');

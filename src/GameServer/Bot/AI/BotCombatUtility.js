@@ -90,7 +90,7 @@ function evaluateCandidate(bot, target, skill, role, policy = {}, plannedCharges
         }
         return null;
     };
-    if (!skill || skill.fetchPassive?.()) return null;
+    if (!skill || skill.fetchPassive?.() || !ClassPolicy.skillAllowed(bot, skill, policy)) return null;
     if (target?.isDead?.() === true || target?.state?.fetchDead?.() === true || target?.fetchHp?.() <= 0) return reject('target_dead');
     if (Feedback.blocked(bot,target,skill)) return reject('native_rejection_backoff');
     // SkillRequest rejects a skill still on reuse after the combat planner has
@@ -223,7 +223,8 @@ function selectChargePlan(bot, role, policy = {}, target = null) {
     const reserve = profile.supported ? profile.manaReserve : (policy.pvp ? 0 : reserveRatio(role));
     const preparation = skills
         .filter((skill) => {
-            if (!skill || skill.fetchPassive?.() || bot.canUseSkill?.(skill) === false || Feedback.blocked(bot,bot,skill)) return false;
+            if (!skill || skill.fetchPassive?.() || !ClassPolicy.skillAllowed(bot, skill, policy)
+                || bot.canUseSkill?.(skill) === false || Feedback.blocked(bot,bot,skill)) return false;
             const semantic = skill.fetchSemantic?.() || {};
             const allowed = Number(semantic.requires?.weaponsAllowed) || 0;
             return semantic.skillType === C4SkillRules.CHARGE

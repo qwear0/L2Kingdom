@@ -1,59 +1,70 @@
 const ServerResponse = invoke('GameServer/Network/Response');
-const DataCache      = invoke('GameServer/DataCache');
-const Database       = invoke('Database');
+const DataCache = invoke('GameServer/DataCache');
+const Database = invoke('Database');
 const pendingPurchases = new WeakMap();
+
+// Reserve every recipient synchronously. Pickup admission and its awards use
+// the same queues as ordinary native grants; no nested purchaseItem calls.
+function serialize(actors, operation) {
+    const backpacks = [...new Set(actors.map(actor => actor.backpack))];
+    const previous = backpacks.map(backpack => pendingPurchases.get(backpack)).filter(Boolean);
+    const pending = Promise.all(previous).then(operation);
+    const tail = pending.catch(() => {});
+    backpacks.forEach(backpack => pendingPurchases.set(backpack, tail));
+    tail.then(() => backpacks.forEach(backpack => {
+        if (pendingPurchases.get(backpack) === tail) pendingPurchases.delete(backpack);
+    }));
+    return pending;
+}
 
 function purchaseItem(session, selfId, amount, metadata = {}) {
     const actor = session?.actor;
-    if (!actor?.backpack) return false;
-    // Several nearby ground stacks can now be picked up in one turn. Wait
-    // for the previous inventory mutation before reading the next amount.
-    const previous = pendingPurchases.get(actor.backpack);
-    const award = () => awardItem(session, actor, selfId, amount, metadata);
-    const pending = previous ? previous.then(award) : award();
-    const settled = pending.catch((err) => {
-        utils.infoWarn('GameServer', 'Item award failed actor=%s item=%s error=%s',
-            actor.fetchId(), selfId, err?.message || String(err));
-    });
-    pendingPurchases.set(actor.backpack, settled);
-    settled.then(() => {
-        if (pendingPurchases.get(actor.backpack) === settled) pendingPurchases.delete(actor.backpack);
-    });
-    return settled;
+    if (!actor?.backpack) return Promise.resolve({ status: 'rejected', reason: 'missing_actor' });
+    return serialize([actor], () => awardItem(session, actor, selfId, amount, metadata));
 }
 
-function awardItem(session, actor, selfId, amount, metadata) {
+async function awardItem(session, actor, selfId, amount, metadata = {}) {
     const backpack = actor.backpack;
-    const refreshInventory = () => {
-        if (session.actor !== actor) return;
-        session.dataSendToMe(ServerResponse.userInfo(actor));
-        session.dataSendToMe(ServerResponse.itemsList(backpack.fetchItems()));
-    };
-
-    return backpack.stackableExists(selfId).then((item) => { // Stackable item exists
-        const itemId = item.fetchId();
-        const total  = item.fetchAmount() + amount;
-
-        return Database.updateItemAmount(actor.fetchId(), itemId, total).then(() => {
-            backpack.updateAmount(itemId, total);
-            refreshInventory();
-        });
-    }, () => new Promise((resolve, reject) => { // New item
-        DataCache.fetchItemFromSelfId(selfId, (item) => {
-            Database.setItem(actor.fetchId(), {
-                  selfId: item.selfId,
-                    name: item.template.name,
-                  amount: amount,
-                 enchant: metadata.enchant ?? 0,
-                equipped: false,
-                    slot: item.etc.slot,
-                    ...(metadata.petData ? { petData: metadata.petData } : {})
-            }).then((packet) => {
-                backpack.insertItem(Number(packet.insertId), selfId, { amount: amount, ...metadata });
-                refreshInventory();
-            }).then(resolve, reject);
-        });
-    }));
+    if (session.actor !== actor || !Number.isSafeInteger(amount) || amount <= 0) {
+        return { status: 'rejected', reason: 'stale_actor_or_amount' };
+    }
+    try {
+        const stack = backpack.fetchItems().find(item => item.fetchSelfId() === selfId && item.fetchStackable());
+        if (stack) {
+            const total = stack.fetchAmount() + amount;
+            if (!Number.isSafeInteger(total)) throw new Error('Item amount overflow');
+            await Database.updateItemAmount(actor.fetchId(), stack.fetchId(), total);
+            backpack.updateAmount(stack.fetchId(), total);
+        } else {
+            let item;
+            DataCache.fetchItemFromSelfId(selfId, definition => { item = definition; });
+            if (!item) throw new Error(`Unknown item ${selfId}`);
+            const packet = await Database.setItem(actor.fetchId(), {
+                selfId: item.selfId, name: item.template.name, amount,
+                enchant: metadata.enchant ?? 0, equipped: false, slot: item.etc.slot,
+                ...(metadata.petData ? { petData: metadata.petData } : {})
+            });
+            backpack.insertItem(Number(packet.insertId), selfId, { amount, ...metadata });
+        }
+    } catch (err) {
+        utils.infoWarn('GameServer', 'Item award failed actor=%s item=%s error=%s',
+            actor.fetchId(), selfId, err?.message || String(err));
+        return { status: 'award_failed', actorId: actor.fetchId(), selfId };
+    }
+    // A presentation failure after the write is not permission to award twice.
+    try {
+        if (session.actor === actor) {
+            session.dataSendToMe(ServerResponse.userInfo(actor));
+            session.dataSendToMe(ServerResponse.itemsList(backpack.fetchItems()));
+        }
+    } catch (err) {
+        utils.infoWarn('GameServer', 'Item award presentation failed actor=%s item=%s error=%s',
+            actor.fetchId(), selfId, err?.message || String(err));
+        return { status: 'awarded', presentationFailed: true };
+    }
+    return { status: 'awarded' };
 }
 
 module.exports = purchaseItem;
+module.exports.serialize = serialize;
+module.exports.awardItem = awardItem;

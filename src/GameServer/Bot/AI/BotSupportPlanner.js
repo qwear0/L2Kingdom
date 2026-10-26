@@ -61,11 +61,13 @@ const INDIVIDUAL_BUFF_TARGET_ROLES = {
 };
 
 function supportSkills(actor) {
+    const controller = actor?.playerAutoFight;
+    if (controller?.run && !controller.supportAvailable()) return [];
     const skills = actor?.skillset?.fetchSkills?.() || actor?.skillset?.skills || [];
     const overlay = HotBotPolicyOverlay.get(actor?.session);
     const excluded = new Set(overlay?.buffPolicy?.excluded || []);
     return skills
-        .filter((skill) => skill && !skill.fetchPassive?.())
+        .filter((skill) => skill && !skill.fetchPassive?.() && ClassPolicy.skillAllowed(actor, skill))
         .filter((skill) => {
             const semantic = skill.fetchSemantic?.();
             // Heal-over-time effects are represented as temporary buffs for
@@ -82,7 +84,8 @@ function supportSkills(actor) {
                 // The current policy is deny-by-exception. Ignore the legacy
                 // `allowed` field so one old `allow` command cannot turn the
                 // whole support package exclusive.
-                ['friendly', 'ally', 'party'].includes(semantic.target);
+                (['friendly', 'ally', 'party'].includes(semantic.target)
+                    || (controller?.run && semantic.target === 'self' && !semantic.toggle));
         });
 }
 
@@ -221,7 +224,9 @@ function actorSupportStateKey(actor) {
         Number(actor?.fetchMp?.() || 0),
         isBusy(actor) ? 1 : 0,
         effects,
-        reservations
+        reservations,
+        actor?.playerAutoFight?.skillRevision || 0,
+        actor?.playerAutoFight?.run ? Number(actor.playerAutoFight.supportAvailable()) : ''
     ].join(':');
 }
 
@@ -280,6 +285,8 @@ function planningEffects(target, planning = null) {
 }
 
 function isUsefulForTarget(target, skill, provider = null, context = {}, planning = null) {
+    if (skill?.fetchTargetKind?.() === 'self' && target !== provider) return false;
+    if (provider?.playerAutoFight?.run && !provider.playerAutoFight.supportInRange(target, skill)) return false;
     const semantic = skill?.fetchSemantic?.() || {};
     if (!Intent.alive(target)) return false;
     if (skill?.fetchTargetKind?.() === 'ally' && !partyAuraRecipients([], provider, skill, planning).includes(target)) return false;
@@ -527,7 +534,9 @@ function canStartSupportCast(action, planning = null) {
     const actor = action?.provider;
     const mp = Number(actor?.fetchMp?.() || 0);
     const maxMp = Math.max(1, Number(actor?.fetchMaxMp?.() || mp || 1));
-    return canCast(actor, action?.skill) &&
+    return ClassPolicy.skillAllowed(actor, action?.skill)
+        && (!actor?.playerAutoFight?.run || actor.playerAutoFight.supportAvailable())
+        && canCast(actor, action?.skill) &&
         actor?.canUseSkill?.(action?.skill) !== false &&
         mp / maxMp >= MIN_SUPPORT_MP_RATIO &&
         !planningEffects(actor, planning).some((effect) => (
@@ -649,6 +658,9 @@ function reconcileLoadout(members,providers) {
     loadoutMaintenance.set(owner,now);
     const loadout=desiredLoadout(members,providers),removed=[];
     for(const [actor,wanted] of loadout.selected) {
+        // Auto-fight observes existing effects; companion maintenance must not
+        // remove the connected player's buffs on its behalf.
+        if (actor.playerAutoFight?.run) continue;
         const discarded=EffectStore.list(actor).filter(e=>e.type==='buff' && e.dispellable!==false && !e.toggle
             && loadout.managedByActor.get(actor).has(BuffLoadout.family(e.key,e.stackFamily)) && !wanted.has(BuffLoadout.normalize(e.key)));
         for(const effect of discarded) if(EffectStore.remove(actor,effect.key)) removed.push({actorId:actor.fetchId(),effect:effect.key});
@@ -667,6 +679,7 @@ function queueSupportCast(session, action) {
         // skillExec can first walk into cast range. Keep the party's pull
         // pause active through that approach instead of treating the cast as
         // abandoned after the old fixed five-second window.
+        actionOwner: action.actionOwner,
         expiresAt: Date.now() + PENDING_SUPPORT_CAST_TIMEOUT_MS
     };
     invalidatePartyActionCache();
@@ -688,7 +701,8 @@ function beginSupportCast(session, provider, target, skill) {
         if (session) session.pendingSupportCast = undefined;
         return false;
     }
-    const partyAura = skill?.fetchTargetKind?.() === 'party' && Number(skill?.fetchDistance?.()) < 0;
+    const partyAura = (pending.actionOwner && skill?.fetchTargetKind?.() === 'ally')
+        || (skill?.fetchTargetKind?.() === 'party' && Number(skill?.fetchDistance?.()) < 0);
     const targetMatches = Number(pending.targetId) === actorOrder(target);
     if (
         Number(pending.providerId) !== actorOrder(provider) ||
@@ -715,14 +729,16 @@ function beginSupportCast(session, provider, target, skill) {
         targetId: actorOrder(supportTarget),
         skillId: Number(skill.fetchSelfId()),
         effect: normalizedEffect(skill.fetchSemantic?.().effect),
-        startedAt: Date.now()
+        startedAt: Date.now(),
+        actionOwner: pending.actionOwner
     };
     return true;
 }
 
 function cancelPendingSupportCast(session, provider, target, skill, reason = 'rejected') {
     const pending = session?.pendingSupportCast;
-    const partyAura = skill?.fetchTargetKind?.() === 'party' && Number(skill?.fetchDistance?.()) < 0;
+    const partyAura = (pending?.actionOwner && skill?.fetchTargetKind?.() === 'ally')
+        || (skill?.fetchTargetKind?.() === 'party' && Number(skill?.fetchDistance?.()) < 0);
     const targetMatches = Number(pending?.targetId) === actorOrder(target);
     if (!pending ||
         Number(pending.providerId) !== actorOrder(provider) ||
@@ -787,7 +803,7 @@ function finishSupportCast(session, provider, skill) {
         landed ? 'landed' : 'missed',
         Math.max(0, Date.now() - Number(active.startedAt || Date.now()))
     );
-    if (Number(session.currentTargetId) === Number(active.targetId)) {
+    if (!active.actionOwner && Number(session.currentTargetId) === Number(active.targetId)) {
         session.currentTargetId = undefined;
         provider?.unselect?.();
     }
@@ -800,7 +816,14 @@ function cancelSupportCast(session, provider) {
     const pending = session.pendingSupportCast;
     session.pendingSupportCast = undefined;
     session.activeSupportCast = undefined;
-    if (active && Number(session.currentTargetId) === Number(active.targetId)) {
+    if (provider?.playerAutoFight) {
+        for (const actor of invoke('GameServer/Bot/AI/PartyAwareness').partyActors(session)) {
+            for (const [key, reservation] of Object.entries(actor.supportReservations || {})) {
+                if (reservation.casterId === actorOrder(provider)) delete actor.supportReservations[key];
+            }
+        }
+    }
+    if (active && !active.actionOwner && Number(session.currentTargetId) === Number(active.targetId)) {
         session.currentTargetId = undefined;
         provider?.unselect?.();
     }
@@ -882,6 +905,11 @@ function nextAction(caster, members, providers = members.map((member) => member.
         }
     }
     if (!next || (caster && next.provider !== caster)) return null;
+    if (!ClassPolicy.skillAllowed(next.provider, next.skill)
+        || (next.provider?.playerAutoFight?.run && !next.provider.playerAutoFight.supportAvailable())) {
+        partyActionCache.delete(cacheOwner);
+        return nextAction(caster, members, providers, options);
+    }
 
     // Other companions can reuse the party-wide choice without touching the
     // effect graph again. The selected provider still validates the cached

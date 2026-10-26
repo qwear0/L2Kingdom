@@ -10,6 +10,20 @@ It reads the existing skill tree once, indexes inherited skill unlocks, and uses
 the existing class equipment profiles. It does not read research files or call
 an LLM. SA is intentionally deferred.
 
+## Connected-player eligibility
+
+`BotClassPolicy.skillAllowed` supplies a pre-selection gate for an active
+`Actor/PlayerAutoFight` run and an optional caller predicate. Offensive choices,
+charge builders/spenders, learned heal/buff/recharge candidates, summon tactics
+and support-cache reuse apply it without mutating the learned skillbook.
+Ordinary bots without that controller retain their policy. `BotHealingPolicy`
+shares only the emergency/self-preservation/top-off decision with FollowingState.
+The automated player joins existing support planning only while eligible and
+executes its own learned native casts; it never commands companion support or
+runs loadout cleanup. This does not add class coverage: mechanical/siege summons,
+cubics, summon special-skill rotations and offensive corpse explosions remain
+outside player auto-fight selection. See [player auto-fight](../../../../docs/world-combat.md#connected-player-auto-fight-p3-skills-support-and-pickup).
+
 ## Implemented consumers
 
 - `LevelingRoutes`: the Might of Heaven route requires skill 1028. Live skillbooks

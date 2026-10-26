@@ -7,6 +7,12 @@ const RestPolicy = invoke('GameServer/Bot/AI/RestPolicy');
 const Competition = invoke('GameServer/Bot/AI/BotMobCompetition');
 const Restrictions = invoke('GameServer/Effects/EffectRestrictions');
 const NpcObjectIndex = require('../World/NpcObjectIndex');
+const CombatUtility = invoke('GameServer/Bot/AI/BotCombatUtility');
+const Capabilities = invoke('GameServer/Bot/AI/BotSkillCapabilities');
+const SupportPlanner = invoke('GameServer/Bot/AI/BotSupportPlanner');
+const SummonerTactics = invoke('GameServer/Bot/AI/SummonerTactics');
+const SummonControl = invoke('GameServer/Npc/SummonControl');
+const PickupCapacity = invoke('GameServer/Inventory/PickupCapacity');
 
 const loc = actor => ({ locX: actor.fetchLocX(), locY: actor.fetchLocY(), locZ: actor.fetchLocZ() });
 const distance = (a, b) => Math.hypot(a.locX - b.locX, a.locY - b.locY);
@@ -27,7 +33,10 @@ class PlayerAutoFight {
         this.center = null;
         this.point = null;
         this.radius = 800;
-        this.allowedSkillId = null;
+        this.allowedSkillIds = new Set();
+        this.basicAttackOnly = true;
+        this.pickup = false;
+        this.skillRevision = 0;
         this.run = null;
     }
 
@@ -41,18 +50,53 @@ class PlayerAutoFight {
             && !actor.isFlying?.() && !actor.stateWater && !actor.fetchBoatId?.() && !actor.fetchBoat?.();
     }
 
-    // P2 still allows only one learned single-target offensive skill. The
-    // shared recipient gate also protects companion AoE/polearm launches.
     eligibleSkill(skill) {
         const semantic = skill?.fetchSemantic?.();
-        return !!semantic && !skill.fetchPassive() && skill.fetchTargetKind() === 'enemy'
-            && ['damage', 'drain', 'blow'].includes(skill.fetchSkillType())
-            && (!semantic.sourceTarget || semantic.sourceTarget === 'one')
-            && !(Number(semantic.radius) > 0) && !semantic.toggle;
+        if (!semantic || skill.fetchPassive() || semantic.notUsedInC4 || semantic.toggle) return false;
+        const kind = skill.fetchTargetKind(), type = skill.fetchSkillType();
+        if ([42, 254, 302].includes(Number(skill.fetchSelfId()))) return true;
+        if (kind === 'enemy') return CombatUtility.OFFENSIVE_TYPES.has(type)
+            && !(type === 'effect' && semantic.effectType === 'debuff');
+        if (kind === 'self' && type === 'charge') return true;
+        const Roles = invoke('GameServer/Bot/AI/BotRoles');
+        if (SummonerTactics.isSummonSkill(skill)) return Roles.isSummoner(this.actor);
+        if (SummonerTactics.isCorpseSummonSkill(skill)) return Roles.isNecromancer(this.actor);
+        if (kind === 'pet') return SummonerTactics.PET_HEAL_IDS.has(Number(skill.fetchSelfId()))
+            || SummonerTactics.PET_BUFF_IDS.has(Number(skill.fetchSelfId()));
+        if (['friendly', 'party', 'ally'].includes(kind)
+            && ['heal', 'healPercent', 'healStatic', 'healHot', 'hot', 'healCleanse'].includes(type)) return true;
+        if (['friendly', 'party'].includes(kind) && ['manaRecharge', 'manaHeal'].includes(type)) return true;
+        return ['self', 'friendly', 'party', 'ally'].includes(kind) && semantic.effectType === 'buff'
+            && semantic.effect && !['hot', 'healHot', 'manaHot'].includes(type)
+            && semantic.effect !== 'kiss_of_eva';
     }
 
     allowsSkill(skill) {
-        return this.eligibleSkill(skill) && skill.fetchSelfId() === this.allowedSkillId;
+        return !this.basicAttackOnly && this.eligibleSkill(skill)
+            && this.allowedSkillIds.has(Number(skill.fetchSelfId()))
+            && this.actor.skillset.fetchSkill(skill.fetchSelfId()) === skill;
+    }
+
+    supportAvailable() {
+        const run = this.run;
+        return !!run && this.available() && !this.basicAttackOnly && !run.wait && !run.recovery
+            && !this.needsRecovery() && ['seeking', 'fighting'].includes(run.state) && this.inside(this.actor);
+    }
+
+    legalActionTarget(target, skill) {
+        if (!skill) return this.legalTarget(target);
+        if (!this.allowsSkill(skill)) return false;
+        const kind = skill.fetchTargetKind();
+        if (kind === 'enemy') return target === this.actor && skill.fetchSemantic?.().sourceTarget === 'aura'
+            ? true : this.legalTarget(target);
+        if (kind === 'corpse_mob') return this.run?.corpses.get(target.fetchId()) === target
+            && NpcObjectIndex.find(World, target.fetchId()) === target && target.isDead?.() && this.inside(target)
+            && !invoke('GameServer/Bot/AI/BotRaidSafety').isProtectedRaidEntity(target);
+        if (['self', 'party', 'ally'].includes(kind)) return target === this.actor;
+        if (kind === 'pet') return SummonControl.activeSummon(this.actor) === target;
+        return kind === 'friendly' && PartyAwareness.partyActors(this.session).includes(target)
+            && !target.isDead?.() && distance(loc(this.actor), loc(target)) <= 900
+            && Math.abs(target.fetchLocZ() - this.actor.fetchLocZ()) <= 64;
     }
 
     ordinaryMonster(target) {
@@ -96,11 +140,16 @@ class PlayerAutoFight {
     canAcquire(target, source = this.actor) {
         const run = this.run;
         return !!run && this.available() && !run.recovery && !run.defenceAnchor && !this.needsRecovery()
-            && !run.wait && ['seeking', 'fighting'].includes(run.state)
+            && !run.wait && !this.capacityBlocked() && !run.pickupPending && ['seeking', 'fighting'].includes(run.state)
             && !this.session.partyRevivalAttempt
             && !invoke('GameServer/Bot/AI/PartyPulling').hasDeadPartyMember(this.session)
             && this.ordinaryMonster(target) && this.inside(target) && this.inside(source)
             && !this.foreignEngagement(target) && Number(run.rejected.get(target.fetchId()) || 0) <= Date.now();
+    }
+
+    capacityBlocked() {
+        if (this.run && PickupCapacity.full(this.actor)) this.run.capacityWait ||= 'inventory_full';
+        return !!this.run?.capacityWait;
     }
 
     defending() {
@@ -156,11 +205,32 @@ class PlayerAutoFight {
     }
 
     allowSkill(id) {
+        if (id === 0) return this.setBasicAttackOnly(!this.basicAttackOnly);
+        const enabled = this.allowedSkillIds.has(id);
+        if (this.run && !enabled) return false;
+        const skill = this.actor.skillset.fetchSkill(id);
+        if (!enabled && !this.eligibleSkill(skill)) return false;
+        if (enabled) this.allowedSkillIds.delete(id);
+        else this.allowedSkillIds.add(id);
+        ++this.skillRevision;
+        if (this.run) {
+            SupportPlanner.cancelSupportCast(this.session, this.actor);
+            // Preserve launched casts; invalidate unlaunched preparation and routes.
+            this.clearTarget(this.run);
+        }
+        return true;
+    }
+
+    setBasicAttackOnly(value) {
         if (this.run) return false;
-        if (id === 0) { this.allowedSkillId = null; return true; }
-        const skill = this.actor.skillset.fetchSkill(Number(id));
-        if (!this.eligibleSkill(skill)) return false;
-        this.allowedSkillId = skill.fetchSelfId();
+        this.basicAttackOnly = !!value;
+        ++this.skillRevision;
+        return true;
+    }
+
+    setPickup(value) {
+        if (this.run) return false;
+        this.pickup = !!value;
         return true;
     }
 
@@ -172,8 +242,8 @@ class PlayerAutoFight {
 
     usesMana() {
         const actor = this.actor;
-        const skill = actor.skillset.fetchSkill(this.allowedSkillId);
-        if (this.allowsSkill(skill) && actor.attack.skillMpCost(actor, skill) > 0) return true;
+        if (actor.skillset.fetchSkills().some(skill => this.allowsSkill(skill)
+            && actor.attack.skillMpCost(actor, skill) > 0)) return true;
         return AttackRange.weaponKind(actor) === 'Weapon.Bow'
             && invoke('GameServer/Items/C4WeaponSA').bowMpCost(actor.backpack.fetchEquippedWeapon(), () => 1) > 0;
     }
@@ -206,13 +276,18 @@ class PlayerAutoFight {
             this.reason = 'points_too_far';
             return false;
         }
+        if (PickupCapacity.full(actor)) { this.reason = 'inventory_full'; return false; }
         invoke(path.actor).clearStoredActions(session, actor);
         actor.attack.resetQueuedEvent();
         actor.selectionRevision = Number(actor.selectionRevision || 0) + 1;
         const run = this.run = { generation: ++this.generation, kind: 'hunt', state: 'seeking',
             center: { ...this.center }, rest: { ...this.point }, radius: this.radius,
             engaged: new Map(), rejected: new Map(), recovery: false, nextScanAt: 0, nextActionAt: 0,
-            safeRestMs: 0, fixedFailures: {}, defenceAnchor: null };
+            safeRestMs: 0, fixedFailures: {}, defenceAnchor: null,
+            corpses: new Map(), utilityAttempts: new Map(), rejectedLoot: new Map() };
+        run.summonOwner = { isCurrent: () => this.run === run && this.available(),
+            canAttack: (target, summon) => this.run === run && SummonControl.activeSummon(actor) === summon
+                && this.legalTarget(target, summon) };
         this.renewOwner(run);
         this.reason = 'seeking';
         invoke('GameServer/Geodata/PlayerTransitionRecovery').cancel(session);
@@ -226,7 +301,7 @@ class PlayerAutoFight {
             source: 'player-auto-fight', controller: this, run,
             isCurrent: () => this.run === run && run.owner === owner
                 && this.generation === run.generation && this.available(),
-            approach: (target, radius, callback) => this.approach(run, target, radius, callback),
+            approach: (target, radius, callback, skill) => this.approach(run, target, radius, callback, skill),
             acceptRoute: route => this.acceptRoute(run, route)
         };
     }
@@ -245,10 +320,11 @@ class PlayerAutoFight {
         return true;
     }
 
-    approach(run, target, radius, callback) {
-        if (!run.owner.isCurrent() || !this.legalTarget(target)) return false;
-        run.approach = { target, radius, callback };
-        this.route(run, loc(target), 'candidate', { targetActor: target, arrivalRadius: Math.max(0, radius - 8) });
+    approach(run, target, radius, callback, skill) {
+        if (!run.owner.isCurrent() || !this.legalActionTarget(target, skill)) return false;
+        run.approach = { target, radius, callback, skill };
+        this.route(run, loc(target), 'candidate', { targetActor: target, arrivalRadius: Math.max(0, radius - 8),
+            allowDeadTarget: skill?.fetchTargetKind() === 'corpse_mob' });
         return false;
     }
 
@@ -269,11 +345,13 @@ class PlayerAutoFight {
             length += distance(previous, waypoint);
             if (Math.abs(previous.locZ - waypoint.locZ) > 64) return false;
             if (run.route.purpose === 'candidate') {
-                if (!this.legalTarget(run.approach.target)) return false;
+                if (!this.legalActionTarget(run.approach.target, run.approach.skill)) return false;
                 const anchor = run.defenceAnchor || run.center;
                 const limit = run.defenceAnchor ? DEFENCE_RADIUS : run.radius + 200;
                 if (distance(waypoint, anchor) > limit) return false;
             }
+            if (run.route.purpose === 'loot' && (distance(waypoint, run.center) > run.radius
+                || distance(waypoint, run.route.lastProgress) > 400)) return false;
             previous = waypoint;
         }
         const travelMs = length / Math.max(1, this.actor.fetchCollectiveRunSpd()) * 1000;
@@ -306,6 +384,13 @@ class PlayerAutoFight {
         const route = run.route;
         if (!route) return;
         if (this.actor.automation.actionOwner === run.owner) this.actor.automation.abortAll(this.actor);
+        if (route.purpose === 'loot') {
+            if (run.loot) run.rejectedLoot.set(run.loot.fetchId(), Date.now() + 30000);
+            run.loot = null;
+            run.route = null;
+            this.reason = 'loot_unreachable';
+            return;
+        }
         if (route.purpose === 'candidate') {
             this.rejectCandidate(run);
             return;
@@ -328,7 +413,7 @@ class PlayerAutoFight {
         const route = run.route;
         if (!route) return false;
         const target = run.approach?.target;
-        if (target && !this.legalTarget(target)) { this.clearTarget(run); return false; }
+        if (target && !this.legalActionTarget(target, run.approach.skill)) { this.clearTarget(run); return false; }
         const destination = target ? loc(target) : route.destination;
         const arrived = distance(loc(this.actor), destination) <= (run.approach?.radius ?? 24)
             && Math.abs(this.actor.fetchLocZ() - destination.locZ) <= 64
@@ -382,6 +467,11 @@ class PlayerAutoFight {
         for (const [id, target] of nearby) {
             const live = !target.state?.fetchDead?.() && !target.isDead?.();
             const threat = live && this.threatening(target, members);
+            if (!live && target.fetchKind?.() === 'Monster' && NpcObjectIndex.find(World, id) === target
+                && (run.engaged.has(id) || run.target === target || Number(target.model?.spoil?.spoilerId) === Number(this.actor.fetchId()))) {
+                run.corpses.set(id, target);
+                if (run.corpses.size > 32) run.corpses.delete(run.corpses.keys().next().value);
+            }
             if (!this.ordinaryMonster(target)) {
                 run.engaged.delete(id);
                 if (threat) active.push(target);
@@ -398,11 +488,127 @@ class PlayerAutoFight {
         return active;
     }
 
-    executableSkill() {
-        const skill = this.actor.skillset.fetchSkill(this.allowedSkillId);
+    executable(skill) {
         return this.allowsSkill(skill) && Restrictions.canCast(this.actor) && this.actor.canUseSkill(skill)
             && this.actor.fetchMp() >= this.actor.attack.skillMpCost(this.actor, skill)
-            && !this.actor.attack.skillUseConditionFailure(this.session, this.actor, skill) ? skill : null;
+            && !this.actor.attack.skillUseConditionFailure(this.session, this.actor, skill);
+    }
+
+    cast(run, target, skill, now, support = null) {
+        if (['self', 'party', 'ally'].includes(skill?.fetchTargetKind())) target = this.actor;
+        if (!this.executable(skill) || !this.legalActionTarget(target, skill) || !this.setSeated(false)) return false;
+        run.actionSkill = skill;
+        if (skill.fetchTargetKind() === 'corpse_mob') run.target = target;
+        run.nextActionAt = now + 500;
+        run.lookupDeadline = now + 5000;
+        if (support) SupportPlanner.queueSupportCast(this.session, { ...support, actionOwner: run.owner });
+        invoke(path.actor).skillRequest(this.session, this.actor, {
+            id: target.fetchId(), selfId: skill.fetchSelfId(), actionOwner: run.owner, ctrl: false
+        });
+        run.nativeStarted = this.actor.state.fetchCasts();
+        return true;
+    }
+
+    supportAction(run, now, inCombat) {
+        const actor = this.actor;
+        const members = PartyAwareness.partyActors(this.session).filter(member => !member.isDead?.()
+            && distance(loc(actor), loc(member)) <= 900 && Math.abs(actor.fetchLocZ() - member.fetchLocZ()) <= 64);
+        const wounded = members.filter(member => member !== actor)
+            .map(member => ({ actor: member, hpRatio: member.fetchHp() / Math.max(1, member.fetchMaxHp()) }))
+            .sort((a, b) => a.hpRatio - b.hpRatio);
+        const healing = invoke('GameServer/Bot/AI/BotHealingPolicy').select(actor, wounded[0],
+            members.filter(member => member.fetchHp() / Math.max(1, member.fetchMaxHp()) < 0.70).length,
+            actor.fetchHp() / Math.max(1, actor.fetchMaxHp()), actor.fetchMp() / Math.max(1, actor.fetchMaxMp()),
+            { usableOnly: true }).action;
+        if (healing && (!run.recovery || healing.emergency)
+            && this.supportInRange(healing.target, healing.skill)
+            && this.cast(run, healing.target, healing.skill, now)) return true;
+        if (inCombat || !this.supportAvailable()) return false;
+        const Pulling = invoke('GameServer/Bot/AI/PartyPulling');
+        const action = SupportPlanner.nextAction(actor, Pulling.supportMembers(this.session), Pulling.supportProviders(this.session));
+        if (action && this.supportInRange(action.target, action.skill)
+            && this.cast(run, action.target, action.skill, now, action)) return true;
+        const recharge = Capabilities.manaRechargeSkill(actor);
+        const manaTarget = members.filter(member => member !== actor && member.fetchMp() / Math.max(1, member.fetchMaxMp()) < 0.60)
+            .sort((a, b) => a.fetchMp() / Math.max(1, a.fetchMaxMp()) - b.fetchMp() / Math.max(1, b.fetchMaxMp()))[0];
+        return !!manaTarget && !!recharge && this.supportInRange(manaTarget, recharge)
+            && this.cast(run, manaTarget, recharge, now);
+    }
+
+    supportInRange(target, skill) {
+        const radius = Number(skill.fetchDistance());
+        return (skill.fetchTargetKind() !== 'friendly' || distance(loc(this.actor), loc(target)) <= 900)
+            && Math.abs(this.actor.fetchLocZ() - target.fetchLocZ()) <= 64
+            && (radius < 0 || distance(loc(this.actor), loc(target)) <= radius)
+            && Geodata.hasLineOfSight(this.actor.fetchLocX(), this.actor.fetchLocY(), this.actor.fetchLocZ(),
+                target.fetchLocX(), target.fetchLocY(), target.fetchLocZ());
+    }
+
+    summonAction(run, target, now) {
+        const corpse = !target && [...run.corpses.values()].find(candidate => {
+            const skill = SummonerTactics.corpseSummonSkill(this.actor, candidate);
+            return skill && this.legalActionTarget(candidate, skill) && this.supportInRange(candidate, skill);
+        });
+        let cast = false;
+        SummonerTactics.combatAction(this.session, this.actor, target || corpse || null, {
+            skillExec: (_session, _actor, data) => {
+                const skill = this.actor.skillset.fetchSkill(data.selfId);
+                const recipient = data.id === this.actor.fetchId() ? this.actor
+                    : SummonControl.activeSummon(this.actor)?.fetchId() === data.id ? SummonControl.activeSummon(this.actor)
+                        : corpse || target;
+                if (!run.recovery && recipient && this.supportInRange(recipient, skill)) cast = this.cast(run, recipient, skill, now);
+            }
+        }, { actionOwner: run.owner, commandOwner: run.summonOwner });
+        return cast;
+    }
+
+    corpseAction(run, now) {
+        const sweep = this.actor.skillset.fetchSkill(42);
+        const SpoilSweep = invoke('GameServer/Npc/SpoilSweep');
+        for (const [id, corpse] of run.corpses) {
+            if (NpcObjectIndex.find(World, id) !== corpse) { run.corpses.delete(id); continue; }
+            if (this.executable(sweep) && this.legalActionTarget(corpse, sweep) && SpoilSweep.isSweepable(corpse)
+                && Number(corpse.model.spoil.spoilerId) === Number(this.actor.fetchId())
+                && Number(run.rejected.get(id) || 0) <= now
+                && distance(loc(this.actor), loc(corpse)) <= 200) return this.cast(run, corpse, sweep, now);
+        }
+        return false;
+    }
+
+    lootEligible(run, item) {
+        return !!item && this.pickup && this.run === run && !run.recovery && !run.wait && !run.capacityWait && this.inside(this.actor)
+            && World.items.spawns.includes(item)
+            && invoke('GameServer/Bot/AI/PartyCompanionService').isOwnedPartyGroundLoot(this.session, item)
+            && this.inside(item) && distance(loc(this.actor), loc(item)) <= 200
+            && Math.abs(this.actor.fetchLocZ() - item.fetchLocZ()) <= 64;
+    }
+
+    pickupAction(run, now) {
+        if (!this.pickup || run.pickupPending || run.recovery || run.wait || run.capacityWait) return false;
+        const item = World.items.spawns.filter(candidate => this.lootEligible(run, candidate)
+            && Number(run.rejectedLoot.get(candidate.fetchId()) || 0) <= now
+            && Geodata.hasLineOfSight(this.actor.fetchLocX(), this.actor.fetchLocY(), this.actor.fetchLocZ(),
+                candidate.fetchLocX(), candidate.fetchLocY(), candidate.fetchLocZ()))
+            .sort((a, b) => distance(loc(this.actor), loc(a)) - distance(loc(this.actor), loc(b)))[0];
+        if (!item) return false;
+        run.loot = item;
+        if (distance(loc(this.actor), loc(item)) > 32) {
+            if (!this.route(run, loc(item), 'loot')) run.rejectedLoot.set(item.fetchId(), now + 30000);
+            return true;
+        }
+        run.pickupPending = true;
+        this.reason = 'picking_up';
+        const owner = run.owner;
+        invoke(path.actor).pickupExec(this.session, this.actor, { id: item.fetchId(), actionOwner: owner }, result => {
+            if (this.run !== run) return;
+            run.pickupPending = false;
+            run.loot = null;
+            run.rejectedLoot.set(item.fetchId(), Date.now() + 30000);
+            if (result?.status === 'capacity') run.capacityWait = 'recipient_capacity';
+            if (result?.status === 'award_failed') run.capacityWait = 'pickup_award_failed';
+            if (run.capacityWait) this.reason = run.capacityWait;
+        }, () => owner.isCurrent() && this.lootEligible(run, item) && !this.encounter(run).length);
+        return true;
     }
 
     basicAvailable() {
@@ -420,7 +626,24 @@ class PlayerAutoFight {
     dispatch(run, target, now) {
         const actor = this.actor;
         if (!this.setSeated(false)) return;
-        const skill = this.executableSkill();
+        const role = invoke('GameServer/Bot/AI/BotRoles').inferRole(actor);
+        const policy = { session: this.session, skillAllowed: skill => this.executable(skill)
+            && (skill.fetchTargetKind() !== 'enemy' || this.canInitiate(actor.attack.resolveSkillTargets(this.session, actor, target, skill))) };
+        const utility = [254, 302].map(id => actor.skillset.fetchSkill(id)).find(skill => this.executable(skill)
+            && !target.model?.spoil?.spoiled && invoke('GameServer/Npc/SpoilSweep').hasSpoils(target)
+            && now - Number(run.utilityAttempts.get(target.fetchId()) || 0) >= 10000);
+        if (utility && policy.skillAllowed(utility)) {
+            run.target = target;
+            run.utilityAttempts.set(target.fetchId(), now);
+            if (this.cast(run, target, utility, now)) return;
+        }
+        const charge = !run.recovery && CombatUtility.selectChargePlan(actor, role,
+            { ...policy, skillAllowed: skill => policy.skillAllowed(skill)
+                || (this.allowsSkill(skill) && Number(skill.fetchSemantic?.().requires?.charges) > 0
+                    && actor.canUseSkill(skill) && actor.fetchMp() >= actor.attack.skillMpCost(actor, skill)
+                    && this.canInitiate(actor.attack.resolveSkillTargets(this.session, actor, target, skill))) }, target);
+        if (charge && this.cast(run, actor, charge.skill, now)) return;
+        const skill = CombatUtility.select(actor, target, role, policy)?.skill;
         if (!skill && !this.basicAvailable()) { this.reason = 'no_executable_action'; return; }
         const targets = skill ? actor.attack.resolveSkillTargets(this.session, actor, target, skill)
             : actor.attack.resolveMeleeTargets(actor, target);
@@ -438,6 +661,7 @@ class PlayerAutoFight {
         const data = { id: target.fetchId(), actionOwner: run.owner, ctrl: false };
         if (skill) invoke(path.actor).skillRequest(this.session, actor, { ...data, selfId: skill.fetchSelfId() });
         else invoke(path.actor).attackRequest(this.session, actor, data);
+        run.nativeStarted ||= actor.state.fetchHits() || actor.state.fetchCasts();
     }
 
     schedule(run) {
@@ -457,6 +681,7 @@ class PlayerAutoFight {
         const { actor } = this;
         const now = Date.now();
         for (const [id, until] of run.rejected) if (until <= now) run.rejected.delete(id);
+        for (const [id, at] of run.utilityAttempts) if (at < now - 30000) run.utilityAttempts.delete(id);
         if (this.needsRecovery()) run.recovery = true;
         if (run.lookupPending && now > run.lookupDeadline) this.rejectCandidate(run);
         if (actor.state.fetchHits() || actor.state.fetchCasts() || actor.attack.bowReloading || run.lookupPending) {
@@ -466,6 +691,8 @@ class PlayerAutoFight {
         if (now < run.nextScanAt) return;
         run.nextScanAt = now + 500;
         const encounter = this.encounter(run);
+        this.capacityBlocked();
+        for (const [id, until] of run.rejectedLoot) if (until <= now) run.rejectedLoot.delete(id);
         if (run.dispatched && !run.nativeStarted && !run.lookupPending && !run.route) this.rejectCandidate(run);
         const threats = encounter.filter(target => this.threatening(target));
         // Keep the interruption point through pursuit, adds and accepted native
@@ -482,11 +709,17 @@ class PlayerAutoFight {
             if (actor.automation.actionOwner === run.owner) actor.automation.abortAll(actor);
             run.route = null;
         }
+        if (run.route?.purpose === 'loot' && (!this.lootEligible(run, run.loot) || activeEncounter)) {
+            if (actor.automation.actionOwner === run.owner) actor.automation.abortAll(actor);
+            run.route = null;
+            run.loot = null;
+        }
+        if (!run.route && now >= run.nextActionAt && this.supportAction(run, now, activeEncounter)) return;
         if (this.tickRoute(run, now)) return;
         if (run.target && !this.legalTarget(run.target)) this.clearTarget(run);
         const target = defensive || encounter.find(readyTarget);
         if (target) {
-            if (now >= run.nextActionAt) this.dispatch(run, target, now);
+            if (now >= run.nextActionAt && !this.summonAction(run, target, now)) this.dispatch(run, target, now);
             return;
         }
         this.clearTarget(run);
@@ -520,6 +753,8 @@ class PlayerAutoFight {
             if (run.safeRestMs >= MAX_SAFE_REST_MS) this.stop('recovery_timeout');
             return;
         }
+        if (run.capacityWait) { this.reason = run.capacityWait; return; }
+        if (run.pickupPending) { this.reason = 'picking_up'; return; }
         if (!this.inside(actor)) {
             this.setState(run, 'returning_to_zone');
             if (!this.route(run, run.center, 'zone')) this.reason = 'movement_restricted';
@@ -527,6 +762,7 @@ class PlayerAutoFight {
         }
         this.setState(run, 'seeking');
         if (now < run.nextActionAt) return;
+        if (this.corpseAction(run, now) || this.summonAction(run, null, now) || this.pickupAction(run, now)) return;
         const candidates = World.fetchNpcsInRadius(run.center.locX, run.center.locY, run.radius)
             .filter(candidate => this.canAcquire(candidate) && Geodata.hasLineOfSight(
                 actor.fetchLocX(), actor.fetchLocY(), actor.fetchLocZ(), candidate.fetchLocX(), candidate.fetchLocY(), candidate.fetchLocZ()))
@@ -555,6 +791,8 @@ class PlayerAutoFight {
         this.reason = reason;
         const { actor } = this;
         const owner = run.owner;
+        SupportPlanner.cancelSupportCast(this.session, actor);
+        SummonControl.releaseAutoCommand(this.session, SummonControl.activeSummon(actor), run.summonOwner);
         if (actor.attack.queue.data?.actionOwner === owner) actor.attack.resetQueuedEvent();
         if (actor.attack.bowRepeatOwner === owner) {
             actor.attack.bowRepeatOwner = null;
@@ -574,7 +812,6 @@ class PlayerAutoFight {
         this.stop(reason);
         this.center = null;
         this.point = null;
-        this.allowedSkillId = null;
         this.reason = reason;
         this.session.nativeAutoFightOpen = false;
     }

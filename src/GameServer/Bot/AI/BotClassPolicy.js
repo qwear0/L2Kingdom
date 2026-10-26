@@ -23,6 +23,14 @@ function hasSkill(actor, skillId, level) {
     return availableAt !== undefined && availableAt <= Number(level ?? actor?.fetchLevel?.() ?? actor?.level ?? actor?.stats?.level ?? 1);
 }
 
+// Optional eligibility is applied before scoring, including hypothetical charge
+// spenders. Ordinary bots have no player controller and retain their policy.
+function skillAllowed(actor, skill, context = {}) {
+    if (context.skillAllowed && !context.skillAllowed(skill)) return false;
+    const controller = actor?.playerAutoFight;
+    return !controller?.run || controller.allowsSkill(skill);
+}
+
 function modeFor(actor, context = {}) {
     if (['solo_pve', 'party_pve', 'solo_pvp', 'party_pvp'].includes(context.mode)) return context.mode;
     const session = context.session || actor?.session;
@@ -83,4 +91,4 @@ function buffUseful(actor, effect) {
     return null;
 }
 
-module.exports = { classIdOf, hasSkill, modeFor, profileFor, offensivePreference, buffUseful };
+module.exports = { classIdOf, hasSkill, skillAllowed, modeFor, profileFor, offensivePreference, buffUseful };

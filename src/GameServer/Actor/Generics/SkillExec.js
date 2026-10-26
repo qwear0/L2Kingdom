@@ -24,7 +24,7 @@ function skillExec(session, actor, data) {
     const SpoilSweep = invoke('GameServer/Npc/SpoilSweep');
 
     if (skill.fetchTargetKind() === 'self') {
-        actor.attack.remoteHit(session, actor, skill);
+        actor.attack.remoteHit(session, actor, skill, { actionOwner: owner });
         return;
     }
 
@@ -35,8 +35,18 @@ function skillExec(session, actor, data) {
             return;
         }
         actor.automation.scheduleAction(session, actor, summon, skill.fetchDistance(), () => {
-            actor.attack.remoteHit(session, summon, skill);
-        });
+            if (current()) actor.attack.remoteHit(session, summon, skill, { actionOwner: owner });
+        }, { action: 'support', actionOwner: owner, skill });
+        return;
+    }
+
+    if (owner && skill.fetchTargetKind() === 'friendly') {
+        const target = invoke('GameServer/Bot/AI/PartyAwareness').partyActors(session)
+            .find(member => Number(member.fetchId()) === Number(data.id));
+        if (!target || !owner.controller.legalActionTarget(target, skill)) return;
+        actor.automation.scheduleAction(session, actor, target, skill.fetchDistance(), () => {
+            if (current()) actor.attack.remoteHit(session, target, skill, { actionOwner: owner });
+        }, { action: 'support', actionOwner: owner, skill });
         return;
     }
 
@@ -44,7 +54,7 @@ function skillExec(session, actor, data) {
     // Lisvus. Attack.resolveSkillTargets expands them to the eligible party,
     // clan/alliance or dead-clan members inside the sourced radius.
     if (['party', 'ally', 'corpse_ally'].includes(skill.fetchTargetKind())) {
-        actor.attack.remoteHit(session, actor, skill);
+        actor.attack.remoteHit(session, actor, skill, { actionOwner: owner });
         return;
     }
 
@@ -52,7 +62,7 @@ function skillExec(session, actor, data) {
     // caster as well. Attack.resolveSkillTargets will fan the native effect
     // out only to valid enemies inside the sourced radius.
     if (skill.fetchTargetKind() === 'enemy' && skill.fetchSemantic?.().sourceTarget === 'aura') {
-        actor.attack.remoteHit(session, actor, skill);
+        actor.attack.remoteHit(session, actor, skill, { actionOwner: owner });
         return;
     }
 
@@ -84,14 +94,14 @@ function skillExec(session, actor, data) {
             }
 
             if (skill.fetchTargetKind() === 'corpse_mob' && npc.fetchAttackable?.() && npc.isDead?.()) {
-                actor.attack.remoteHit(session, npc, skill);
+                actor.attack.remoteHit(session, npc, skill, { actionOwner: owner });
             }
             else if (skill.fetchTargetKind() === 'enemy' && canTargetEnemyNpc(npc, data)) {
                 actor.attack.remoteHit(session, npc, skill, { actionOwner: owner });
             }
-        }, { action: SpoilSweep.isSweepSkill(data.selfId) ? 'sweep' : 'skill', actionOwner: owner,
-            allowDeadTarget: SpoilSweep.isSweepSkill(data.selfId)
-                && String(session?.accountId || '').startsWith('bot_') });
+        }, { action: SpoilSweep.isSweepSkill(data.selfId) ? 'sweep' : 'skill', actionOwner: owner, skill,
+            allowDeadTarget: (owner && skill.fetchTargetKind() === 'corpse_mob')
+                || (SpoilSweep.isSweepSkill(data.selfId) && String(session?.accountId || '').startsWith('bot_')) });
     }).catch((error) => {
         if (!current()) return;
         if (owner) {

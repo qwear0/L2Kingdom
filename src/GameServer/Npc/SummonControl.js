@@ -125,6 +125,8 @@ function sendStopMove(session, summon) {
 }
 
 function stop(session, summon) {
+    summon.commandRevision = Number(summon.commandRevision || 0) + 1;
+    summon.autoFightCommandOwner = null;
     delete summon.attackTargetId;
     summon.controlMode = 'idle';
     summon.followOwner = false;
@@ -215,7 +217,11 @@ function scheduleFollowStep(session, actor, summon) {
     });
 }
 
-function startFollowOwner(session, actor, summon) {
+function startFollowOwner(session, actor, summon, options = {}) {
+    const owner = options.commandOwner;
+    if (owner && (!owner.isCurrent() || activeSummon(actor) !== summon)) return;
+    const revision = summon.commandRevision = Number(summon.commandRevision || 0) + 1;
+    summon.autoFightCommandOwner = owner || null;
     delete summon.attackTargetId;
     ensureTimerBag(summon);
     clearFollowTimer(summon);
@@ -228,7 +234,14 @@ function startFollowOwner(session, actor, summon) {
     summon.controlMode = 'follow';
     summon.followOwner = true;
 
-    const tick = () => scheduleFollowStep(session, actor, summon);
+    const tick = () => {
+        if (summon.commandRevision !== revision) return;
+        if (owner && (!owner.isCurrent() || activeSummon(actor) !== summon)) {
+            releaseAutoCommand(session, summon, owner);
+            return;
+        }
+        scheduleFollowStep(session, actor, summon);
+    };
     tick();
     summon.timer.followOwner = setInterval(tick, FollowTickMs);
     summon.timer.followOwner.unref?.();
@@ -267,14 +280,20 @@ function moveToTarget(session, actor, summon) {
     });
 }
 
-function attack(session, actor, summon) {
+function attack(session, actor, summon, options = {}) {
     if (Number(summon.fetchSummonSkillId?.()) === 301) {
         session.dataSendToMe(ServerResponse.actionFailed());
         return;
     }
 
-    selectedTarget(actor).then((target) => {
-        if (!target || target === summon) {
+    const owner = options.commandOwner;
+    const revision = summon.commandRevision = Number(summon.commandRevision || 0) + 1;
+    summon.autoFightCommandOwner = owner || null;
+    const current = () => summon.commandRevision === revision && (!owner ||
+        (owner.isCurrent() && session.actor === actor && activeSummon(actor) === summon));
+    (options.target ? Promise.resolve(options.target) : selectedTarget(actor)).then((target) => {
+        if (!current()) return;
+        if (!target || target === summon || (owner && !owner.canAttack(target, summon))) {
             session.dataSendToMe(ServerResponse.actionFailed());
             return;
         }
@@ -298,12 +317,33 @@ function attack(session, actor, summon) {
         );
 
         summon.automation.scheduleAction(session, summon, target, attackRange, () => {
-            attackTick(session, summon, target);
+            if (current()) attackTick(session, summon, target, owner, revision);
         }, { collisionAware: true, action: 'attack' });
     });
 }
 
-function attackTick(session, summon, target) {
+// Release only this run's loops. Newer manual commands and accepted native
+// hit timers retain their own command/revision semantics.
+function releaseAutoCommand(session, summon, owner) {
+    if (!summon || summon.autoFightCommandOwner !== owner) return;
+    summon.autoFightCommandOwner = null;
+    summon.commandRevision = Number(summon.commandRevision || 0) + 1;
+    clearFollowTimer(summon);
+    clearResumeTimer(summon);
+    summon.automation.abortAll(summon);
+    delete summon.attackTargetId;
+    summon.controlMode = 'idle';
+    summon.followOwner = false;
+    summon.state.setHits(false);
+    sendStopMove(session, summon);
+}
+
+function attackTick(session, summon, target, owner = null, revision = summon.commandRevision) {
+    if (summon.commandRevision !== revision) return;
+    if (owner && (!owner.isCurrent() || !owner.canAttack(target, summon))) {
+        releaseAutoCommand(session, summon, owner);
+        return;
+    }
     if (!target || summon.controlMode !== 'attack' || summon.isDead?.()) {
         stop(session, summon);
         return;
@@ -312,7 +352,7 @@ function attackTick(session, summon, target) {
     if (target.isDead?.() || target.state?.fetchDead?.() === true) {
         const owner = session?.actor;
         if (owner && (owner.summon === summon || owner.pet === summon)) {
-            startFollowOwner(session, owner, summon);
+            startFollowOwner(session, owner, summon, { commandOwner: summon.autoFightCommandOwner });
         } else {
             stop(session, summon);
         }
@@ -330,7 +370,7 @@ function attackTick(session, summon, target) {
         summon.state.setHits(false);
         if (!Restrictions.canMove(summon)) { stop(session, summon); return; }
         summon.automation.scheduleAction(session, summon, target, range,
-            () => attackTick(session, summon, target), { collisionAware: true, action: 'attack' });
+            () => attackTick(session, summon, target, owner, revision), { collisionAware: true, action: 'attack' });
         return;
     }
 
@@ -345,7 +385,7 @@ function attackTick(session, summon, target) {
     summon.state.setHits(true);
 
     summon.attack.queueTimer(() => {
-        if (summon.controlMode !== 'attack' || summon.isDead?.()
+        if (summon.commandRevision !== revision || summon.controlMode !== 'attack' || summon.isDead?.()
             || target.isDead?.() || target.state?.fetchDead?.() === true) return;
         if (!isValidEnemyTarget(session.actor, target) || !Restrictions.canAttack(summon) ||
             !AttackRange.isWithinRange(summon, target, range)) return;
@@ -359,9 +399,10 @@ function attackTick(session, summon, target) {
     }, speed * 0.644);
 
     summon.attack.queueTimer(() => {
+        if (summon.commandRevision !== revision) return;
         summon.state.setHits(false);
         if (summon.controlMode !== 'attack' || summon.isDead?.()) return;
-        attackTick(session, summon, target);
+        attackTick(session, summon, target, owner, revision);
     }, speed);
 }
 
@@ -547,6 +588,7 @@ module.exports = {
     moveToTarget,
     showStatusWindow,
     startFollowOwner,
+    releaseAutoCommand,
     startLifetime,
     attackTick,
     isValidEnemyTarget,
