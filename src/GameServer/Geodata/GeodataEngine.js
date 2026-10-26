@@ -5,6 +5,23 @@ const VirtualObstacles = invoke('GameServer/Geodata/VirtualObstacles/index');
 const REGION_OFFSET_X = 20;
 const REGION_OFFSET_Y = 18;
 const MAX_LAYER_STEP = 64;
+const PATH_DIRECTIONS = [
+    { dx: 0, dy: -1, bit: 8, oppBit: 4 },
+    { dx: 0, dy: 1, bit: 4, oppBit: 8 },
+    { dx: 1, dy: 0, bit: 1, oppBit: 2 },
+    { dx: -1, dy: 0, bit: 2, oppBit: 1 }
+];
+
+// Pack normal world cells and L2J's 8-unit layers into an exact 44-bit integer.
+// Nonstandard/missing-geodata heights retain string keys, so other callers do
+// not acquire coordinate limits or alias different floors through truncation.
+function pathNodeKey(cx, cy, z) {
+    if (cx >= -32768 && cx < 32768 && cy >= -32768 && cy < 32768
+        && z >= -16384 && z < 16384 && Number.isInteger(z / 8)) {
+        return ((cx + 32768) * 65536 + cy + 32768) * 4096 + (z + 16384) / 8;
+    }
+    return `${cx},${cy},${z}`;
+}
 
 class BinaryMinHeap {
     constructor(compare) {
@@ -508,8 +525,21 @@ const GeodataEngine = {
         const startCy = startY >> 4;
         const endCx = endX >> 4;
         const endCy = endY >> 4;
-        const startCell = this.getCellData((startCx << 4) + 8, (startCy << 4) + 8, startZ);
-        const endCell = this.getCellData((endCx << 4) + 8, (endCy << 4) + 8, endZ);
+        // A synchronous search sees one navigation state. Cache by requested Z,
+        // not only XY: nearest-layer selection differs between floors. Bound
+        // memory per search and release it on return; no per-actor cache survives.
+        const cells = new Map();
+        const cellAt = (cx, cy, z) => {
+            const key = pathNodeKey(cx, cy, z);
+            let cell = cells.get(key);
+            if (!cell) {
+                cell = this.getCellData((cx << 4) + 8, (cy << 4) + 8, z);
+                if (cells.size < 65536) cells.set(key, cell);
+            }
+            return cell;
+        };
+        const startCell = cellAt(startCx, startCy, startZ);
+        const endCell = cellAt(endCx, endCy, endZ);
         const hasLayerData = this.hasGeo(startX, startY) && this.hasGeo(endX, endY);
         const goalRadius = Math.max(0, Number(options.goalRadius || 0));
         const goalZTolerance = goalRadius > 0
@@ -564,15 +594,15 @@ const GeodataEngine = {
         ));
         openList.push(startNode);
         const bestCosts = new Map();
-        bestCosts.set(`${startCx},${startCy},${startCell.z}`, 0);
+        startNode.key = pathNodeKey(startCx, startCy, startCell.z);
+        bestCosts.set(startNode.key, 0);
 
         let targetNode = null;
         let nodesExpanded = 0;
 
         while (openList.length > 0) {
             const current = openList.shift();
-            const currentKey = `${current.cx},${current.cy},${current.cz}`;
-            if (current.g !== bestCosts.get(currentKey)) {
+            if (current.g !== bestCosts.get(current.key)) {
                 continue;
             }
 
@@ -587,24 +617,16 @@ const GeodataEngine = {
                 break;
             }
 
-            const currentCell = this.getCellData((current.cx << 4) + 8, (current.cy << 4) + 8, current.cz);
-            
-            const directions = [
-                { dx: 0, dy: -1, bit: 8, oppBit: 4 },
-                { dx: 0, dy: 1, bit: 4, oppBit: 8 },
-                { dx: 1, dy: 0, bit: 1, oppBit: 2 },
-                { dx: -1, dy: 0, bit: 2, oppBit: 1 }
-            ];
-
-            for (const dir of directions) {
+            const currentCell = cellAt(current.cx, current.cy, current.cz);
+            for (const dir of PATH_DIRECTIONS) {
                 const nCx = current.cx + dir.dx;
                 const nCy = current.cy + dir.dy;
                 if ((currentCell.nswe & dir.bit) === 0) {
                     continue;
                 }
 
-                const nCell = this.getCellData((nCx << 4) + 8, (nCy << 4) + 8, currentCell.z);
-                const key = `${nCx},${nCy},${nCell.z}`;
+                const nCell = cellAt(nCx, nCy, currentCell.z);
+                const key = pathNodeKey(nCx, nCy, nCell.z);
 
                 if ((nCell.nswe & dir.oppBit) === 0) {
                     continue;
@@ -631,6 +653,7 @@ const GeodataEngine = {
                     h: h,
                     f: f,
                     parent: current,
+                    key,
                     order: insertOrder++
                 };
 

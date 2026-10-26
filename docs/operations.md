@@ -23,6 +23,7 @@ These are existing commands, not checks executed by creating this document.
 | `npm run generate:knowledge-base` | Regenerates the five committed `data/KnowledgeBase/` outputs. |
 | `npm run check:knowledge-base` | Rebuilds catalogue content in memory and compares outputs; not gameplay verification. |
 | `npm run check` | Existing Node `--check` traversal of JavaScript under `src/`, `scripts/`, `tests/`; syntax only, no application startup. |
+| `node scripts/profile-spawn-placement.js --output tmp/profiles/<new-run> [--cold] [--cache <file>] [--seed <uint32>]` | Explicit offline territory preparation/CPU profiling. Reads config, datapack and geodata; writes a CPU profile, summary and derived cache under `tmp/`. No database initialization, listeners, world population or game workers. Can consume substantial CPU/RAM; not a routine syntax check. |
 | `npm test` | Existing explicitly selected suite; not routinely authorized. |
 | `npm run test:geodata` | Prepares geodata before the selected suite, including installation side effects. |
 | `npm run load:mixed` | Writes scenario config/database artifacts and starts runtime processes. Legacy load-hook activation is constrained by owned-only policy. |
@@ -31,6 +32,19 @@ These are existing commands, not checks executed by creating this document.
 Simulation runtime/config/database/history/log/save/preset paths remain isolated below `tmp/simulations/<id>/`; shared configuration is loaded before instance overrides. The old separate launcher ports and old `/api/status`, `/api/start`, `/api/stop` requests are removed. Unavailable management is **not** evidence a game has stopped. New generated configs explicitly isolate history as well as world paths. Existing generated configs are preserved, not overwritten: before launch, confirm that any inherited shared `Database.historyPath` does not join instances, and keep customized public ports consistent with the consumer definition. No config/data is silently relocated.
 
 Other scripts can migrate, generate, benchmark or mutate data. Inspect the specific owner and side effects before invoking them; a file's presence is not an operating schedule.
+
+## Offline territory profiling
+
+Use only when profiling is requested; this executes the real preparation algorithm, not an automated test suite. It does not start or stop the game, download geodata, or touch SQLite. Prefer running without competing startup work when comparing timings.
+
+```sh
+node scripts/profile-spawn-placement.js --cold --output tmp/profiles/spawns-cold
+node scripts/profile-spawn-placement.js --output tmp/profiles/spawns-warm --cache tmp/profiles/spawns-cold/spawn-placement.json
+```
+
+Each output directory must be new and below repository `tmp/`. The default cache is inside that output directory; `--cache` explicitly selects another file below `tmp/`. `--cold` bypasses a valid cache and atomically replaces it after preparation. A fixed seed (default `1`) affects only this profiling process, making cold comparisons reproducible while normal gameplay keeps its random source. Do not change geodata or algorithm sources during a run: cache publication is rejected if those inputs change.
+
+`spawn-placement.cpuprofile` is a standard V8 CPU profile, sampled every 10 ms. `summary.json` reports cache hit/miss, territory/unavailable/point counts, preparation elapsed time (including hashing and the fixed-position audit), process CPU usage, memory and top self-time frames. DataCache/geodata initialization happens before profiling; these numbers are not complete server startup time or client acceptance. Compare availability as well as time, since faster rejection is not a successful optimization.
 
 ## Persistent management and settings
 

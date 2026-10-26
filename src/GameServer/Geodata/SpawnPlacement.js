@@ -1,5 +1,6 @@
 const Geo = invoke('GameServer/Geodata/GeodataEngine');
 const Surface = require('./SpawnSurface');
+const DiskCache = require('./SpawnPlacementCache');
 
 const POOL_SIZE = 128;
 const SAMPLE_ATTEMPTS = 512;
@@ -195,28 +196,39 @@ function auditFixed(definitions) {
         invalid, examples.join(', '));
 }
 
-function init(definitions) {
+function init(definitions, cacheOptions) {
+    const startedAt = Date.now();
     territories = definitions.filter(item => item.spawns.some(spawn => !spawn.coords.length && spawn.total > 0));
     reset();
-    const startedAt = Date.now();
-    utils.infoSuccess('SpawnPlacement', 'preparing accessible points for %d random territories', territories.length);
-    for (const [index, territory] of territories.entries()) {
-        prepare(territory);
-        if ((index + 1) % 128 === 0) utils.infoSuccess('SpawnPlacement', 'prepared %d/%d territories in %d seconds',
-            index + 1, territories.length, Math.round((Date.now() - startedAt) / 1000));
-    }
-    utils.infoSuccess('SpawnPlacement', 'retrying territories without accessible points');
-    // A later zone may supply an entry for an earlier one. Cache unresolved
-    // zones too: repeated respawns must not repeat thousands of failed paths.
-    for (const territory of territories) {
-        const key = keyFor(territory.bounds, territory.spawnAnchors);
-        if (!pools.get(key).length) pools.set(key, build(territory));
+    const disk = DiskCache.open(territories.map(item => keyFor(item.bounds, item.spawnAnchors)), trusted, POOL_SIZE, cacheOptions);
+    if (disk.cached) {
+        for (const [key, points] of disk.cached.pools) pools.set(key, points);
+        trusted = disk.cached.trusted;
+        trustedKeys = new Set(trusted.map(point => `${point.locX >> 4}:${point.locY >> 4}:${point.locZ}`));
+        utils.infoSuccess('SpawnPlacement', 'loaded disk cache for %d random territories', territories.length);
+    } else {
+        utils.infoSuccess('SpawnPlacement', 'preparing accessible points for %d random territories', territories.length);
+        for (const [index, territory] of territories.entries()) {
+            prepare(territory);
+            if ((index + 1) % 128 === 0) utils.infoSuccess('SpawnPlacement', 'prepared %d/%d territories in %d seconds',
+                index + 1, territories.length, Math.round((Date.now() - startedAt) / 1000));
+        }
+        utils.infoSuccess('SpawnPlacement', 'retrying territories without accessible points');
+        // A later zone may supply an entry for an earlier one. Cache unresolved
+        // zones too: repeated respawns must not repeat thousands of failed paths.
+        for (const territory of territories) {
+            const key = keyFor(territory.bounds, territory.spawnAnchors);
+            if (!pools.get(key).length) pools.set(key, build(territory));
+        }
+        disk.save(pools, trusted);
     }
     const unavailable = territories.filter(territory => !prepare(territory).length);
     utils.infoSuccess('SpawnPlacement', '%d random territories prepared; %d awaiting accessible points; preparation took %d seconds',
         territories.length - unavailable.length, unavailable.length, Math.round((Date.now() - startedAt) / 1000));
     for (const territory of unavailable) warn(territory);
     auditFixed(definitions);
+    return { cacheHit: !!disk.cached, territories: territories.length, unavailable: unavailable.length,
+        points: [...pools.values()].reduce((total, points) => total + points.length / 3, 0), elapsedMs: Date.now() - startedAt };
 }
 
 function warn(territory) {
