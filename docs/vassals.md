@@ -40,7 +40,19 @@ A vassal belongs to one **character**, with an original `boundClanId`. Another c
 
 `VassalOrders` owns duties; `src/GameServer/Lord/GatherAreas.js` supplies five authored gathering polygon sets. Failure to find a safe target does not authorize hunting outside the assigned area.
 
-Ruins of Despair includes all nine authored ruin spawn polygons, `gludio_t19_22_060` through `gludio_t19_22_068`; their existing XY and height bounds remain authoritative.
+The explicit gathering catalog preserves authored XY/height bounds and derives menu levels from loaded monster templates:
+
+| Destination | Polygons | Monster levels |
+| --- | --- | --- |
+| Ruins of Agony | 18 verified core polygons | 15–24 |
+| Ruins of Despair | 9, unchanged (`gludio_t19_22_060` through `gludio_t19_22_068`) | 19–24 |
+| Abandoned Camp | 37 | 17–29 |
+| Langk Lizardmen (Gludin) | 26 | 15–25 |
+| Wasteland | 99 western, central/eastern and southern surface polygons | 22–36 |
+
+Agony excludes `gludio_t18_21_009`: its two canonical definitions share remote, off-core bounds. Neighboring fields, the separate Langk coastal corridor and underground Wasteland destinations are not implicitly authorized. Coverage is permission to use the selected polygons, not a guarantee of safe targets or walkable routes everywhere.
+
+The catalog and area-ID lookup compile lazily and are reused while the `DataCache.npcs` / `DataCache.npcSpawns` array identities remain unchanged. Replacing either array recompiles and validates selected IDs, bounds and templates; invalid or ambiguous selected data fails explicitly. Actor suitability, occupancy and destinations are not cached here.
 
 Gathering distribution and route recovery stay within that assignment:
 
