@@ -28,8 +28,20 @@ function nearest(points, target, limit) {
         .sort((a, b) => a.distance - b.distance).slice(0, limit).map(entry => entry.point);
 }
 
-function addTrusted(point) {
+// layers() deliberately conflates absent, malformed and obstacle-masked data.
+// Do not turn that absence, or a failed bounded search, into an unreachable claim.
+function supportFailure(point) {
+    if (!point || ![point.locX, point.locY, point.locZ].every(Number.isFinite)) return 'invalid_coordinate';
+    const layers = Surface.layers(point.locX, point.locY);
+    if (!layers.length) return 'surface_unavailable';
+    const closest = layers.reduce((a, b) => Math.abs(a.z - point.locZ) <= Math.abs(b.z - point.locZ) ? a : b);
+    return !closest.nswe ? 'surface_blocked' : 'height_mismatch';
+}
+
+function addTrusted(point, source, roots) {
     const valid = Surface.supported(point);
+    if (roots) roots.push({ source, authored: point, normalized: valid,
+        included: true, reason: valid ? null : supportFailure(point) });
     if (!valid) return;
     const key = `${valid.locX >> 4}:${valid.locY >> 4}:${valid.locZ}`;
     if (trustedKeys.has(key)) return;
@@ -37,7 +49,7 @@ function addTrusted(point) {
     trusted.push(valid);
 }
 
-function reset() {
+function reset(roots) {
     revision = Number(Geo.navigationRevision || 0);
     pools.clear();
     trusted = [];
@@ -45,22 +57,22 @@ function reset() {
     warned = new Set();
     const gatekeepers = invoke('GameServer/World/C4GatekeeperTeleports');
     for (const [npcId, routes] of Object.entries(gatekeepers.lists)) {
-        for (const [id] of routes) addTrusted(gatekeepers.destination(npcId, id));
+        for (const [id] of routes) addTrusted(gatekeepers.destination(npcId, id), `gatekeeper:${npcId}:${id}`, roots);
     }
-    for (const point of invoke('GameServer/World/C4CrumaTowerTeleports').DESTINATIONS.values()) addTrusted(point);
-    for (const dungeon of invoke('GameServer/World/C4SevenSignsDungeonTeleports').DUNGEONS) {
+    for (const [id, point] of invoke('GameServer/World/C4CrumaTowerTeleports').DESTINATIONS) addTrusted(point, `cruma:${id}`, roots);
+    for (const [index, dungeon] of invoke('GameServer/World/C4SevenSignsDungeonTeleports').DUNGEONS.entries()) {
         for (const side of ['inside', 'outside']) {
             const [locX, locY, locZ] = dungeon[side].destination;
-            addTrusted({ locX, locY, locZ });
+            addTrusted({ locX, locY, locZ }, `seven-signs:${index}:${side}`, roots);
         }
     }
-    for (const template of invoke('GameServer/DataCache').newbieSpawns) {
-        for (const point of template.spawns) addTrusted(point);
+    for (const [index, template] of invoke('GameServer/DataCache').newbieSpawns.entries()) {
+        for (const [i, point] of template.spawns.entries()) addTrusted(point, `player-start:${index}:${i}`, roots);
     }
     // Explicit anchors are an authored access contract, not automatically
     // inferred from monster positions, polygon centres or the largest roof.
-    for (const territory of territories) {
-        for (const point of territory.spawnAnchors || []) addTrusted(point);
+    for (const [index, territory] of territories.entries()) {
+        for (const [i, point] of (territory.spawnAnchors || []).entries()) addTrusted(point, `territory:${index}:${territory.selfId}:${i}`, roots);
     }
 }
 
@@ -78,9 +90,12 @@ function inside(x, y, bounds) {
     return result;
 }
 
-function candidates(bounds) {
+function candidates(bounds, work) {
     if (!Array.isArray(bounds) || bounds.length < 3 || bounds.some(point =>
-        ![point.locX, point.locY, point.minZ, point.maxZ].every(Number.isFinite))) return [];
+        ![point.locX, point.locY, point.minZ, point.maxZ].every(Number.isFinite))) {
+        if (work) work.reason = 'invalid_bounds';
+        return [];
+    }
     const minX = Math.min(...bounds.map(point => point.locX));
     const maxX = Math.max(...bounds.map(point => point.locX));
     const minY = Math.min(...bounds.map(point => point.locY));
@@ -92,21 +107,38 @@ function candidates(bounds) {
     // Bound rejection sampling too: a malformed or very thin polygon must
     // not trap startup in the old random-point helper's unbounded loop.
     for (let i = 0; i < SAMPLE_ATTEMPTS * 8 && seen.size < SAMPLE_ATTEMPTS; i++) {
+        if (work) work.xyDraws++;
         const locX = (((minX + Math.random() * (maxX - minX)) >> 4) << 4) + 8;
         const locY = (((minY + Math.random() * (maxY - minY)) >> 4) << 4) + 8;
         const key = `${locX}:${locY}`;
         if (seen.has(key) || !inside(locX, locY, bounds)) continue;
         seen.add(key);
-        for (const layer of Surface.layers(locX, locY)) {
+        const layers = Surface.layers(locX, locY);
+        if (work) {
+            work.sampledCells++;
+            work.decodedLayers += layers.length;
+            if (!layers.length) work.surfaceUnavailableCells++;
+        }
+        for (const layer of layers) {
+            if (work && !layer.nswe) work.blockedLayers++;
+            if (work && (layer.z < minZ || layer.z > maxZ)) work.outOfRangeLayers++;
             if (!layer.nswe || layer.z < minZ || layer.z > maxZ) continue;
+            if (work) work.candidateLayers++;
             points.push({ locX, locY, locZ: layer.z });
         }
     }
     return points;
 }
 
-function build(territory) {
-    const points = candidates(territory.bounds);
+function build(territory, attempts) {
+    const work = attempts && { xyDraws: 0, sampledCells: 0, decodedLayers: 0,
+        surfaceUnavailableCells: 0, blockedLayers: 0, outOfRangeLayers: 0,
+        candidateLayers: 0, nearbyRoots: 0, directWalkCalls: 0, pathSearchRequests: 0, reason: null };
+    const walk = (from, to) => {
+        if (work) work.directWalkCalls++;
+        return Surface.walk(from, to);
+    };
+    const points = candidates(territory.bounds, work);
     const accepted = [];
     let searches = 0;
     if (points.length) {
@@ -117,13 +149,15 @@ function build(territory) {
         };
         const anchors = nearest(trusted.filter(point =>
             Math.hypot(point.locX - centre.locX, point.locY - centre.locY) <= ANCHOR_RADIUS), centre, 8);
+        if (work) work.nearbyRoots = anchors.length;
         // Prove one entry into the territory first. Later points can reuse that
         // proof; no search starts from an unverified surface, even on retry.
         for (const anchor of anchors) {
             for (const point of nearest(points, anchor, 2)) {
-                let connected = Surface.walk(anchor, point);
+                let connected = walk(anchor, point);
                 if (!connected && searches < PATH_SEARCHES / 2) {
                     searches++;
+                    if (work) work.pathSearchRequests++;
                     connected = Surface.reachable(anchor, point, PATH_NODES);
                 }
                 if (connected) {
@@ -141,9 +175,10 @@ function build(territory) {
                 for (const point of points) {
                     if (seen.has(point)) continue;
                     const neighbours = nearest(accepted, point, 4);
-                    let valid = neighbours.some(anchor => Surface.walk(anchor, point));
+                    let valid = neighbours.some(anchor => walk(anchor, point));
                     if (!valid && searches < PATH_SEARCHES) {
                         searches++;
+                        if (work) work.pathSearchRequests++;
                         valid = Surface.reachable(neighbours[0], point, PATH_NODES);
                     }
                     if (!valid) continue;
@@ -157,35 +192,63 @@ function build(territory) {
             for (let i = 0; i < accepted.length; i += 32) addTrusted(accepted[i]);
         }
     }
+    if (work) {
+        work.reason ||= accepted.length ? null : !points.length ? 'sampling_miss_or_absence'
+            : !work.nearbyRoots ? 'root_unavailable' : 'connectivity_unknown';
+        work.pathNodeAllowance = work.pathSearchRequests * (PATH_NODES + 1);
+        work.searchLimitReached = searches >= (accepted.length ? PATH_SEARCHES : PATH_SEARCHES / 2);
+        attempts.push(work);
+    }
     const packed = new Int32Array(accepted.length * 3);
     accepted.forEach((point, index) => packed.set([point.locX, point.locY, point.locZ], index * 3));
     return packed;
 }
 
-function prepare(territory) {
+function prepare(territory, work) {
     ensureRevision();
     const key = keyFor(territory.bounds, territory.spawnAnchors);
-    if (!pools.has(key)) pools.set(key, build(territory));
+    if (!pools.has(key)) {
+        if (work && !work.has(key)) work.set(key, []);
+        pools.set(key, build(territory, work?.get(key)));
+    }
     return pools.get(key);
 }
 
-function auditFixed(definitions) {
+function auditFixed(definitions, detailed) {
     const monsters = new Set(invoke('GameServer/DataCache').npcs
         .filter(npc => npc.template?.kind === 'Monster').map(npc => Number(npc.selfId)));
     const seen = new Set();
     const examples = [];
-    let invalid = 0;
-    for (const territory of definitions) {
-        for (const spawn of territory.spawns) {
-            if (!monsters.has(Number(spawn.selfId)) || spawn.total <= 0) continue;
-            for (const point of spawn.coords) {
+    const records = detailed ? new Map() : null;
+    const failures = {};
+    const heightBuckets = { '65-128': 0, '129-256': 0, '257-512': 0, 'above-512': 0 };
+    let invalid = 0, rows = 0, coordinateReferences = 0, declaredSlots = 0;
+    for (const [definitionId, territory] of definitions.entries()) {
+        for (const [row, spawn] of territory.spawns.entries()) {
+            if (!monsters.has(Number(spawn.selfId)) || spawn.total <= 0 || !spawn.coords.length) continue;
+            rows++;
+            coordinateReferences += spawn.coords.length;
+            declaredSlots += spawn.total * spawn.coords.length;
+            for (const [coordinate, point] of spawn.coords.entries()) {
                 const key = `${point.locX}:${point.locY}:${point.locZ}`;
-                if (seen.has(key)) continue;
+                const reference = detailed && { definitionId, row, coordinate, npcId: spawn.selfId, slots: spawn.total };
+                if (seen.has(key)) {
+                    records?.get(key).references.push(reference);
+                    continue;
+                }
                 seen.add(key);
                 const supported = Surface.supported(point);
                 const exit = supported && [[16, 0], [-16, 0], [0, 16], [0, -16]].some(([dx, dy]) =>
                     Surface.walk(supported, { locX: supported.locX + dx, locY: supported.locY + dy }));
+                const reason = !detailed || exit ? null : supported ? 'local_exit_missing' : supportFailure(point);
+                if (records) records.set(key, { authored: point, normalized: supported, local: reason || 'supported',
+                    global: 'not_prepared', references: [reference] });
                 if (exit) continue;
+                if (detailed) failures[reason] = (failures[reason] || 0) + 1;
+                if (reason === 'height_mismatch') {
+                    const delta = Math.min(...Surface.layers(point.locX, point.locY).map(layer => Math.abs(layer.z - point.locZ)));
+                    heightBuckets[delta <= 128 ? '65-128' : delta <= 256 ? '129-256' : delta <= 512 ? '257-512' : 'above-512']++;
+                }
                 invalid++;
                 if (examples.length < 10) examples.push(`${territory.selfId}/${spawn.selfId}@${key}`);
             }
@@ -194,12 +257,82 @@ function auditFixed(definitions) {
     if (invalid) utils.infoWarn('SpawnPlacement',
         '%d authored monster positions lack a supported surface or local exit; kept unchanged for content correction. Examples: %s',
         invalid, examples.join(', '));
+    return { rows, coordinateReferences, declaredSlots, unique: seen.size, invalid, failures, heightBuckets, global: 'not_prepared',
+        ...(records && { records: [...records.values()] }) };
 }
 
-function init(definitions, cacheOptions) {
+// Detailed accounting is opt-in and never supplies new roots or relaxes admission.
+// In particular, a nonempty pool is not an adequacy or global fixed-access proof.
+function describe(definitions, roots, work, fixed) {
+    const poolRecords = [...pools].map(([key, values], poolId) => {
+        const cells = new Set(), floors = new Set();
+        let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+        for (let i = 0; i < values.length; i += 3) {
+            const [x, y, z] = values.subarray(i, i + 3);
+            cells.add(`${x >> 4}:${y >> 4}`);
+            floors.add(z);
+            minX = Math.min(minX, x); maxX = Math.max(maxX, x);
+            minY = Math.min(minY, y); maxY = Math.max(maxY, y);
+        }
+        return { poolId, key, definitionIds: [], declaredSlots: 0, points: values.length / 3,
+            uniqueCells: cells.size, floorZ: [...floors].sort((a, b) => a - b),
+            extent: values.length ? { minX, maxX, minY, maxY } : null,
+            attempts: work.get(key) || null };
+    });
+    const byKey = new Map(poolRecords.map(record => [record.key, record]));
+    const randomIndices = new Map(territories.map((territory, index) => [territory, index]));
+    const definitionRecords = definitions.map((territory, definitionId) => {
+        const randomIndex = randomIndices.get(territory);
+        const pool = randomIndex === undefined ? null : byKey.get(keyFor(territory.bounds, territory.spawnAnchors));
+        const rows = territory.spawns.flatMap((spawn, row) => spawn.total > 0 ? [{ row, npcId: spawn.selfId,
+            mode: spawn.coords.length ? 'fixed' : 'random', declaredSlots: spawn.total * (spawn.coords.length || 1) }] : []);
+        if (pool) {
+            pool.definitionIds.push(definitionId);
+            pool.declaredSlots += rows.filter(row => row.mode === 'random').reduce((sum, row) => sum + row.declaredSlots, 0);
+        } else {
+            for (const [index, point] of (territory.spawnAnchors || []).entries()) {
+                const normalized = Surface.supported(point);
+                roots.push({ source: `fixed-only:${definitionId}:${territory.selfId}:${index}`, authored: point,
+                    normalized, included: false, reason: 'fixed_only_root_excluded',
+                    supportReason: normalized ? null : supportFailure(point) });
+            }
+        }
+        return { definitionId, territoryId: territory.selfId, randomIndex: randomIndex ?? null, poolId: pool?.poolId ?? null, rows };
+    });
+    for (const pool of poolRecords) {
+        const last = pool.attempts?.at(-1);
+        pool.reason = pool.points ? null : last?.reason || 'cached_unresolved';
+        pool.adequacy = { status: 'unreviewed', flags: [], intendedArea: null };
+        if (!pool.points) pool.adequacy.flags.push('empty_pool');
+        if (pool.uniqueCells === 1 && pool.declaredSlots > 1) pool.adequacy.flags.push('one_cell_multiple_slots');
+        if (pool.points > 0 && pool.points < POOL_SIZE) pool.adequacy.flags.push('underfilled_pool');
+        if (pool.adequacy.flags.length) pool.adequacy.status = 'review_required';
+    }
+    const counters = { xyDraws: 0, sampledCells: 0, decodedLayers: 0, candidateLayers: 0,
+        directWalkCalls: 0, pathSearchRequests: 0, pathNodeAllowance: 0 };
+    for (const attempts of work.values()) for (const attempt of attempts) {
+        for (const key of Object.keys(counters)) counters[key] += attempt[key];
+    }
+    return { version: 1, definitions: definitionRecords, pools: poolRecords, roots, fixed,
+        nonRandomDefinitions: definitionRecords.filter(record => record.randomIndex === null).length,
+        fixedOnlyDefinitions: definitionRecords.filter(record => record.randomIndex === null && record.rows.some(row => row.mode === 'fixed')).length,
+        fixedOnlyAnchorsExcluded: roots.filter(root => !root.included).length,
+        work: { ...counters, scope: 'random_preparation_only',
+            directWalkScope: 'build_calls_only_excludes_reachable_internal_walks',
+            pathNodeAllowanceKind: 'upper_bound_not_measured_expansions',
+            fixedConnectivitySearches: 0, fixedGlobalStatus: 'not_prepared' },
+        enforcedLimits: { poolPoints: POOL_SIZE, sampledCellsPerAttempt: SAMPLE_ATTEMPTS,
+            xyDrawsPerAttempt: SAMPLE_ATTEMPTS * 8, pathSearchesPerAttempt: PATH_SEARCHES,
+            pathNodeParameter: PATH_NODES, pathExpansionUpperBoundPerCall: PATH_NODES + 1,
+            globalWorkBudget: null, deterministicFallback: false, fixedProofCache: false } };
+}
+
+function init(definitions, cacheOptions = {}) {
     const startedAt = Date.now();
+    const roots = cacheOptions.diagnostics ? [] : null;
+    const work = cacheOptions.diagnostics ? new Map() : null;
     territories = definitions.filter(item => item.spawns.some(spawn => !spawn.coords.length && spawn.total > 0));
-    reset();
+    reset(roots);
     const disk = DiskCache.open(territories.map(item => keyFor(item.bounds, item.spawnAnchors)), trusted, POOL_SIZE, cacheOptions);
     if (disk.cached) {
         for (const [key, points] of disk.cached.pools) pools.set(key, points);
@@ -209,7 +342,7 @@ function init(definitions, cacheOptions) {
     } else {
         utils.infoSuccess('SpawnPlacement', 'preparing accessible points for %d random territories', territories.length);
         for (const [index, territory] of territories.entries()) {
-            prepare(territory);
+            prepare(territory, work);
             if ((index + 1) % 128 === 0) utils.infoSuccess('SpawnPlacement', 'prepared %d/%d territories in %d seconds',
                 index + 1, territories.length, Math.round((Date.now() - startedAt) / 1000));
         }
@@ -218,7 +351,7 @@ function init(definitions, cacheOptions) {
         // zones too: repeated respawns must not repeat thousands of failed paths.
         for (const territory of territories) {
             const key = keyFor(territory.bounds, territory.spawnAnchors);
-            if (!pools.get(key).length) pools.set(key, build(territory));
+            if (!pools.get(key).length) pools.set(key, build(territory, work?.get(key)));
         }
         disk.save(pools, trusted);
     }
@@ -226,9 +359,11 @@ function init(definitions, cacheOptions) {
     utils.infoSuccess('SpawnPlacement', '%d random territories prepared; %d awaiting accessible points; preparation took %d seconds',
         territories.length - unavailable.length, unavailable.length, Math.round((Date.now() - startedAt) / 1000));
     for (const territory of unavailable) warn(territory);
-    auditFixed(definitions);
+    const fixed = auditFixed(definitions, !!work);
+    const diagnostics = work && describe(definitions, roots, work, fixed);
     return { cacheHit: !!disk.cached, territories: territories.length, unavailable: unavailable.length,
-        points: [...pools.values()].reduce((total, points) => total + points.length / 3, 0), elapsedMs: Date.now() - startedAt };
+        points: [...pools.values()].reduce((total, points) => total + points.length / 3, 0), elapsedMs: Date.now() - startedAt,
+        ...(diagnostics && { diagnostics }) };
 }
 
 function warn(territory) {

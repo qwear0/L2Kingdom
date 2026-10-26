@@ -42,7 +42,8 @@ async function main() {
         await session.post('Profiler.setSamplingInterval', { interval: 10000 });
         await session.post('Profiler.start');
         const cpu = process.cpuUsage();
-        const result = placement.init(invoke('GameServer/DataCache').npcSpawns, { cachePath, rebuild: settings.cold });
+        const { diagnostics, ...result } = placement.init(invoke('GameServer/DataCache').npcSpawns,
+            { cachePath, rebuild: settings.cold, diagnostics: true });
         const cpuUsage = process.cpuUsage(cpu);
         const { profile } = await session.post('Profiler.stop');
         fs.writeFileSync(path.join(output, 'spawn-placement.cpuprofile'), JSON.stringify(profile));
@@ -63,8 +64,15 @@ async function main() {
         const top = [...frames.values()].map(frame => ({ ...frame,
             percent: Math.round(frame.selfMs / total * 10000000) / 100
         })).sort((a, b) => b.selfMs - a.selfMs).slice(0, 30);
+        const { records, ...fixedSummary } = diagnostics.fixed;
         const summary = { ...result, seed, cold: settings.cold, cachePath, node: process.version,
-            cpuUsage, memory: process.memoryUsage(), maxRssKiB: process.resourceUsage().maxRSS, top };
+            cpuUsage, memory: process.memoryUsage(), maxRssKiB: process.resourceUsage().maxRSS, top,
+            diagnosticsFile: 'diagnostics.json', diagnosticVersion: diagnostics.version,
+            fixed: fixedSummary, work: diagnostics.work, enforcedLimits: diagnostics.enforcedLimits,
+            rejectedRoots: diagnostics.roots.filter(root => root.included && root.reason).length,
+            fixedOnlyAnchorsExcluded: diagnostics.fixedOnlyAnchorsExcluded,
+            adequacyReviewRequired: diagnostics.pools.filter(pool => pool.adequacy.status === 'review_required').length };
+        fs.writeFileSync(path.join(output, 'diagnostics.json'), JSON.stringify(diagnostics, null, 2) + '\n');
         fs.writeFileSync(path.join(output, 'summary.json'), JSON.stringify(summary, null, 2) + '\n');
         console.info('Spawn profile:', JSON.stringify(summary));
     } finally {
