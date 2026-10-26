@@ -93,7 +93,7 @@ function skillExec(session, actor, data) {
         if (!current()) return;
         if (owner) {
             owner.controller.stop('skill_failed');
-            utils.infoWarn('PlayerAutoFight', 'skill failed: %s', error.message || String(error));
+            utils.infoWarn('PlayerAutoFight', 'skill failed: %s', error?.message || String(error));
             return;
         }
         World.fetchUser(data.id).then((user) => {

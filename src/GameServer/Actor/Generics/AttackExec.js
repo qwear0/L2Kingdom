@@ -32,7 +32,7 @@ function attackExec(session, actor, data) {
         if (!current()) return;
         if (owner) {
             owner.controller.stop('attack_failed');
-            utils.infoWarn('PlayerAutoFight', 'attack failed: %s', error.message || String(error));
+            utils.infoWarn('PlayerAutoFight', 'attack failed: %s', error?.message || String(error));
             return;
         }
         World.fetchUser(data.id).then((user) => {

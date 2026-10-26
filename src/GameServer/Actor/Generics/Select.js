@@ -114,7 +114,15 @@ function openManufactureWindow(session, crafter) {
 function select(session, actor, data) {
     const ActionOwner = invoke('GameServer/Actor/PlayerActionOwner');
     if (!ActionOwner.current(session, actor, data.actionOwner)) return;
-    const revision = actor.selectionRevision = Number(actor.selectionRevision || 0) + 1;
+    // Same-target clicks must keep their ordered lookup callbacks: the first
+    // selects and the second interacts, even when both packets arrive before
+    // promise callbacks run. A different target/owner still supersedes them.
+    const previous = actor.selectionIntent;
+    const sameIntent = previous && previous.targetId === Number(data.id)
+        && previous.owner === data.actionOwner && previous.revision === actor.selectionRevision;
+    const revision = sameIntent ? previous.revision : Number(actor.selectionRevision || 0) + 1;
+    actor.selectionRevision = revision;
+    actor.selectionIntent = { targetId: Number(data.id), owner: data.actionOwner, revision };
     const current = () => session.actor === actor && actor.selectionRevision === revision
         && ActionOwner.current(session, actor, data.actionOwner);
     if (!data.selectionOnly && Number(actor.fetchDestId()) === Number(data.id)) ActionOwner.takeover(session, actor);

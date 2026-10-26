@@ -558,6 +558,7 @@ class Automation extends SelectedModel {
     }
 
     abortMovement(creature, { notifyClient = true } = {}) {
+        const ownedPlayerMovement = this.actionOwner?.source === 'player-auto-fight';
         this.actionOwner = null;
         this.clearPlayerAttackApproach();
         this.stopMoveInterpolation();
@@ -586,10 +587,10 @@ class Automation extends SelectedModel {
             session.accountId?.startsWith?.('bot_')
         );
 
-        // The server owns bot movement timers.  If one is cancelled without
-        // a StopMove, C4 keeps animating the old route until a later combat
-        // packet or CharInfo forces an obvious position correction.
-        if (wasMoving && notifyClient && botSession && session.dataSendToMeAndOthers && creature?.fetchId) {
+        // Bots and explicitly owned player routes advance on server timers.
+        // Cancelling those timers also needs StopMove, or C4 keeps following
+        // the last segment after authoritative progression has stopped.
+        if (wasMoving && notifyClient && (botSession || ownedPlayerMovement) && session?.dataSendToMeAndOthers && creature?.fetchId) {
             invoke('GameServer/Actor/Generics/MoveTo').recordMovementTrace(session, {
                 event: 'stop',
                 at: Date.now(),

@@ -119,7 +119,7 @@ class PlayerAutoFight {
             }).catch(error => {
                 if (!owner.isCurrent()) return;
                 this.stop('target_lookup_failed');
-                utils.infoWarn('PlayerAutoFight', 'target lookup failed: %s', error.message || String(error));
+                utils.infoWarn('PlayerAutoFight', 'target lookup failed: %s', error?.message || String(error));
             });
         }
         this.schedule(run);
@@ -148,7 +148,7 @@ class PlayerAutoFight {
             try { this.tick(run); }
             catch (error) {
                 this.stop('action_failed');
-                utils.infoWarn('PlayerAutoFight', 'native action failed: %s', error.stack || error.message);
+                utils.infoWarn('PlayerAutoFight', 'native action failed: %s', error?.stack || error?.message || String(error));
             }
             if (this.run === run) this.schedule(run);
         }, 100);
