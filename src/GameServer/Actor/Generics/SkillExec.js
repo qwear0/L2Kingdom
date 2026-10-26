@@ -1,5 +1,6 @@
 const World = invoke('GameServer/World/World');
 const ArenaCombatRules = invoke('GameServer/World/ArenaCombatRules');
+const C4SkillRules = invoke('GameServer/Skills/C4SkillRules');
 const ActionOwner = invoke('GameServer/Actor/PlayerActionOwner');
 
 function canTargetEnemyNpc(npc, data = {}) {
@@ -125,7 +126,8 @@ function skillExec(session, actor, data) {
                     }
                     actor.attack.remoteHit(session, user, skill);
                 }
-            });
+            }, { skill, allowDeadTarget: skill.fetchTargetKind() === 'corpse_player'
+                && skill.fetchSemantic?.().skillType === C4SkillRules.RESURRECT });
         }).catch((err) => {
             cancelFailedSupportTarget(session, actor, data, skill);
             utils.infoWarn('GameServer', 'Skill -> ' + err);

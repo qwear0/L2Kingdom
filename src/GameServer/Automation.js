@@ -212,7 +212,7 @@ class Automation extends SelectedModel {
             || session.accountId?.startsWith?.('bot_'));
         const resolved = bot ? invoke('GameServer/Geodata/GeodataEngine').walkSegment(
             { locX: actor.fetchLocX(), locY: actor.fetchLocY(), locZ: actor.fetchLocZ() },
-            { ...point, locZ: matchHeight ? point.locZ : undefined }
+            point, matchHeight
         ) : point;
         if (!resolved) {
             // Detach before abortAll: cancelling interpolation normally samples

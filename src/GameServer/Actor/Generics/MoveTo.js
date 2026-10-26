@@ -138,9 +138,7 @@ function startPathMovement({ session, actor, path, isClose, moveGoal }) {
     const current = () => session.actor === actor && (!moveGoal || session.activeMoveGoal === moveGoal)
         && ActionOwner.current(session, actor, moveGoal?.actionOwner);
     const advancePosition = (point, matchHeight = true) => {
-        const resolved = GeodataEngine.walkSegment(locOf(actor), {
-            ...point, locZ: matchHeight ? point.locZ : undefined
-        });
+        const resolved = GeodataEngine.walkSegment(locOf(actor), point, matchHeight);
         // Server stepping must use the same floor/cell traversal as route
         // smoothing, including the drift from the first cell's centre.
         if (!resolved || moveGoal?.actionOwner
@@ -230,7 +228,8 @@ function startPathMovement({ session, actor, path, isClose, moveGoal }) {
             } else {
                 const nextX = Math.round(currentLoc.locX + dx * ratio);
                 const nextY = Math.round(currentLoc.locY + dy * ratio);
-                if (!advancePosition({ locX: nextX, locY: nextY }, false)) return;
+                const nextZ = Math.round(currentLoc.locZ + dz * ratio);
+                if (!advancePosition({ locX: nextX, locY: nextY, locZ: nextZ }, false)) return;
                 invoke('GameServer/Bot/AI/PartyCompanionService').updatePosition(session, actor);
                 if (moveGoal?.town) {
                     const point = locOf(actor);

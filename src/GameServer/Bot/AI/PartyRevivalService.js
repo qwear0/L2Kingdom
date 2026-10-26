@@ -197,7 +197,7 @@ function castScroll(session, actor, target, skill) {
     });
     actor.automation.scheduleAction(session, actor, target, skill.fetchDistance(), () => {
         actor.attack.remoteHit(session, target, skill);
-    });
+    }, { skill, allowDeadTarget: true });
 }
 
 function cancelAttempt(leaderSession) {
