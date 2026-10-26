@@ -93,7 +93,7 @@ Exceptional legacy stock/effects/cumulative-SP behavior therefore remains a sepa
 
 NodeL2 initializes DB/data maintenance, clans/geodata/world, clan halls/AFK trades, personas/catalogues, TCP listeners and bots before optional observer and developer console readiness. Startup can migrate/write persistence; it is not a read-only check.
 
-Managed **running** requires completed necessary initialization, awaited AuthServer and GameServer listening, and awaited private observer listening when enabled. The parent uses v1 generation-bound `ready` IPC, not a log marker. Required listener/startup failures initiate shutdown; an old generation cannot mark a new child ready. A 120-second readiness deadline requests the same graceful shutdown chain, not a second process.
+Managed **running** requires completed necessary initialization, awaited AuthServer and GameServer listening, and awaited private observer listening when enabled. The parent uses v1 generation-bound `ready` IPC, not a log marker. Required listener/startup failures initiate shutdown; an old generation cannot mark a new child ready. A 30-minute readiness deadline allows full-world geodata connectivity preparation and requests the same graceful shutdown chain on expiry, not a second process. Preparation reports bounded progress in the server log; progress messages do not establish readiness.
 
 Settings IPC is independently available without observer HTTP: `settings.read`, `settings.apply`, `settings.reply`, current generation and bounded request IDs. Parent correlation is capped at 32 outstanding requests with a four-second reply bound; stale replies are ignored. Proxy requests have a 15-second deadline and endpoint/generation checks.
 

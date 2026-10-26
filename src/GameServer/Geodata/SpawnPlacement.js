@@ -198,7 +198,14 @@ function auditFixed(definitions) {
 function init(definitions) {
     territories = definitions.filter(item => item.spawns.some(spawn => !spawn.coords.length && spawn.total > 0));
     reset();
-    for (const territory of territories) prepare(territory);
+    const startedAt = Date.now();
+    utils.infoSuccess('SpawnPlacement', 'preparing accessible points for %d random territories', territories.length);
+    for (const [index, territory] of territories.entries()) {
+        prepare(territory);
+        if ((index + 1) % 128 === 0) utils.infoSuccess('SpawnPlacement', 'prepared %d/%d territories in %d seconds',
+            index + 1, territories.length, Math.round((Date.now() - startedAt) / 1000));
+    }
+    utils.infoSuccess('SpawnPlacement', 'retrying territories without accessible points');
     // A later zone may supply an entry for an earlier one. Cache unresolved
     // zones too: repeated respawns must not repeat thousands of failed paths.
     for (const territory of territories) {
@@ -206,8 +213,8 @@ function init(definitions) {
         if (!pools.get(key).length) pools.set(key, build(territory));
     }
     const unavailable = territories.filter(territory => !prepare(territory).length);
-    utils.infoSuccess('SpawnPlacement', '%d random territories prepared; %d awaiting accessible points',
-        territories.length - unavailable.length, unavailable.length);
+    utils.infoSuccess('SpawnPlacement', '%d random territories prepared; %d awaiting accessible points; preparation took %d seconds',
+        territories.length - unavailable.length, unavailable.length, Math.round((Date.now() - startedAt) / 1000));
     for (const territory of unavailable) warn(territory);
     auditFixed(definitions);
 }

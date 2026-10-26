@@ -99,13 +99,15 @@ class ManagementController {
             child.stdout.on('data', chunk => this.append('stdout', chunk));
             child.stderr.on('data', chunk => this.append('stderr', chunk));
             let treeReport = null;
+            // Full-world geodata connectivity preparation runs before readiness and
+            // can take several minutes. Keep a hard bound without skipping it.
             const startupTimer = setTimeout(() => {
                 if (this.child !== child || this.phase !== 'starting') return;
                 this.append('management', 'startup readiness deadline exceeded; initiating shutdown');
                 this.phase = 'stopping'; this.finish(operation, 'failed', { message: 'Startup readiness timed out.' });
                 if (child.connected) child.send({ v: 1, type: 'shutdown', generation, reason: 'startup_timeout' }, () => {});
                 else child.kill('SIGTERM');
-            }, 120000);
+            }, 30 * 60 * 1000);
             startupTimer.unref();
             child.on('message', message => {
                 if (this.child !== child || this.generation !== generation || message?.v !== 1 || message.generation !== generation) return;
