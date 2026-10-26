@@ -50,13 +50,21 @@ function build() {
         for (const to of towns) routes[from][to] = from === to ? path(0, 0, []) : null;
     }
     const points = new Map();
+    const edges = new Map();
     for (const [npcId, rows] of Object.entries(GatekeeperTeleports.lists)) {
         const from = GATEKEEPER_TOWNS[npcId];
         if (!from) continue;
-        for (const [destinationId] of rows) {
+        for (const [destinationId, label] of rows) {
             const destination = GatekeeperTeleports.destination(Number(npcId), destinationId);
             if (!destination) continue;
             const to = townKeyAt(destination);
+            const edgeKey = `${npcId}:${destinationId}`;
+            edges.set(edgeKey, Object.freeze({
+                key: edgeKey, npcId: Number(npcId), destinationId, label,
+                sourceTownKey: from, landingTownKey: to,
+                locX: destination.locX, locY: destination.locY, locZ: destination.locZ,
+                fee: destination.price
+            }));
             if (to && to !== from) {
                 const current = routes[from][to];
                 if (!current || destination.price < current.fee) routes[from][to] = path(destination.price, 1, [{ locX: destination.locX, locY: destination.locY, locZ: destination.locZ, fee: destination.price, npcId: Number(npcId), destinationId }]);
@@ -102,7 +110,25 @@ function build() {
         for (const from of towns) if (routes[from][key]) hops[from] = routes[from][key].hops;
         teleportPoints.push(Object.freeze({ locX: town.locX, locY: town.locY, locZ: town.locZ, hops: Object.freeze(hops) }));
     }
-    return { routes, teleportPoints: Object.freeze(teleportPoints) };
+    // Keep each offered final edge, including competing offers to the same
+    // landing. Excluding an access/offer must not erase a distinct provider.
+    // Only mapped city providers contribute edges; field landings are one-way.
+    const exitRoutes = {};
+    for (const from of towns) {
+        const exits = [];
+        for (const edge of edges.values()) {
+            const prefix = routes[from][edge.sourceTownKey];
+            if (!prefix) continue;
+            exits.push(Object.freeze({
+                key: `${from}:${edge.key}`,
+                fee: prefix.fee + edge.fee,
+                hops: prefix.hops + 1,
+                steps: Object.freeze([...prefix.steps.map(step => edges.get(`${step.npcId}:${step.destinationId}`)), edge])
+            }));
+        }
+        exitRoutes[from] = Object.freeze(exits);
+    }
+    return { routes, teleportPoints: Object.freeze(teleportPoints), exitRoutes: Object.freeze(exitRoutes) };
 }
 
 function ensure() {
@@ -118,6 +144,13 @@ function route(fromKey, toKey) {
 
 function teleportPoints() {
     return ensure().teleportPoints;
+}
+
+// Executable cheapest-fare city prefixes plus each native city/field exit.
+// Unlike teleportPoints(), every landing here has an actual offered last hop.
+const EMPTY_ROUTES = Object.freeze([]);
+function exitRoutes(fromKey) {
+    return ensure().exitRoutes[fromKey] || EMPTY_ROUTES;
 }
 
 // The TownRespawn key of a town object or of the town by the region rule at a point.
@@ -144,4 +177,4 @@ function between(from, to) {
     return { start, destination, gate: TownRespawn.towns[gateKey], route: route(townKey(start), gateKey) };
 }
 
-module.exports = { GATEKEEPER_TOWNS, route, teleportPoints, townKey, landingTown, between };
+module.exports = { GATEKEEPER_TOWNS, route, teleportPoints, exitRoutes, townKey, landingTown, between };
