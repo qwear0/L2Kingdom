@@ -187,6 +187,103 @@ function recover(session, bot, options = {}) {
     return scroll ? 'scroll' : 'unstuck';
 }
 
+// Ordinary journey recall is a real regional item cast, not the legacy
+// requested-town trip above. Its owner must retain the spent-scroll record
+// even on interruption; only native physical arrival can continue a journey.
+function beginRegionalRecall(session, bot, options) {
+    const restrictions = invoke('GameServer/Effects/EffectRestrictions');
+    const skill = bot.backpack.buildItemSkill({ skillId: SOE_SKILL_ID, level: 1 });
+    if (!skill) throw Error('journey_recall_skill_missing');
+    const result = { status: 'refused', reason: 'recall_unavailable', scrollSpent: false };
+    const karma = bot.fetchKarma();
+    const allowed = () => session.actor === bot && options.isCurrent() && !bot.isDead() && bot.fetchKarma() === karma
+        && !hasCombatThreat(session, bot) && !session.pendingActorTeleport
+        && !session.trade && !session.activeTrade && !session.activeNegotiation && !session.botTrade
+        && !bot.fetchPrivateStoreType?.() && !bot.isInOlympiadMode?.() && !bot.state.fetchSeated()
+        && restrictions.canUseBasicAction(bot) && bot.canUseSkill(skill);
+    if (!allowed() || bot.state.fetchCasts() || session.townEscape) return result;
+    const scroll = bot.backpack.fetchItemFromSelfId(TripPayment.SCROLL_OF_ESCAPE);
+    if (!scroll || scroll.fetchAmount() < 1 || scroll.fetchPetLocked?.()) return result;
+    const destination = invoke('GameServer/World/TownRespawn').restartCoords(bot);
+    const origin = { locX: bot.fetchLocX(), locY: bot.fetchLocY(), locZ: bot.fetchLocZ() };
+    const castMs = skill.fetchCalculatedHitTime();
+    if (!Number.isFinite(castMs) || castMs < 0) throw Error('journey_recall_cast_time_invalid');
+    bot.automation.abortAll(bot);
+    const moveGeneration = session.moveRouteGeneration;
+    const marker = { token: Symbol('journey_recall'), town: 'regional recall',
+        startedAt: Date.now(), completesAt: Date.now() + castMs };
+    let timer;
+    const cancel = (reason = 'recall_interrupted', error = null) => {
+        if (['arrived', 'cancelled', 'failed'].includes(result.status) || result.status === 'dispatched' && !error) return false;
+        clearTimeout(timer);
+        if (session.townEscape === marker) {
+            session.townEscape = undefined;
+            if (!bot.attack.activeCast && bot.state.fetchCasts()) {
+                bot.state.setCasts(false);
+                session.dataSendToMeAndOthers?.(ServerResponse.magicSkillCanceld(bot.fetchId()), bot);
+            }
+        }
+        result.status = error ? 'failed' : 'cancelled';
+        result.reason = reason;
+        result.error = error;
+        if (error) utils.infoWarn('BotRecall', 'native recall failed for %s: %s', bot.fetchId(), error.message);
+        options.onCancel?.(reason, error);
+        return true;
+    };
+    result.cancel = cancel;
+    const stationary = () => session.moveRouteGeneration === moveGeneration
+        && !session.pendingPathRequest && !bot.state.fetchTowards()
+        && bot.fetchLocX() === origin.locX && bot.fetchLocY() === origin.locY && bot.fetchLocZ() === origin.locZ;
+    result.validate = () => {
+        if (result.status !== 'casting') return false;
+        if (!allowed() || !stationary() || session.townEscape !== marker
+            || !bot.state.fetchCasts() || bot.attack.activeCast) {
+            cancel('recall_interrupted');
+            return false;
+        }
+        return true;
+    };
+    session.townEscape = marker;
+    try {
+        if (!allowed()) { cancel('owner_changed'); return result; }
+        bot.backpack.deleteItem(session, scroll.fetchId(), 1, () => {
+            result.scrollSpent = true;
+            options.onSpent?.();
+            if (!allowed() || !stationary() || session.townEscape !== marker) { cancel(); return; }
+            bot.state.setCasts(true);
+            result.status = 'casting';
+            result.reason = null;
+            session.dataSendToMeAndOthers?.(ServerResponse.skillStarted(bot, bot.fetchId(), skill), bot);
+            session.dataSendToMe?.(ServerResponse.skillDurationBar(castMs));
+            timer = setTimeout(() => {
+                try {
+                    if (!result.validate()) return;
+                    bot.state.setCasts(false);
+                    session.townEscape = undefined;
+                    const accepted = invoke('GameServer/Actor/Generics/TeleportTo')(session, bot, destination, {
+                        urgentWakeup: true,
+                        onArrival: coords => {
+                            result.status = 'arrived';
+                            options.onArrival?.(coords);
+                        }
+                    });
+                    if (!accepted) { cancel('recall_dispatch_refused'); return; }
+                    result.status = 'dispatched';
+                    result.sequence = bot.teleportSequence;
+                    options.onDispatch?.(result.sequence, destination);
+                } catch (error) {
+                    cancel('recall_dispatch_error', error);
+                }
+            }, castMs);
+        });
+        if (!result.scrollSpent) cancel('scroll_unavailable');
+    } catch (error) {
+        result.paymentUncertain = !result.scrollSpent;
+        cancel('recall_action_error', error);
+    }
+    return result;
+}
+
 function karmaTown() {
     const town = Object.values(invoke('GameServer/World/TownRespawn').towns).find((candidate) => candidate.name === Karma.TOWN_NAME);
     return { name: town.name, x: town.locX, y: town.locY, z: town.locZ };
@@ -342,6 +439,7 @@ module.exports = {
     holdMeeting,
     interruptEscape,
     recover,
+    beginRegionalRecall,
     request,
     requestMeeting,
     revealSupplyErrand,
