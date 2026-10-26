@@ -266,8 +266,17 @@ function randomCoords(definition) {
 }
 
 function nearLeader(leader) {
-    const origin = Surface.supported({ locX: Number(leader.fetchLocX()), locY: Number(leader.fetchLocY()), locZ: Number(leader.fetchLocZ()) });
-    if (!origin) return null;
+    const location = { locX: Number(leader.fetchLocX()), locY: Number(leader.fetchLocY()), locZ: Number(leader.fetchLocZ()) };
+    if (![location.locX, location.locY, location.locZ].every(Number.isFinite)) return null;
+    // Fixed spawns keep their authored Z, which may differ from geodata by
+    // more than a movement step. Resolve the nearest layer before walking;
+    // do not skip a blocked nearest layer to pick another dungeon floor.
+    let surface = null;
+    for (const layer of Surface.layers(location.locX, location.locY)) {
+        if (!surface || Math.abs(layer.z - location.locZ) < Math.abs(surface.z - location.locZ)) surface = layer;
+    }
+    if (!surface?.nswe) return null;
+    const origin = { ...location, locZ: surface.z };
     for (let i = 0; i < 16; i++) {
         const angle = Math.random() * Math.PI * 2;
         const radius = i < 12 ? 80 + Math.random() * 220 : 16 * (i - 11);
