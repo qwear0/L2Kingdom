@@ -1270,9 +1270,10 @@ const PopulationService = {
                 await Writes.flushCharacter(id);
                 await checkpoint();
                 if (!current()) continue;
+                // Do not yield between capture and write admission: newer buffered
+                // vitals could otherwise be flushed first, then overwritten by
+                // this stale status snapshot.
                 const status = CharacterStatus.persistenceRecord(actor);
-                await checkpoint();
-                if (!current()) continue;
                 await Database.updateCharacterStatus(id, status);
                 await checkpoint();
                 if (!current()) continue;
