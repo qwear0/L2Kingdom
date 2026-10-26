@@ -1,3 +1,5 @@
+const { randomInt } = require('node:crypto');
+
 // All mutations here run on Database's existing synchronous transaction queue.
 // Prepared catalog data contains no SQL calls; publication belongs to services
 // after commit, and a publication failure must never roll back a reward receipt.
@@ -141,10 +143,22 @@ function repository({ one, all, write, run, inTransaction, withCharacterFlush })
                 if (one('SELECT COUNT(*) AS total FROM characters WHERE clanId = ?', [clan.id]).total >= Rules.memberLimit(clan.level)) throw Error('clan_full');
                 write('INSERT INTO accounts(username,password) VALUES(?,?)', [prepared.username, prepared.password]);
                 const p = prepared;
+                // Choose inside the creation transaction so concurrent recruits cannot
+                // claim the same unused look. Receipt replays retain the committed look.
+                const used = all(`SELECT c.face, c.hair, c.hairColor FROM characters c
+                    JOIN vassals v ON v.characterId = c.id
+                    WHERE v.ownerCharacterId = ? AND c.race = ? AND c.sex = ?`, [ownerCharacterId, p.race, p.sex]);
+                const appearances = Array.from({ length: 3 * 5 * 4 }, (_, index) => ({
+                    face: index % 3, hair: Math.floor(index / 3) % 5, hairColor: Math.floor(index / 15)
+                }));
+                const unused = appearances.filter(look => !used.some(row =>
+                    row.face === look.face && row.hair === look.hair && row.hairColor === look.hairColor));
+                const choices = unused.length ? unused : appearances;
+                const { face, hair, hairColor } = choices[randomInt(choices.length)];
                 const id = write(`INSERT INTO characters(username,name,race,classId,level,exp,sex,face,hair,hairColor,
                     hp,maxHp,mp,maxMp,locX,locY,locZ,clanId,newbie)
-                    VALUES(?,?,?,?,20,?,?,0,0,0,?,?,?,?,?,?,?,? ,0)`,
-                [p.username,p.name,p.race,p.classId,p.exp,p.sex,p.maxHp,p.maxHp,p.maxMp,p.maxMp,p.locX,p.locY,p.locZ,clan.id]).insertId;
+                    VALUES(?,?,?,?,20,?,?,?,?,?,?,?,?,?,?,?,?,? ,0)`,
+                [p.username,p.name,p.race,p.classId,p.exp,p.sex,face,hair,hairColor,p.maxHp,p.maxHp,p.maxMp,p.maxMp,p.locX,p.locY,p.locZ,clan.id]).insertId;
                 grant(id, prepared, true);
                 write('INSERT INTO vassals(characterId,ownerCharacterId,boundClanId,loadoutPreference,creationRequestId,updatedAt) VALUES(?,?,?,?,?,?)',
                     [id,ownerCharacterId,clan.id,p.loadoutPreference,requestId,Date.now()]);

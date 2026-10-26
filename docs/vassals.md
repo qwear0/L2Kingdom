@@ -19,6 +19,8 @@ This is the current gameplay ownership boundary, not the historical ambient-bot 
 4. Confirmation receipts are valid for ten minutes. A successfully committed receipt replays before later expiry/capacity checks; retry must not duplicate a character or grant.
 5. A committed result can report publication pending if live restoration fails. Durable success and successful live publication are separate outcomes.
 
+New vassals keep the selected race and sex and receive a random face, hairstyle and hair color from the existing bot appearance ranges (3 faces × 5 hairstyles × 4 colors). Creation prefers combinations not already used by the same owner's vassals of that race and sex; only an exhausted 60-combination pool permits repeats. The choice is committed with the character, so receipt replay, live restoration and restart preserve it. Existing characters are not rerolled.
+
 There is no additional configurable vassal cap. SQL clan-capacity triggers count **all** clan members: level 0/1/2/3/4–5 capacities are 10/15/20/30/40. Thus an otherwise empty level-1 clan with its Lord has 14 free member slots. Live party capacity is separate: nine members, at most eight companions beside the player.
 
 ## Character ownership, not account or social permission
