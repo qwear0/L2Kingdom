@@ -2120,6 +2120,8 @@ function worldStatus() {
             heapUsedMb: Math.round(memory.heapUsed / 1024 / 1024),
             rssMb: Math.round(memory.rss / 1024 / 1024),
             developerDiagnostics: {
+                hotDispatch: invoke('GameServer/Bot/AI/HotAiDispatcher').snapshot(),
+                eventLoop: invoke('GameServer/Bot/Population/PopulationMetrics').eventLoopSnapshot(),
                 main: invoke('GameServer/Bot/Economy/EconomyDiagnostics').metrics(),
                 worker: invoke('GameServer/Bot/Population/ColdSimulationCoordinator').snapshot().worker?.developerDiagnostics || null,
                 transport: invoke('HistoryDatabase').stats().economyDiagnostics || { enabled: false }

@@ -1,6 +1,7 @@
 const { DiagnosticMetricMap } = require('./DiagnosticMetricMap');
 const Config = invoke('GameServer/Bot/Population/PopulationConfig');
 const { monitorEventLoopDelay } = require('perf_hooks');
+const DELAY_WINDOW_MS = 30000;
 
 function now() {
     return Date.now();
@@ -150,6 +151,7 @@ const PopulationMetrics = {
     coldSafetySource: null,
     delayHistogram: null,
     delayWindowStartedAt: 0,
+    completedDelayWindow: null,
 
     init() {
         if (!Config.developerDiagnostics) return;
@@ -199,6 +201,8 @@ const PopulationMetrics = {
             this.delayHistogram = monitorEventLoopDelay({ resolution: 20 });
             this.delayHistogram.enable();
             this.delayWindowStartedAt = now();
+            this.completedDelayWindow = null;
+            this.eventLoop = { lagMs: 0, maxLagMs: 0, samples: 0, slowSamples: 0 };
         }
 
         let expectedAt = now() + Config.eventLoopSampleMs;
@@ -208,12 +212,29 @@ const PopulationMetrics = {
 
             this.eventLoop.lagMs = lag;
             if (Config.developerDiagnostics) {
-            this.eventLoop.maxLagMs = Math.max(this.eventLoop.maxLagMs, lag);
-            this.eventLoop.samples += 1;
-            if (lag >= Config.slowEventLoopLagMs) {
-                this.eventLoop.slowSamples += 1;
-            }
-
+                this.eventLoop.maxLagMs = Math.max(this.eventLoop.maxLagMs, lag);
+                this.eventLoop.samples += 1;
+                if (lag >= Config.slowEventLoopLagMs) this.eventLoop.slowSamples += 1;
+                const histogram = this.delayHistogram;
+                if (histogram && measuredAt - this.delayWindowStartedAt >= DELAY_WINDOW_MS) {
+                    const samples = Number(histogram.count);
+                    // Only this sampler rotates windows; observers must not consume
+                    // measurements or change the window seen by another reader.
+                    this.completedDelayWindow = {
+                        available: samples > 0,
+                        status: samples > 0 ? 'ready' : 'no_samples',
+                        resolutionMs: 20,
+                        startedAt: this.delayWindowStartedAt,
+                        endedAt: measuredAt,
+                        windowMs: measuredAt - this.delayWindowStartedAt,
+                        samples,
+                        p95Ms: samples ? Math.round(histogram.percentile(95) / 1e6) : null,
+                        p99Ms: samples ? Math.round(histogram.percentile(99) / 1e6) : null,
+                        maxMs: samples ? Math.round(histogram.max / 1e6) : null
+                    };
+                    histogram.reset();
+                    this.delayWindowStartedAt = measuredAt;
+                }
             }
             expectedAt = measuredAt + Config.eventLoopSampleMs;
         }, Config.eventLoopSampleMs);
@@ -226,6 +247,8 @@ const PopulationMetrics = {
     stopEventLoopMonitor() {
         this.delayHistogram?.disable();
         this.delayHistogram = null;
+        this.delayWindowStartedAt = 0;
+        this.completedDelayWindow = null;
         if (!this.timer) return;
         clearInterval(this.timer);
         this.timer = null;
@@ -595,20 +618,30 @@ const PopulationMetrics = {
         return Number(this.eventLoop.lagMs || 0);
     },
 
+    eventLoopSnapshot() {
+        if (!Config.developerDiagnostics) return { enabled: false };
+        return {
+            enabled: true,
+            ...this.eventLoop,
+            delay: this.completedDelayWindow ? { ...this.completedDelayWindow } : {
+                available: false,
+                status: this.delayHistogram ? 'warming_up' : 'stopped',
+                resolutionMs: 20,
+                startedAt: this.delayWindowStartedAt || null,
+                endedAt: null,
+                windowMs: null,
+                samples: 0,
+                p95Ms: null,
+                p99Ms: null,
+                maxMs: null
+            }
+        };
+    },
+
     snapshot() {
         if (!Config.developerDiagnostics) return { enabled: false };
         const elapsedMs = Math.max(1, now() - (this.startedAt || now()));
-        const histogram = this.delayHistogram;
-        const delay = {
-            resolutionMs: 20,
-            windowMs: histogram ? Math.max(0, now() - this.delayWindowStartedAt) : 0,
-            samples: Number(histogram?.count || 0),
-            p95Ms: histogram?.count ? Math.round(histogram.percentile(95) / 1e6) : 0,
-            p99Ms: histogram?.count ? Math.round(histogram.percentile(99) / 1e6) : 0,
-            maxMs: histogram?.count ? Math.round(histogram.max / 1e6) : 0
-        };
-        histogram?.reset();
-        this.delayWindowStartedAt = now();
+        const { delay } = this.eventLoopSnapshot();
         const delta = {};
 
         Object.keys(this.counters).forEach((key) => {

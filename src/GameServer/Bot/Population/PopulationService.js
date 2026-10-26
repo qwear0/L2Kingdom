@@ -1101,6 +1101,7 @@ const PopulationService = {
         if (Config.enabled === false) return;
         if (this.initialized) return this.lifeReadyPromise;
         if (Config.ownedOnly) {
+            if (Config.developerDiagnostics) Metrics.startEventLoopMonitor();
             this.lifeReadyPromise = LifeState.init();
             this.initialized = true;
             return this.lifeReadyPromise;
@@ -1133,6 +1134,7 @@ const PopulationService = {
             // Only hot snapshot persistence and WAL maintenance survive here.
             // No worker, job registry, board review, seeder, legacy repair,
             // warehouse distribution or party/clan/director events are started.
+            if (Config.developerDiagnostics) Metrics.startEventLoopMonitor();
             this.ownedSnapshotTimer = setInterval(() => {
                 this.persistOwnedActors().catch(error => utils.infoWarn('Vassal', 'snapshot failed: %s', error.message));
             }, 30000);

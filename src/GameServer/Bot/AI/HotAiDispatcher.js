@@ -4,6 +4,7 @@ const DiagnosticConfig = require('../Population/PopulationConfig');
 const { performance } = require('perf_hooks');
 
 const SAMPLE_LIMIT = 1024;
+const PROCESS_STARTED_AT = Math.round(Date.now() - process.uptime() * 1000);
 const urgentQueue = [];
 const normalQueue = [];
 const pending = new Map();
@@ -13,6 +14,7 @@ let drainTimer = null;
 
 const counters = {
     enqueued: 0,
+    started: 0,
     completed: 0,
     coalesced: 0,
     canceled: 0,
@@ -53,7 +55,10 @@ function drain() {
     const entry = nextEntry();
     if (!entry) return;
     pending.delete(entry.key);
-    if (DiagnosticConfig.developerDiagnostics) sample(waitSamples, performance.now() - entry.queuedAt);
+    if (DiagnosticConfig.developerDiagnostics) {
+        counters.started += 1;
+        sample(waitSamples, performance.now() - entry.queuedAt);
+    }
     const startedAt = DiagnosticConfig.developerDiagnostics ? performance.now() : 0;
     try {
         entry.task();
@@ -111,10 +116,30 @@ function cancel(key) {
 
 function snapshot() {
     if (!DiagnosticConfig.developerDiagnostics) return { enabled: false };
+    const measuredAt = performance.now();
+    let urgentDepth = 0;
+    let oldestUrgentMs = null;
+    let oldestNormalMs = null;
+    for (const entry of pending.values()) {
+        const age = Math.max(0, measuredAt - entry.queuedAt);
+        if (entry.urgent) {
+            urgentDepth += 1;
+            oldestUrgentMs = Math.max(oldestUrgentMs ?? 0, age);
+        } else oldestNormalMs = Math.max(oldestNormalMs ?? 0, age);
+    }
     return {
+        enabled: true,
+        processId: process.pid,
+        processStartedAt: PROCESS_STARTED_AT,
         ...counters,
+        sampleScope: 'latest_started_tasks',
+        sampleLimit: SAMPLE_LIMIT,
+        waitSamples: waitSamples.length,
+        runSamples: runSamples.length,
         depth: pending.size,
-        urgentDepth: [...pending.values()].filter((entry) => entry.urgent).length,
+        urgentDepth,
+        oldestUrgentMs,
+        oldestNormalMs,
         waitP95Ms: percentile(waitSamples, 0.95),
         waitMaxMs: waitSamples.length ? Number(Math.max(...waitSamples).toFixed(2)) : 0,
         runP95Ms: percentile(runSamples, 0.95),
