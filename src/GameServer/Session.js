@@ -164,6 +164,7 @@ class Session {
 
         this.socket   = socket;
         this.serverId = optn.id;
+        this.npcHtmlGeneration = 0;
         if (invoke('GameServer/Bot/Population/PopulationConfig').developerDiagnostics === true && process.env.L2NODE_PACKET_TRACE !== '0') {
             this.packetTrace = [];
             this.movementPacketTrace = [];
@@ -219,6 +220,9 @@ class Session {
         ActorVisibility.trackPacket(World, this, data);
         this.recordOutboundPacket(data);
         const packet = this.packData(data);
+        // All NPC HTML dialogs share one client window, regardless of their owner.
+        // A newer page must revoke pending asynchronous redraws of the old one.
+        if (packetOpcode(data) === 0x0f) ++this.npcHtmlGeneration;
         this.socket.write(packet);
     }
 

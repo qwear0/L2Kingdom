@@ -99,11 +99,13 @@ function renderWithCompletion(session, controller, message = '') {
     render(session, message);
     if (controller.settingsStatus !== 'loading' && controller.settingsSave !== 'saving') return;
     const epoch = session.nativeAutoFightEpoch, revision = session.nativeAutoFightRevision;
-    // Redraw only the page still awaiting this result. Navigation, another edit,
-    // character replacement or NativeUiSession.reset revokes that UI capability.
+    const htmlGeneration = session.npcHtmlGeneration;
+    // Auto-fight revisions cannot detect another dialog replacing the shared HTML
+    // window. Require both page identity and lifecycle ownership before redrawing.
     controller.settingsTask?.then(() => {
         if (session.actor === controller.actor && session.nativeAutoFightActor === controller.actor && session.nativeAutoFightOpen
-            && session.nativeAutoFightEpoch === epoch && session.nativeAutoFightRevision === revision) render(session);
+            && session.nativeAutoFightEpoch === epoch && session.nativeAutoFightRevision === revision
+            && session.npcHtmlGeneration === htmlGeneration) render(session);
     }).catch(error => utils.infoWarn('PlayerAutoFight', 'settings page redraw failed: %s', error?.message));
 }
 
