@@ -1,3 +1,5 @@
+const { performance } = require('perf_hooks');
+const OWNED_SNAPSHOT_SLICE_MS = 2;
 const PartyMarketBreak = require('./PartyMarketBreak');
 const BackgroundCandidateQueue = require('./BackgroundCandidateQueue');
 const { WorkerCommandAdmissionRefusal, checkWorkerCommandAdmission } = require('./WorkerCommandAdmission');
@@ -1042,6 +1044,10 @@ const PopulationService = {
     initialized: false,
     started: false,
     lifeReadyPromise: null,
+    ownedSnapshotTimer: null,
+    ownedSnapshotPromise: null,
+    ownedSnapshotAdmissionOpen: false,
+    stopPromise: null,
     hotBoardReviewGeneration: 0,
     hotBoardReviewService: null,
     hotBoardReviewStartPromise: null,
@@ -1126,7 +1132,7 @@ const PopulationService = {
     },
 
     start() {
-        if (this.started || Config.enabled === false) return;
+        if (this.stopPromise || this.started || Config.enabled === false) return;
         if (!this.initialized) this.init();
 
         this.started = true;
@@ -1135,6 +1141,7 @@ const PopulationService = {
             // No worker, job registry, board review, seeder, legacy repair,
             // warehouse distribution or party/clan/director events are started.
             if (Config.developerDiagnostics) Metrics.startEventLoopMonitor();
+            this.ownedSnapshotAdmissionOpen = true;
             this.ownedSnapshotTimer = setInterval(() => {
                 this.persistOwnedActors().catch(error => utils.infoWarn('Vassal', 'snapshot failed: %s', error.message));
             }, 30000);
@@ -1234,34 +1241,76 @@ const PopulationService = {
         Director.start();
     },
 
-    async persistOwnedActors() {
-        if (this.ownedSnapshotRunning) return;
-        this.ownedSnapshotRunning = true;
-        try {
+    persistOwnedActors() {
+        if (this.ownedSnapshotPromise) return this.ownedSnapshotPromise;
+        if (!this.ownedSnapshotAdmissionOpen) return Promise.resolve();
+        const pass = (async () => {
+            let sliceStartedAt = performance.now();
+            const checkpoint = async () => {
+                if (performance.now() - sliceStartedAt < OWNED_SNAPSHOT_SLICE_MS) return;
+                // Database.cooperatively has a process-global, inheritable budget.
+                // Keep this producer's budget local, including preparation/status work.
+                await new Promise(resolve => setImmediate(resolve));
+                sliceStartedAt = performance.now();
+            };
             const Registry = invoke('GameServer/Lord/VassalService');
             const Writes = invoke('GameServer/Persistence/CharacterWriteQueue');
-            const Status = invoke('GameServer/Actor/CharacterStatus');
-            const Database = invoke('Database');
-            for (const session of invoke('GameServer/Bot/BotManager').sessions) {
+            const CharacterStatus = invoke('GameServer/Actor/CharacterStatus');
+            // Bound this admitted pass to its starting roster; removals clear actor.
+            for (const session of [...invoke('GameServer/Bot/BotManager').sessions]) {
                 const actor = session.actor;
-                if (!actor || !Registry.find(actor.fetchId())) continue;
-                Writes.location(actor.fetchId(), { locX: actor.fetchLocX(), locY: actor.fetchLocY(), locZ: actor.fetchLocZ() });
-                Writes.experience(actor.fetchId(), actor.fetchLevel(), actor.fetchExp(), actor.fetchSp());
-                await Writes.flushCharacter(actor.fetchId());
-                await Database.updateCharacterStatus(actor.fetchId(), Status.persistenceRecord(actor));
-                if (session.actor === actor && !await LifeState.markHot(session, 'owned_snapshot')) throw Error('owned_snapshot_failed');
+                const id = actor?.fetchId();
+                const current = () => session.actor === actor && actor && Registry.find(id);
+                await checkpoint();
+                if (!current()) continue;
+                Writes.location(id, { locX: actor.fetchLocX(), locY: actor.fetchLocY(), locZ: actor.fetchLocZ() });
+                Writes.experience(id, actor.fetchLevel(), actor.fetchExp(), actor.fetchSp());
+                await checkpoint();
+                if (!current()) continue;
+                await Writes.flushCharacter(id);
+                await checkpoint();
+                if (!current()) continue;
+                const status = CharacterStatus.persistenceRecord(actor);
+                await checkpoint();
+                if (!current()) continue;
+                await Database.updateCharacterStatus(id, status);
+                await checkpoint();
+                if (!current()) continue;
+                if (!await LifeState.markHot(session, 'owned_snapshot')) throw Error('owned_snapshot_failed');
             }
-        } finally { this.ownedSnapshotRunning = false; }
+        })().finally(() => {
+            if (this.ownedSnapshotPromise === pass) this.ownedSnapshotPromise = null;
+        });
+        this.ownedSnapshotPromise = pass;
+        return pass;
     },
 
     stop() {
+        if (this.stopPromise) return this.stopPromise;
+        this.ownedSnapshotAdmissionOpen = false;
         if (this.ownedSnapshotTimer) clearInterval(this.ownedSnapshotTimer);
         this.ownedSnapshotTimer = null;
+        // An admitted snapshot may be suspended in setImmediate. Wait for every
+        // drain even after failure, before NodeL2 can flush/close its database.
+        const drain = Promise.allSettled([
+            this.ownedSnapshotPromise,
+            Promise.resolve().then(() => ColdSimulationCoordinator.stop()),
+            Promise.resolve().then(() => this.stopLocalServices())
+        ]).then(results => {
+            const errors = results.filter(result => result.status === 'rejected').map(result => result.reason);
+            if (errors.length) throw new AggregateError(errors, `population drain failed: ${errors.map(error => error?.message || error).join('; ')}`);
+        }).finally(() => {
+            if (this.stopPromise === drain) this.stopPromise = null;
+        });
+        this.stopPromise = drain;
+        return drain;
+    },
+
+    stopLocalServices() {
         ClanActionService.stopEvents();
         this.stopPartyAssemblyEvents();
         this.stopLifecycleSafetySweep();
         this.stopHotBoardReviews();
-        const coldStop = ColdSimulationCoordinator.stop();
         if (this.initialSummaryTimer) {
             clearTimeout(this.initialSummaryTimer);
             this.initialSummaryTimer = null;
@@ -1336,7 +1385,6 @@ const PopulationService = {
         Director.stop();
         Metrics.stopEventLoopMonitor();
         this.started = false;
-        return coldStop;
     },
 
     scheduleGeneratedColdSeed(delayMs = Config.generatedColdSeedDelayMs) {
