@@ -21,6 +21,15 @@ const MAX_SAFE_REST_MS = 6 * 60 * 60 * 1000;
 const DEFENCE_RADIUS = 400;
 const MAX_POINT_DISTANCE = 3000;
 
+// A slope may gain more than one cell's step height over its full length.
+// Require real geodata before relaxing the height guard: missing-region
+// line-of-sight fallback must not authorize a jump or another floor.
+function sameTerrainLayer(from, to) {
+    return Math.abs(from.locZ - to.locZ) <= 64
+        || (Geodata.hasGeo(from.locX, from.locY) && Geodata.hasGeo(to.locX, to.locY)
+            && Geodata.hasLineOfSight(from.locX, from.locY, from.locZ, to.locX, to.locY, to.locZ));
+}
+
 class PlayerAutoFight {
     static forActor(actor) {
         return actor.playerAutoFight ||= new PlayerAutoFight(actor);
@@ -204,7 +213,7 @@ class PlayerAutoFight {
     inside(target, extra = 0) {
         const center = this.run?.center || this.center;
         return !!center && distance(loc(target), center) <= (this.run?.radius || this.radius) + extra
-            && Math.abs(target.fetchLocZ() - center.locZ) <= 64;
+            && sameTerrainLayer(center, loc(target));
     }
 
     engaged(target) {
@@ -242,7 +251,7 @@ class PlayerAutoFight {
 
     legalTarget(target, source = this.actor) {
         const run = this.run;
-        if (!run || !this.ordinaryMonster(target) || Math.abs(target.fetchLocZ() - source.fetchLocZ()) > 64) return false;
+        if (!run || !this.ordinaryMonster(target) || !sameTerrainLayer(loc(source), loc(target))) return false;
         if (this.threatening(target) && this.defending()) run.defenceAnchor ||= loc(this.actor);
         if (run.defenceAnchor) {
             return this.engaged(target) && distance(loc(target), run.defenceAnchor) <= DEFENCE_RADIUS
@@ -452,7 +461,7 @@ class PlayerAutoFight {
         let previous = loc(this.actor), length = 0;
         for (const waypoint of route) {
             length += distance(previous, waypoint);
-            if (Math.abs(previous.locZ - waypoint.locZ) > 64) return false;
+            if (!sameTerrainLayer(previous, waypoint)) return false;
             if (run.route.purpose === 'candidate') {
                 if (!this.legalActionTarget(run.approach.target, run.approach.skill)) return false;
                 const anchor = run.defenceAnchor || run.center;
@@ -808,8 +817,12 @@ class PlayerAutoFight {
         // actions; only a finished encounter may release the defence leash.
         if (!encounter.length) run.defenceAnchor = null;
         else if (threats.length && this.defending()) run.defenceAnchor ||= loc(actor);
-        if (threats.some(target => !this.ordinaryMonster(target))) run.wait = 'unsupported_threat';
-        else if (threats.some(target => !this.legalTarget(target))) run.wait = 'defence_leash';
+        // Threat waits follow the current encounter; only a failed fixed-point
+        // route stays latched until Stop/Start, including during defence.
+        if (run.wait !== 'path_blocked') {
+            run.wait = threats.some(target => !this.ordinaryMonster(target)) ? 'unsupported_threat'
+                : threats.some(target => !this.legalTarget(target)) ? 'defence_leash' : null;
+        }
         const readyTarget = target => this.legalTarget(target) && Number(run.rejected.get(target.fetchId()) || 0) <= now;
         const defensive = threats.find(readyTarget);
         if (encounter.length || run.route || run.state !== 'resting') run.safeRestSince = null;
