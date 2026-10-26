@@ -1,4 +1,4 @@
-const ServerResponse = invoke('GameServer/Network/Response');
+const GroundItemVisibility = require('../GroundItemVisibility');
 const ConsoleText = invoke('GameServer/ConsoleText');
 const PartyCompanionService = invoke('GameServer/Bot/AI/PartyCompanionService');
 const Purchase = invoke('GameServer/World/Generics/PurchaseItem');
@@ -44,6 +44,7 @@ async function claim(session, actor, item, canContinue) {
             if (admission.status !== 'admitted') return { ...admission, recipientId: entry.actor.fetchId() };
         }
         this.items.spawns.splice(index, 1);
+        GroundItemVisibility.remove(this, session, canonical);
         reservation.commit?.();
         const results = [];
         // This is not a multi-recipient database transaction. Keep partial
@@ -55,7 +56,6 @@ async function claim(session, actor, item, canContinue) {
             }));
         }
         try {
-            session.dataSendToMeAndOthers(ServerResponse.deleteOb(canonical.fetchId()), canonical);
             recipients.forEach((entry, i) => {
                 if (results[i].status === 'awarded' && entry.session.actor === entry.actor) {
                     ConsoleText.transmitPickup(entry.session, selfId, entry.amount);

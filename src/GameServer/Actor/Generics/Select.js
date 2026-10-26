@@ -1,5 +1,6 @@
 const ServerResponse = invoke('GameServer/Network/Response');
 const World          = invoke('GameServer/World/World');
+const GroundItemVisibility = require('../../World/GroundItemVisibility');
 const DataCache      = invoke('GameServer/DataCache');
 const Item           = invoke('GameServer/Item/Item');
 const SummonControl  = invoke('GameServer/Npc/SummonControl');
@@ -241,6 +242,8 @@ function select(session, actor, data) {
                     Generics.attackRequest(session, actor, data);
                 }
             }).catch(() => {
+                if (!current()) return;
+                if (!selectionOnly && GroundItemVisibility.removeMissing(World, session, data.id)) return;
                 utils.infoWarn('GameServer', 'unknown World Id %d', data.id);
             });
         });

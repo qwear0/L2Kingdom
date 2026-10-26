@@ -4,6 +4,9 @@
 // The game client shows players, bots and NPCs within this 2D distance.
 const CLIENT_VISIBILITY_RADIUS = 6000;
 
+// Ground-object IDs increase monotonically for the lifetime of the world.
+const GROUND_ITEM_ID_START = 5000000;
+
 // Hunting-spot cells: a spot id is its cell `x_y` (plus `:area` inside a
 // partitioned dungeon). Spot ids are saved in database rows (a bot's spotId,
 // spot backoffs, party records): never change this size without migrating them.
@@ -14,4 +17,4 @@ const SPOT_CELL_SIZE = 6000;
 // visibility radius.
 const NPC_GRID_SIZE = CLIENT_VISIBILITY_RADIUS;
 
-module.exports = { CLIENT_VISIBILITY_RADIUS, SPOT_CELL_SIZE, NPC_GRID_SIZE };
+module.exports = { CLIENT_VISIBILITY_RADIUS, GROUND_ITEM_ID_START, SPOT_CELL_SIZE, NPC_GRID_SIZE };

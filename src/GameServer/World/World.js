@@ -229,7 +229,7 @@ function coldBotTell(playerSession, state, text) {
     });
 }
 
-const { CLIENT_VISIBILITY_RADIUS, NPC_GRID_SIZE } = invoke('GameServer/World/WorldConstants');
+const { CLIENT_VISIBILITY_RADIUS, GROUND_ITEM_ID_START, NPC_GRID_SIZE } = invoke('GameServer/World/WorldConstants');
 const CLIENT_VISIBILITY_RADIUS_SQUARED = CLIENT_VISIBILITY_RADIUS * CLIENT_VISIBILITY_RADIUS;
 
 function isBotSession(session) {
@@ -356,7 +356,7 @@ const World = {
         };
         RaidEntityIndex.reset(this);
         this.npc.raidBossState = await RaidBossState.load();
-        this.items = { spawns   : [], nextId: 5000000 };
+        this.items = { spawns   : [], nextId: GROUND_ITEM_ID_START };
 
         World.spawnNpcs();
         RaidBossMinionManager.start(this);

@@ -1,4 +1,4 @@
-const ServerResponse = invoke('GameServer/Network/Response');
+const GroundItemVisibility = require('../GroundItemVisibility');
 const Item           = invoke('GameServer/Item/Item');
 const DataCache      = invoke('GameServer/DataCache');
 
@@ -7,9 +7,7 @@ function spawnItem(session, selfId, amount, coords, onSpawn) {
         const item = new Item(this.items.nextId++, { ...utils.crushOb(itemDetails), ...coords });
         item.setAmount(amount);
         this.items.spawns.push(item);
-        const packet = ServerResponse.spawnItem(item);
-        if (session) session.dataSendToMeAndOthers(packet, item);
-        else this.fetchVisibleUsers(null, item).forEach(recipient => recipient.dataSendToMe(packet));
+        GroundItemVisibility.publish(this, session, item);
         onSpawn?.(item);
     });
 }
