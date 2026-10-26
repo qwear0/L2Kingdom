@@ -38,7 +38,11 @@ function render(session, message = '') {
             body += command('New session (clear both points)', 'new') + '<br>'
                 + command('Set zone center here', 'center') + '<br>'
                 + command('Set rest point here', 'point') + '<br>';
-            if (editable) body += 'Radius: ' + Settings.RADII.map(radius => command(String(radius), `radius ${radius}`)).join(' / ') + '<br>';
+            if (editable) {
+                body += `Radius (${Settings.MIN_RADIUS}-${Settings.MAX_RADIUS}; current ${controller.radius}):<br>`
+                    + '<edit var="af_radius" width=90 height=15 length=4><br>'
+                    + Html.button('Save radius', `${prefix} radius $af_radius`, { width: 100 }) + '<br>';
+            }
         }
         body += 'Start needs both points. Stop preserves them; New session clears them. Points and active combat are never saved.<br>'
             + 'Manual movement/combat takes over. Closing this window does not stop hunting.<br>';
@@ -87,7 +91,7 @@ function render(session, message = '') {
         if (!controller.run && controller.settingsStatus !== 'loading') {
             body += command('Replace preferences with defaults (clear whitelist)', 'defaults') + '<br>';
         }
-        body += 'Edits save automatically per character. Defaults: radius 800, basic only ON, pickup OFF, no allowed skills, HP 35/95%, MP 20/95%.<br>';
+        body += 'Edits save automatically per character. Defaults: radius 1200, basic only ON, pickup OFF, no allowed skills, HP 35/95%, MP 20/95%.<br>';
     }
     body += '<br>' + command('Refresh', 'refresh');
     session.dataSendToMe(Response.npcHtml(0, Html.page(body, {
@@ -127,11 +131,11 @@ function handler(session, parts) {
     const action = parts[3];
     const noArgument = ['stop', 'new', 'start', 'center', 'point', 'pickup', 'basic', 'refresh', 'load', 'save', 'defaults'];
     if (noArgument.includes(action)) { if (parts.length !== 4) return; }
-    else if (['allow', 'radius', 'page'].includes(action)) {
+    else if (['allow', 'page'].includes(action)) {
         if (parts.length !== 5 || !/^\d{1,6}$/.test(parts[4])) return;
     } else if (action === 'view') {
         if (parts.length !== 5 || !TABS.some(([id]) => id === parts[4])) return;
-    } else if (action !== 'thresholds') return;
+    } else if (!['thresholds', 'radius'].includes(action)) return;
     const controller = Controller.forActor(session.actor);
     // Consume before dispatch so repeated New Session/Start/edits cannot apply twice.
     ++session.nativeAutoFightRevision;
@@ -144,7 +148,8 @@ function handler(session, parts) {
     else if (action === 'center') accepted = controller.rememberPoint('center');
     else if (action === 'point') accepted = controller.rememberPoint();
     else if (action === 'allow') accepted = controller.allowSkill(Number(parts[4]));
-    else if (action === 'radius') accepted = controller.setRadius(Number(parts[4]));
+    else if (action === 'radius') accepted = parts.length === 5 && /^\d{1,4}$/.test(parts[4])
+        && controller.setRadius(Number(parts[4]));
     else if (action === 'pickup') accepted = controller.setPickup(!controller.pickup);
     else if (action === 'basic') accepted = controller.setBasicAttackOnly(!controller.basicAttackOnly);
     else if (action === 'load') controller.loadSettings(true);
@@ -158,7 +163,9 @@ function handler(session, parts) {
     }
     renderWithCompletion(session, controller, accepted ? '' : action === 'thresholds'
         ? 'Not applied: enter all four integer percentages; each must satisfy 1 <= enter < resume <= 100. Stop before editing.'
-        : 'Not applied. Check status/reason and Stop before changing structural settings.');
+        : action === 'radius'
+            ? `Not applied: enter an integer radius from ${Settings.MIN_RADIUS} to ${Settings.MAX_RADIUS}. Stop before editing.`
+            : 'Not applied. Check status/reason and Stop before changing structural settings.');
 }
 
 handler.open = open;

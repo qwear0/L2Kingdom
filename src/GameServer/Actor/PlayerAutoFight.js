@@ -10,6 +10,7 @@ const NpcObjectIndex = require('../World/NpcObjectIndex');
 const CombatUtility = invoke('GameServer/Bot/AI/BotCombatUtility');
 const Capabilities = invoke('GameServer/Bot/AI/BotSkillCapabilities');
 const SupportPlanner = invoke('GameServer/Bot/AI/BotSupportPlanner');
+const SkillIntent = invoke('GameServer/Bot/AI/BotSkillIntent');
 const SummonerTactics = invoke('GameServer/Bot/AI/SummonerTactics');
 const SummonControl = invoke('GameServer/Npc/SummonControl');
 const PickupCapacity = invoke('GameServer/Inventory/PickupCapacity');
@@ -145,7 +146,7 @@ class PlayerAutoFight {
         const semantic = skill?.fetchSemantic?.();
         if (!semantic || skill.fetchPassive() || semantic.notUsedInC4 || semantic.toggle) return false;
         const kind = skill.fetchTargetKind(), type = skill.fetchSkillType();
-        if ([42, 254, 302].includes(Number(skill.fetchSelfId()))) return true;
+        if ([42, 92, 254, 302].includes(Number(skill.fetchSelfId()))) return true;
         if (kind === 'enemy') return CombatUtility.OFFENSIVE_TYPES.has(type)
             && !(type === 'effect' && semantic.effectType === 'debuff');
         if (kind === 'self' && type === 'charge') return true;
@@ -338,7 +339,7 @@ class PlayerAutoFight {
     }
 
     setRadius(radius) {
-        if (!this.canEditSettings() || !Settings.RADII.includes(radius)) return false;
+        if (!this.canEditSettings() || !Settings.validRadius(radius)) return false;
         this.radius = radius;
         this.persistSettings();
         return true;
@@ -754,6 +755,17 @@ class PlayerAutoFight {
             run.target = target;
             run.utilityAttempts.set(target.fetchId(), now);
             if (this.cast(run, target, utility, now)) return;
+        }
+        // Shield Stun is explicit control, not a damage candidate. Native
+        // execution owns its approach/range; an active stun or rejected
+        // effect must not be retried on every damage-rotation tick.
+        const stun = actor.skillset.fetchSkill(92);
+        if (stun && policy.skillAllowed(stun) && !SkillIntent.equivalentActive(target, stun)
+            && !invoke('GameServer/Bot/AI/BotActionFeedback').blocked(actor, target, stun)
+            && this.cast(run, target, stun, now)) {
+            run.target = target;
+            this.setState(run, 'fighting');
+            return;
         }
         const charge = !run.recovery && CombatUtility.selectChargePlan(actor, role,
             { ...policy, skillAllowed: skill => policy.skillAllowed(skill)

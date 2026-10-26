@@ -1,17 +1,23 @@
 const MAX_JSON_BYTES = 8192;
 const MAX_SKILLS = 512;
-const RADII = [400, 800, 1200];
+const MIN_RADIUS = 1;
+// Bound custom scans to the native client visibility radius.
+const MAX_RADIUS = 6000;
 const KEYS = ['radius', 'allowedSkillIds', 'basicAttackOnly', 'pickup', 'hpEnter', 'hpResume', 'mpEnter', 'mpResume'];
 
 function defaults() {
-    return { radius: 800, allowedSkillIds: [], basicAttackOnly: true, pickup: false,
+    return { radius: 1200, allowedSkillIds: [], basicAttackOnly: true, pickup: false,
         hpEnter: 35, hpResume: 95, mpEnter: 20, mpResume: 95 };
+}
+
+function validRadius(radius) {
+    return Number.isInteger(radius) && radius >= MIN_RADIUS && radius <= MAX_RADIUS;
 }
 
 function validate(value) {
     if (!value || typeof value !== 'object' || Array.isArray(value)
         || Object.keys(value).length !== KEYS.length || KEYS.some(key => !Object.hasOwn(value, key))
-        || !RADII.includes(value.radius) || typeof value.basicAttackOnly !== 'boolean' || typeof value.pickup !== 'boolean'
+        || !validRadius(value.radius) || typeof value.basicAttackOnly !== 'boolean' || typeof value.pickup !== 'boolean'
         || !Array.isArray(value.allowedSkillIds) || value.allowedSkillIds.length > MAX_SKILLS
         || value.allowedSkillIds.some(id => !Number.isInteger(id) || id < 1 || id > 65535)
         || new Set(value.allowedSkillIds).size !== value.allowedSkillIds.length) throw Error('invalid_auto_fight_settings');
@@ -35,4 +41,4 @@ function decode(json) {
     return validate(JSON.parse(json));
 }
 
-module.exports = { defaults, validate, encode, decode, RADII, MAX_SKILLS };
+module.exports = { defaults, validate, encode, decode, validRadius, MIN_RADIUS, MAX_RADIUS, MAX_SKILLS };

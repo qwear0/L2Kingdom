@@ -341,10 +341,13 @@ function matchesSkillEffect(effect, skill, keys) {
         return semantic.stackFamily === effect.stackFamily;
     }
 
-    // Songs and dances are separate party effects even when another buff
-    // happens to expose the same stat (for example Chant of Rage and Dance
-    // of Fire both use pCritDamageMul). Stat overlap remains a compatibility
-    // fallback for ordinary legacy buffs, but must not suppress party music.
+    // Identified buffs may coexist despite sharing a stat (Shield/Majesty,
+    // ordinary buffs/music). Only a shared native stack or benefit family
+    // makes different skills substitutes; stat overlap is for anonymous legacy effects.
+    if (skillId > 0 && Number(effect?.id) > 0) {
+        return effect?.type !== 'item_passive' && BuffLoadout.family(effect?.key, effect?.stackFamily)
+            === BuffLoadout.family(semantic.effect, semantic.stackFamily);
+    }
     const effectMusic = /^(song|dance)_/.test(normalizedEffect(effect?.key));
     return !isPartyMusic(skill) && !effectMusic && effect?.type !== 'item_passive' && overlaps(effect, keys);
 }
