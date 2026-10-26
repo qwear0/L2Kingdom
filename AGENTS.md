@@ -6,6 +6,7 @@ Meet requirements with the least implementation, verification, and maintenance c
 - Inspect relevant code and contracts; treat proposed diagnoses as hypotheses. Ask about consequential choices that inspection cannot resolve; make minor, reversible choices yourself. If evidence contradicts the approach or progress stalls, seek new evidence, change approach, or report the blocker.
 - Implement the requested outcome and necessary related changes. Preserve unrelated behavior and others' changes. Analysis requests do not authorize edits.
 - Prefer the simplest adequate design. Reuse suitable code and dependencies. Add abstractions, dependencies, configuration, compatibility layers, or infrastructure only for concrete current needs. Similar-looking code alone does not justify an abstraction.
+- High server performance with thousands of active bots is a project priority. Evaluate every proposed change for its performance impact at that scale, including CPU cost, memory use, event-loop blocking, and database/network load. Prefer more efficient solutions when correctness and clarity are comparable; avoid unnecessary per-bot work and repeated full-world scans.
 - Fix causes at the narrowest coherent layer. Do not hide failures with silent catches, fabricated defaults, or misleading fallbacks. Recovery behavior must match the intended contract.
 - Verify proportionately and report significant verification gaps.
 
