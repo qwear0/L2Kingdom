@@ -22,7 +22,7 @@ The automated player joins existing support planning only while eligible and
 executes its own learned native casts; it never commands companion support or
 runs loadout cleanup. This does not add class coverage: mechanical/siege summons,
 cubics, summon special-skill rotations and offensive corpse explosions remain
-outside player auto-fight selection. See [player auto-fight](../../../../docs/world-combat.md#connected-player-auto-fight-p3-skills-support-and-pickup).
+outside player auto-fight selection. See [player auto-fight](../../../../docs/world-combat.md#connected-player-auto-fight).
 
 ## Implemented consumers
 

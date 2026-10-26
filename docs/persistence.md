@@ -29,6 +29,18 @@ Read this before changing database writes, snapshots, worker handoffs or recover
 
 Owned vassals have an additional lifecycle snapshot path: `PopulationService.persistOwnedActors` queues location/experience, flushes character state, saves status and marks lifecycle state hot. Owned-only startup schedules this every 30 seconds. Offscreen vassals remain hot; elapsed downtime is not simulated reward time.
 
+## Connected-player auto-fight preferences
+
+`Actor/PlayerAutoFight.js` owns live preference state; `Actor/PlayerAutoFightSettings.js` validates the exact durable fields. `Database.fetchAutoFightSettings` and `saveAutoFightSettings` read/write through the main serialized queue with character/account ownership checks. Migration **69** and the fresh SQLite bootstrap define `character_auto_fight_settings`: one `characterId` primary/foreign key with `ON DELETE CASCADE`, plus valid JSON bounded to 8192 UTF-8 bytes. Ordinary character/account deletion and character wipes cascade through the foreign key; there is no bot-lifecycle or observer writer.
+
+- Durable fields: radius 400/800/1200, up to 512 unique skill IDs, basic-attack-only, pickup, and player HP/MP enter/resume percentages. Defaults are radius 800, an empty whitelist, basic-only ON, pickup OFF, HP 35/95%, MP 20/95%. Each resource requires integer `1 <= enter < resume <= 100`. Unknown/missing fields, invalid types, duplicates or invalid bounds are rejected; unavailable learned skills remain non-executable under the live skill gate.
+- Preferences load lazily when opening `.autofight`; Start and edits wait for completion. A missing row uses defaults, not a write. Invalid stored data or a read failure is visible and blocks Start, with explicit retry or replacement with defaults rather than a silent fallback.
+- Every explicit preference edit queues a complete immutable snapshot. New snapshots serialize after old ones; only the latest edit completion can set the visible save result. A queued write rechecks the actor/lifecycle before execution, so an old connection cannot overwrite a later login's settings. Loads and callbacks cannot apply to a replaced actor, and UI redraws also require the same open page epoch/revision.
+- Save failure preserves the live edit, displays that it is not saved, offers retry and blocks a subsequent Start. Disabling a running skill takes effect before persistence finishes; a failed save does not re-enable it. Disconnect/teleport/teardown can invalidate pending work; pending edits are not a durability guarantee, and an interrupted save must be retried if the actor remains active.
+- Coordinates, session/run flags, targets, routes, timers, stats and skill ownership are never part of this row. Reconnect loads preferences only, with no setup points or automatic combat. Party/vassal pull settings and native recovery policy are separate owners.
+
+Migration application, save/relogin behavior and malformed-data recovery still require separately authorized runtime verification. Static implementation does not assert that migration 69 has run on the live world. See [controls and execution](world-combat.md#connected-player-auto-fight).
+
 ## Retained cold ownership protocol
 
 The cold worker architecture remains in source but is not started by the enforced owned-only policy. When tracing retained code, follow:

@@ -1708,6 +1708,12 @@ function applySchemaMigrations() {
     migrations.push([66, () => require('./DatabasePartyCandidateProjection').upgradeRecruitment(connection)]);
     migrations.push([67, () => require('./DatabasePlayerWarehouse').migrate(connection)]);
     migrations.push([68, () => require('./GameServer/Lord/Repository').migrate(connection)]);
+    migrations.push([69, () => connection.exec(`
+        CREATE TABLE IF NOT EXISTS character_auto_fight_settings (
+            characterId INTEGER PRIMARY KEY REFERENCES characters(id) ON DELETE CASCADE,
+            settingsJson TEXT NOT NULL CHECK(json_valid(settingsJson) AND length(CAST(settingsJson AS BLOB)) <= 8192)
+        );
+    `)]);
     const applied = new Set(connection.prepare('SELECT version FROM schema_migrations').all().map((row) => Number(row.version)));
     migrations.forEach(([version, apply]) => {
         if (applied.has(version)) return;
@@ -6992,6 +6998,26 @@ const Database = {
             write('DELETE FROM board_trade_participants WHERE characterId=?', [character.id]);
             return write('DELETE FROM characters WHERE id=?', [character.id]);
         }, 'character:delete');
+    },
+    fetchAutoFightSettings(characterId, accountId) {
+        return enqueue(() => {
+            if (!one('SELECT 1 FROM characters WHERE id = ? AND username = ? COLLATE NOCASE', [characterId, accountId])) {
+                throw Error('auto_fight_settings_owner_changed');
+            }
+            return one('SELECT settingsJson FROM character_auto_fight_settings WHERE characterId = ?', [characterId]) || null;
+        }, { operation: 'auto-fight:settings-read', read: true });
+    },
+    saveAutoFightSettings(characterId, accountId, settings, isCurrent) {
+        const json = require('./GameServer/Actor/PlayerAutoFightSettings').encode(settings);
+        return enqueue(() => {
+            // A queued edit must not outlive its character connection and overwrite
+            // preferences loaded by a later login of that same character.
+            if (!isCurrent() || !one('SELECT 1 FROM characters WHERE id = ? AND username = ? COLLATE NOCASE', [characterId, accountId])) {
+                throw Error('auto_fight_settings_owner_changed');
+            }
+            return write(`INSERT INTO character_auto_fight_settings (characterId, settingsJson) VALUES (?, ?)
+                ON CONFLICT(characterId) DO UPDATE SET settingsJson = excluded.settingsJson`, [characterId, json]);
+        }, { operation: 'auto-fight:settings-save' });
     },
     fetchSkills(characterId) {
         return select('skills', ['*'], 'characterId = ?', [characterId], 'skill:list');

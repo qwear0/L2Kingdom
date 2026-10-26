@@ -73,6 +73,11 @@ CREATE INDEX IF NOT EXISTS characters_username ON characters(username);
 CREATE INDEX IF NOT EXISTS characters_clanId ON characters(clanId);
 CREATE INDEX IF NOT EXISTS characters_clan_level_id ON characters(clanId, level DESC, id ASC);
 
+CREATE TABLE IF NOT EXISTS character_auto_fight_settings (
+    characterId INTEGER PRIMARY KEY REFERENCES characters(id) ON DELETE CASCADE,
+    settingsJson TEXT NOT NULL CHECK(json_valid(settingsJson) AND length(CAST(settingsJson AS BLOB)) <= 8192)
+);
+
 CREATE TABLE IF NOT EXISTS character_death_experience (
     characterId INTEGER PRIMARY KEY REFERENCES characters(id) ON DELETE CASCADE,
     deathSequence INTEGER NOT NULL DEFAULT 1,

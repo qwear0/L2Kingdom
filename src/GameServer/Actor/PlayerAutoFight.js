@@ -13,6 +13,7 @@ const SupportPlanner = invoke('GameServer/Bot/AI/BotSupportPlanner');
 const SummonerTactics = invoke('GameServer/Bot/AI/SummonerTactics');
 const SummonControl = invoke('GameServer/Npc/SummonControl');
 const PickupCapacity = invoke('GameServer/Inventory/PickupCapacity');
+const Settings = require('./PlayerAutoFightSettings');
 
 const loc = actor => ({ locX: actor.fetchLocX(), locY: actor.fetchLocY(), locZ: actor.fetchLocZ() });
 const distance = (a, b) => Math.hypot(a.locX - b.locX, a.locY - b.locY);
@@ -32,12 +33,93 @@ class PlayerAutoFight {
         this.reason = 'stopped';
         this.center = null;
         this.point = null;
-        this.radius = 800;
-        this.allowedSkillIds = new Set();
-        this.basicAttackOnly = true;
-        this.pickup = false;
+        this.applySettings(Settings.defaults());
+        this.settingsStatus = 'unloaded';
+        this.settingsSave = 'clean';
+        this.settingsError = '';
+        this.settingsEpoch = 0;
+        this.settingsRevision = 0;
+        this.settingsTask = null;
         this.skillRevision = 0;
         this.run = null;
+    }
+
+    applySettings(settings) {
+        this.radius = settings.radius;
+        this.allowedSkillIds = new Set(settings.allowedSkillIds);
+        for (const key of ['basicAttackOnly', 'pickup', 'hpEnter', 'hpResume', 'mpEnter', 'mpResume']) this[key] = settings[key];
+    }
+
+    settingsSnapshot() {
+        return { radius: this.radius, allowedSkillIds: [...this.allowedSkillIds], basicAttackOnly: this.basicAttackOnly,
+            pickup: this.pickup, hpEnter: this.hpEnter, hpResume: this.hpResume, mpEnter: this.mpEnter, mpResume: this.mpResume };
+    }
+
+    settingsCurrent(epoch = this.settingsEpoch) {
+        return epoch === this.settingsEpoch && this.session.actor === this.actor && this.actor.playerAutoFight === this
+            && this.session.socket?.destroyed !== true;
+    }
+
+    loadSettings(retry = false) {
+        if (!this.settingsCurrent() || this.settingsStatus === 'loading' || this.settingsStatus === 'ready') return this.settingsTask;
+        if (this.settingsStatus !== 'unloaded' && !retry) return this.settingsTask;
+        const epoch = this.settingsEpoch, revision = this.settingsRevision;
+        const characterId = this.actor.fetchId(), accountId = this.session.accountId;
+        this.settingsStatus = 'loading';
+        this.settingsError = '';
+        this.settingsTask = Promise.resolve().then(() => invoke('Database').fetchAutoFightSettings(characterId, accountId))
+            .then(row => {
+                if (!this.settingsCurrent(epoch) || revision !== this.settingsRevision) return;
+                let settings;
+                try { settings = row ? Settings.decode(row.settingsJson) : Settings.defaults(); }
+                catch (_) {
+                    this.settingsStatus = 'invalid';
+                    this.settingsError = 'Stored preferences are invalid. Retry loading or explicitly replace them with defaults.';
+                    return;
+                }
+                this.applySettings(settings);
+                ++this.skillRevision;
+                this.settingsStatus = 'ready';
+                this.settingsSave = 'clean';
+            }, () => {
+                if (!this.settingsCurrent(epoch) || revision !== this.settingsRevision) return;
+                this.settingsStatus = 'load_failed';
+                this.settingsError = 'Could not load preferences. Start is blocked; retry loading or explicitly replace them with defaults.';
+            });
+        return this.settingsTask;
+    }
+
+    persistSettings() {
+        const epoch = this.settingsEpoch, revision = ++this.settingsRevision;
+        const settings = this.settingsSnapshot(), characterId = this.actor.fetchId(), accountId = this.session.accountId;
+        this.settingsSave = 'saving';
+        this.settingsError = '';
+        // Database serializes immutable snapshots. Only the latest completion may
+        // change the visible save state; earlier failures cannot mask later edits.
+        this.settingsTask = Promise.resolve().then(() => invoke('Database').saveAutoFightSettings(characterId, accountId, settings,
+            () => this.settingsCurrent(epoch) && this.session.accountId === accountId)).then(() => {
+            if (this.settingsCurrent(epoch) && revision === this.settingsRevision) this.settingsSave = 'saved';
+        }, () => {
+            if (!this.settingsCurrent(epoch) || revision !== this.settingsRevision) return;
+            this.settingsSave = 'failed';
+            this.settingsError = 'Preferences changed in memory but were NOT saved. Retry saving before Start or logout.';
+        });
+        return this.settingsTask;
+    }
+
+    resetSettings() {
+        if (this.run || !this.settingsCurrent() || this.settingsStatus === 'loading') return false;
+        this.applySettings(Settings.defaults());
+        ++this.skillRevision;
+        this.settingsStatus = 'ready';
+        this.persistSettings();
+        return true;
+    }
+
+    retrySettingsSave() {
+        if (!this.settingsCurrent() || this.settingsStatus !== 'ready' || this.settingsSave !== 'failed') return false;
+        this.persistSettings();
+        return true;
     }
 
     available() {
@@ -205,9 +287,10 @@ class PlayerAutoFight {
     }
 
     allowSkill(id) {
-        if (id === 0) return this.setBasicAttackOnly(!this.basicAttackOnly);
+        if (!this.settingsCurrent() || this.settingsStatus !== 'ready') return false;
         const enabled = this.allowedSkillIds.has(id);
-        if (this.run && !enabled) return false;
+        if (!Number.isInteger(id) || id < 1 || id > 65535 || (this.run && !enabled)
+            || (!enabled && this.allowedSkillIds.size >= Settings.MAX_SKILLS)) return false;
         const skill = this.actor.skillset.fetchSkill(id);
         if (!enabled && !this.eligibleSkill(skill)) return false;
         if (enabled) this.allowedSkillIds.delete(id);
@@ -216,27 +299,48 @@ class PlayerAutoFight {
         if (this.run) {
             SupportPlanner.cancelSupportCast(this.session, this.actor);
             // Preserve launched casts; invalidate unlaunched preparation and routes.
+            const owner = this.run.owner;
+            if (this.actor.attack.queue.data?.actionOwner === owner) this.actor.attack.resetQueuedEvent();
+            if (this.actor.storedSpell?.actionOwner === owner) this.actor.storedSpell = undefined;
             this.clearTarget(this.run);
+            if (this.run.owner === owner) this.renewOwner(this.run);
         }
+        this.persistSettings();
         return true;
     }
 
+    canEditSettings() {
+        return !this.run && this.settingsCurrent() && this.settingsStatus === 'ready';
+    }
+
     setBasicAttackOnly(value) {
-        if (this.run) return false;
-        this.basicAttackOnly = !!value;
+        if (!this.canEditSettings() || typeof value !== 'boolean') return false;
+        this.basicAttackOnly = value;
         ++this.skillRevision;
+        this.persistSettings();
         return true;
     }
 
     setPickup(value) {
-        if (this.run) return false;
-        this.pickup = !!value;
+        if (!this.canEditSettings() || typeof value !== 'boolean') return false;
+        this.pickup = value;
+        this.persistSettings();
         return true;
     }
 
     setRadius(radius) {
-        if (this.run || ![400, 800, 1200].includes(radius)) return false;
+        if (!this.canEditSettings() || !Settings.RADII.includes(radius)) return false;
         this.radius = radius;
+        this.persistSettings();
+        return true;
+    }
+
+    setThresholds(hpEnter, hpResume, mpEnter, mpResume) {
+        if (!this.canEditSettings()) return false;
+        try { Settings.validate({ ...this.settingsSnapshot(), hpEnter, hpResume, mpEnter, mpResume }); }
+        catch (_) { return false; }
+        Object.assign(this, { hpEnter, hpResume, mpEnter, mpResume });
+        this.persistSettings();
         return true;
     }
 
@@ -252,7 +356,8 @@ class PlayerAutoFight {
         const actor = this.actor;
         const hp = actor.fetchHp() / Math.max(1, actor.fetchMaxHp());
         const mp = actor.fetchMp() / Math.max(1, actor.fetchMaxMp());
-        if (hp < (high ? 0.95 : 0.35) || (this.usesMana() && mp < (high ? 0.95 : 0.20))) return true;
+        if (hp < (high ? this.hpResume : this.hpEnter) / 100
+            || (this.usesMana() && mp < (high ? this.mpResume : this.mpEnter) / 100)) return true;
         return PartyAwareness.partyActors(this.session).some(member => member !== actor && RestPolicy.needsRest(member,
             member.fetchHp() / Math.max(1, member.fetchMaxHp()), member.fetchMp() / Math.max(1, member.fetchMaxMp()),
             { party: true, locked: high }));
@@ -266,6 +371,10 @@ class PlayerAutoFight {
     start() {
         const { actor, session } = this;
         if (this.run) return false;
+        if (this.settingsStatus !== 'ready' || ['saving', 'failed'].includes(this.settingsSave)) {
+            this.reason = this.settingsStatus === 'ready' ? `settings_${this.settingsSave}` : `settings_${this.settingsStatus}`;
+            return false;
+        }
         if (!this.available() || this.busy() || actor.state.inMotion()
             || session.moveTimer || session.pendingPathRequest || actor.attack.bowReloading) {
             this.reason = 'start_blocked';
@@ -810,6 +919,13 @@ class PlayerAutoFight {
 
     dispose(reason = 'disposed') {
         this.stop(reason);
+        ++this.settingsEpoch;
+        this.settingsTask = null;
+        if (this.settingsStatus === 'loading') this.settingsStatus = 'unloaded';
+        if (this.settingsSave === 'saving') {
+            this.settingsSave = 'failed';
+            this.settingsError = 'Save interrupted. Retry saving preferences before Start or logout.';
+        }
         this.center = null;
         this.point = null;
         this.reason = reason;
