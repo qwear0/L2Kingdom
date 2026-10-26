@@ -111,13 +111,14 @@ function interruptEscape(session, bot) {
 
 function beginEscape(session, bot, town, options = {}) {
     const token = Symbol('bot_town_escape');
-    const skill = {
+    const skill = options.skill || {
         fetchSelfId: () => SOE_SKILL_ID,
         fetchCalculatedHitTime: () => SOE_CAST_MS,
         fetchReuseTime: () => 0
     };
+    const castMs = skill.fetchCalculatedHitTime();
 
-    session.townEscape = { token, town: town.name, startedAt: Date.now(), completesAt: Date.now() + SOE_CAST_MS };
+    session.townEscape = { token, town: town.name, startedAt: Date.now(), completesAt: Date.now() + castMs };
     bot.state.setCasts(true);
     if (session.supplyErrandHidden !== true) {
         session.dataSendToMeAndOthers?.(ServerResponse.skillStarted(bot, bot.fetchId(), skill), bot);
@@ -163,9 +164,27 @@ function beginEscape(session, bot, town, options = {}) {
             weight: 3,
             dedupeKey: `travel:${bot.fetchId()}:${town.name}`,
             coalesceWindowMs: 30000,
-            meta: { town: town.name, mode: 'scroll_of_escape' }
+            meta: { town: town.name, mode: options.mode || 'scroll_of_escape' }
         })).catch(() => {});
-    }, SOE_CAST_MS);
+    }, castMs);
+}
+
+function recover(session, bot, options = {}) {
+    if (bot.isDead() || inCombat(session, bot) || session.townEscape || session.pendingActorTeleport
+        || Number(bot.fetchPrivateStoreType?.() || 0) > 0 || bot.isInOlympiadMode?.()) return 'deferred';
+    const scroll = TripPayment.hasActorScroll(bot);
+    const skill = bot.backpack.buildItemSkill({ skillId: scroll ? SOE_SKILL_ID : 2099, level: 1 });
+    if (!skill) throw Error('vassal_recovery_skill_missing');
+    const restrictions = invoke('GameServer/Effects/EffectRestrictions');
+    const allowed = () => scroll ? restrictions.canUseBasicAction(bot) : restrictions.canCast(bot);
+    if (!allowed() || bot.canUseSkill?.(skill) === false) return 'deferred';
+    const destination = invoke('GameServer/World/TownRespawn').restartCoords(bot);
+    if (scroll && !TripPayment.payActor(session, bot, { scroll: true })) return 'deferred';
+    beginEscape(session, bot, { name: 'town recovery', x: destination.locX, y: destination.locY, z: destination.locZ }, {
+        ...options, skill, mode: scroll ? 'recovery_scroll' : 'recovery_unstuck',
+        isCurrent: () => allowed() && (!options.isCurrent || options.isCurrent())
+    });
+    return scroll ? 'scroll' : 'unstuck';
 }
 
 function karmaTown() {
@@ -322,6 +341,7 @@ module.exports = {
     inCombat,
     holdMeeting,
     interruptEscape,
+    recover,
     request,
     requestMeeting,
     revealSupplyErrand,

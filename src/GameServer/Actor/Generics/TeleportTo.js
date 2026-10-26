@@ -43,11 +43,11 @@ function syncPartyCompanions(leaderSession, destination, Generics, companions = 
             return;
         }
         const offset = COMPANION_TELEPORT_OFFSETS[moved % COMPANION_TELEPORT_OFFSETS.length];
-        const companionDestination = {
+        const companionDestination = GeodataEngine.walkSegment(destination, {
             locX: destination.locX + offset.locX,
             locY: destination.locY + offset.locY,
             locZ: destination.locZ
-        };
+        }) || { ...destination };
         moved += 1;
 
         // A leader's teleport ends a field recovery attempt. Revive first because

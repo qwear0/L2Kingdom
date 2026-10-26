@@ -13,6 +13,8 @@ A service must distinguish pending live state, committed durable state and respo
 
 ## Ground pickup and award outcomes
 
+`World/Generics/NpcRewards.js` scatters drops only along a walkable continuation of the corpse's floor, using at most six candidates in the existing 50-unit radius. If none is usable, the drop remains at the corpse. Nearest height alone is not admission: it can select an adjacent roof. Bot loot movement follows the [native movement safeguards](world-combat.md#movement-and-asynchronous-paths), rather than interpolating directly through an obstruction.
+
 `World/GroundItemVisibility.js` records weak client-character references per ground item, only when real players observe it. Claiming a drop releases that record and sends `DeleteObject` to its previous observers, regardless of their current distance, before asynchronous inventory awards. Removal visits only those observers plus the picking player, never all world sessions; unobserved bot drops have constant visibility-removal overhead. Weak references do not retain disconnected characters/sessions, and replaced characters are skipped.
 
 One client's send failure is logged without blocking other observers or the award. After native entity lookups fail, a stale click on an issued, now absent ground-object ID clears that client's object and pending action without issuing another grant. Live drops and IDs outside the current world's issued ground range are not cleared.

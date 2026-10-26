@@ -137,14 +137,21 @@ function shouldSkipInitialWaypoint(index, path, distance, dz) {
 function startPathMovement({ session, actor, path, isClose, moveGoal }) {
     const current = () => session.actor === actor && (!moveGoal || session.activeMoveGoal === moveGoal)
         && ActionOwner.current(session, actor, moveGoal?.actionOwner);
-    const advancePosition = (point) => {
-        // A bad layer snap must not move a connected player to another floor
-        // or bypass native falling via server-side coordinate progression.
-        if (moveGoal?.actionOwner && Math.abs(point.locZ - actor.fetchLocZ()) > ACTIVE_GOAL_Z_TOLERANCE) {
-            moveGoal.actionOwner.controller.routeFailed(moveGoal.actionOwner.run);
+    const advancePosition = (point, matchHeight = true) => {
+        const resolved = GeodataEngine.walkSegment(locOf(actor), {
+            ...point, locZ: matchHeight ? point.locZ : undefined
+        });
+        // Server stepping must use the same floor/cell traversal as route
+        // smoothing, including the drift from the first cell's centre.
+        if (!resolved || moveGoal?.actionOwner
+            && Math.abs(resolved.locZ - actor.fetchLocZ()) > ACTIVE_GOAL_Z_TOLERANCE) {
+            actor.automation.abortAll(actor);
+            session.lastPathfinding = { ...session.lastPathfinding, requestedTo: moveGoal?.requestedTo,
+                routeUsable: false, error: 'MOVEMENT_BLOCKED', at: Date.now() };
+            moveGoal?.actionOwner?.controller.routeFailed(moveGoal.actionOwner.run);
             return false;
         }
-        actor.setLocXYZ(point);
+        actor.setLocXYZ(resolved);
         return true;
     };
     const moveAlongPath = (index) => {
@@ -168,7 +175,8 @@ function startPathMovement({ session, actor, path, isClose, moveGoal }) {
         // Announcing that tiny correction before the real leg makes C4 briefly
         // turn or stop at the start of every route. Keep the authoritative
         // current coordinate and begin with the first meaningful waypoint.
-        if (shouldSkipInitialWaypoint(index, path, distance, dz)) {
+        if (shouldSkipInitialWaypoint(index, path, distance, dz)
+            && GeodataEngine.walkSegment(currentLoc, path[index + 1])) {
             moveAlongPath(index + 1);
             return;
         }
@@ -222,9 +230,7 @@ function startPathMovement({ session, actor, path, isClose, moveGoal }) {
             } else {
                 const nextX = Math.round(currentLoc.locX + dx * ratio);
                 const nextY = Math.round(currentLoc.locY + dy * ratio);
-                const nextZ = Math.round(currentLoc.locZ + dz * ratio);
-                const snappedZ = GeodataEngine.getHeight(nextX, nextY, nextZ);
-                if (!advancePosition({ locX: nextX, locY: nextY, locZ: snappedZ })) return;
+                if (!advancePosition({ locX: nextX, locY: nextY }, false)) return;
                 invoke('GameServer/Bot/AI/PartyCompanionService').updatePosition(session, actor);
                 if (moveGoal?.town) {
                     const point = locOf(actor);
@@ -523,10 +529,7 @@ function moveTo(session, actor, coords) {
                 }
                 clearPending();
                 const routeFound = Array.isArray(candidatePath) && candidatePath.length > 1;
-                const fallbackLineOfSight = !routeFound && GeodataEngine.hasLineOfSight(
-                    startX, startY, startZ,
-                    pathTarget.locX, pathTarget.locY, pathTarget.locZ
-                );
+                const fallbackLineOfSight = !routeFound && !!GeodataEngine.walkSegment(start, pathTarget);
                 let movementPath = routeFound
                     ? candidatePath
                     : (fallbackLineOfSight ? [{ ...pathTarget }] : []);
@@ -635,10 +638,7 @@ function moveTo(session, actor, coords) {
             };
 
             const directDistance = distance2d(start, requestedTo);
-            if (directDistance <= COMPANION_DIRECT_DISTANCE && GeodataEngine.hasLineOfSight(
-                startX, startY, startZ,
-                requestedTo.locX, requestedTo.locY, requestedTo.locZ
-            )) {
+            if (directDistance <= COMPANION_DIRECT_DISTANCE && GeodataEngine.walkSegment(start, requestedTo)) {
                 session.pendingPathRequest = null;
                 return finish([{ ...start }, { ...requestedTo }], 'short_direct');
             }
@@ -703,10 +703,7 @@ function moveTo(session, actor, coords) {
         // terrain. The runtime has always handled that case with a direct
         // movement fallback, so distinguish a clear line from a genuinely
         // blocked destination before callers decide to reject the route.
-        const fallbackLineOfSight = !routeFound && GeodataEngine.hasLineOfSight(
-            startX, startY, startZ,
-            pathTarget.locX, pathTarget.locY, pathTarget.locZ
-        );
+        const fallbackLineOfSight = !routeFound && !!GeodataEngine.walkSegment(coords.from, pathTarget);
         if (!routeFound) {
             // Never announce a straight segment through blocked geodata. In a
             // multilevel town cell that can also snap the authoritative Z to

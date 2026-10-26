@@ -7,11 +7,11 @@ const AttackRange    = invoke('GameServer/Actor/AttackRange');
 
 class Automation extends SelectedModel {
     static needsGeodataApproach(session, src, dst) {
-        const bot = session?.actor === src && (session.constructor?.name === 'BotSession'
-            || session.accountId?.startsWith?.('bot_'));
-        return !!bot && src !== dst && !invoke('GameServer/Geodata/GeodataEngine').hasLineOfSight(
-            src.fetchLocX(), src.fetchLocY(), src.fetchLocZ(),
-            dst.fetchLocX(), dst.fetchLocY(), dst.fetchLocZ()
+        const bot = session?.actor === src && (session.botSession === true
+            || session.constructor?.name === 'BotSession' || session.accountId?.startsWith?.('bot_'));
+        return !!bot && src !== dst && !invoke('GameServer/Geodata/GeodataEngine').walkSegment(
+            { locX: src.fetchLocX(), locY: src.fetchLocY(), locZ: src.fetchLocZ() },
+            { locX: dst.fetchLocX(), locY: dst.fetchLocY(), locZ: dst.fetchLocZ() }
         );
     }
 
@@ -207,24 +207,49 @@ class Automation extends SelectedModel {
         };
     }
 
+    placeMovePosition(session, actor, point, matchHeight = true) {
+        const bot = session?.actor === actor && (session.botSession === true
+            || session.accountId?.startsWith?.('bot_'));
+        const resolved = bot ? invoke('GameServer/Geodata/GeodataEngine').walkSegment(
+            { locX: actor.fetchLocX(), locY: actor.fetchLocY(), locZ: actor.fetchLocZ() },
+            { ...point, locZ: matchHeight ? point.locZ : undefined }
+        ) : point;
+        if (!resolved) {
+            // Detach before abortAll: cancelling interpolation normally samples
+            // it once more, which must not recurse into a failed placement.
+            const move = this.moveInterpolation;
+            this.moveInterpolation = null;
+            clearTimeout(move?.timer);
+            session.lastPathfinding = { requestedTo: move?.to || point, routeUsable: false,
+                error: 'MOVEMENT_BLOCKED', strategy: 'native_approach', at: Date.now() };
+            this.abortAll(actor);
+            return false;
+        }
+        actor.setLocXYZ(resolved);
+        return true;
+    }
+
     updateMovePosition() {
         const move = this.moveInterpolation;
-        if (!move) return;
+        if (!move) return true;
         const ratio = Math.min(1, Math.max(0, (Date.now() - move.startedAt) / move.duration));
-        move.actor.setLocXYZ({
+        // Action stop Z is a 3D range interpolation, not a terrain sample.
+        // Follow the source floor even at arrival; target admission is separate.
+        return this.placeMovePosition(move.session, move.actor, {
             locX: Math.round(move.from.locX + (move.to.locX - move.from.locX) * ratio),
             locY: Math.round(move.from.locY + (move.to.locY - move.from.locY) * ratio),
             locZ: Math.round(move.from.locZ + (move.to.locZ - move.from.locZ) * ratio)
-        });
+        }, false);
     }
 
     stopMoveInterpolation() {
         const move = this.moveInterpolation;
-        if (!move) return;
-        this.updateMovePosition();
+        if (!move) return true;
+        const placed = this.updateMovePosition();
         clearTimeout(move.timer);
         if (move.session?.moveTimer === move.timer) move.session.moveTimer = null;
         this.moveInterpolation = null;
+        return placed;
     }
 
     startMoveInterpolation(session, actor, to, duration) {
@@ -243,7 +268,7 @@ class Automation extends SelectedModel {
         };
         const advance = () => {
             if (this.moveInterpolation !== move) return;
-            this.updateMovePosition();
+            if (!this.updateMovePosition()) return;
             const remaining = move.duration - (Date.now() - move.startedAt);
             if (remaining <= 0) return;
             move.timer = setTimeout(advance, Math.min(100, remaining));
@@ -364,7 +389,7 @@ class Automation extends SelectedModel {
             if (approach && this.playerAttackApproach !== approach) return;
             this.clearPlayerAttackApproach();
             if (approach) Timer.clear(this.timer.action);
-            this.stopMoveInterpolation();
+            if (!this.stopMoveInterpolation()) return;
             src.state.setTowards(false);
             this.clearDestId();
             // C4 need not acknowledge the final MoveToPawn point, so complete
@@ -372,9 +397,9 @@ class Automation extends SelectedModel {
             // floor: borrowing it makes the next player report look like a
             // fall. Keep the player's latest accepted height at arrival.
             const arrivalCoords = approach ? approach.stopCoords : stopCoords;
-            src.setLocXYZ(movingSelf && !movingBot
+            if (!this.placeMovePosition(movingSelf ? session : null, src, movingSelf && !movingBot
                 ? { ...arrivalCoords, locZ: src.fetchLocZ() }
-                : arrivalCoords);
+                : arrivalCoords, false)) return;
             if (movingSelf) {
                 if (session.moveTimer) {
                     clearInterval(session.moveTimer);
@@ -501,9 +526,9 @@ class Automation extends SelectedModel {
         this.startMoveInterpolation(session, src, destination, ticks);
 
         Timer.start(this.timer.action, () => {
-            this.stopMoveInterpolation();
+            if (!this.stopMoveInterpolation()) return;
             src.state.setTowards(false);
-            src.setLocXYZ(destination);
+            if (!this.placeMovePosition(session?.actor === src ? session : null, src, destination)) return;
             callback(destination);
         }, ticks);
         return true;
@@ -525,6 +550,7 @@ class Automation extends SelectedModel {
         const dx = dst.fetchLocX() - from.locX;
         const dy = dst.fetchLocY() - from.locY;
         const distance = Math.hypot(dx, dy);
+        if (Automation.needsGeodataApproach(session, src, dst)) return false;
         // Lisvus thinkPickUp checks 36 + the actor's collision radius.
         if (distance <= 36 + Math.max(0, Number(src.fetchRadius?.()) || 0)) {
             src.state.setTowards(false);
@@ -550,8 +576,8 @@ class Automation extends SelectedModel {
         this.startMoveInterpolation(session, src, to, ticks);
         Timer.start(this.timer.pickup, () => {
             Timer.clear(this.timer.pickup);
-            this.stopMoveInterpolation();
-            src.setLocXYZ(to);
+            if (!this.stopMoveInterpolation()) return;
+            if (!this.placeMovePosition(session?.actor === src ? session : null, src, to, false)) return;
             this.pickupTargetId = null;
             src.state.setTowards(false);
             callback();

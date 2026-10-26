@@ -76,6 +76,8 @@ Server configuration cards include live `AuthServer.autoCreate`, restart auth/ga
 | `POST` / `DELETE …/clan/:id/crest` | Replace/delete crest. Existing empty-body DELETE remains valid through forwarding. |
 | `POST /observer/api/control/teleport-player-to-raid` | Socket-loopback-only movement beside a live boss. |
 
+Live bot detail includes `movement.farmRecovery` for autonomous gather-duty stall monitoring: state, elapsed work, attempt count, last escape method/source and duty status. It is read-only live-session diagnostics, available without developer movement tracing; see [vassal recovery](vassals.md#farming-stall-recovery).
+
 Some game read handlers do not enforce GET-only; parent management methods are stricter. Do not infer a universal method contract from a read label.
 
 ## Incremental world flow and offline behavior

@@ -15,6 +15,8 @@ const TOWN_RETRY_MS = 5 * 60 * 1000;
 const GATHER_ARRIVAL_RADIUS = 16;
 const GATHER_STALL_MS = 30000;
 const GATHER_ROUTE_RETRY_MS = 5 * 60 * 1000;
+const FARM_STALL_MS = 5 * 60 * 1000;
+const MAX_FARM_RECOVERIES = 3;
 
 function rowFor(session) { return Registry.find(session.actor?.fetchId()); }
 function seated(session, value) {
@@ -468,6 +470,105 @@ function noTarget(session) {
     run.gatherTravel = { avoidZoneIndex: currentZoneIndex };
     travelToGatherPoint(session, area, run);
 }
+function farmWatchdog(session, row, run, paused) {
+    if (row.order !== 'gather' || row.gatherResumePending) return false;
+    const bot = session.actor, now = Date.now(), point = Areas.pointOf(bot), exp = bot.fetchExp();
+    const watch = run.watchdog ||= { state: 'monitoring', stalledMs: 0, attempts: 0, point, exp, at: now };
+    const elapsed = now - watch.at, wasPaused = watch.state === 'paused';
+    watch.at = now;
+    const gainedExp = exp !== watch.exp;
+    const moved = Math.hypot(point.locX - watch.point.locX, point.locY - watch.point.locY) >= 96;
+    if (gainedExp || moved) {
+        watch.point = point;
+        watch.exp = exp;
+        watch.stalledMs = 0;
+        // Walking back to the same trap is not productive farming. Only a
+        // reward (or an explicit new order) renews the recovery allowance.
+        if (gainedExp) { watch.attempts = 0; watch.exhausted = false; }
+    }
+    if (watch.castToken) {
+        if (paused || !bot.state.fetchCasts()
+            || Math.hypot(point.locX - watch.from.locX, point.locY - watch.from.locY) > 16) {
+            if (session.townEscape?.token === watch.castToken) {
+                session.townEscape = undefined;
+                bot.state.setCasts(false);
+            }
+        } else if (session.townEscape?.token === watch.castToken || session.pendingActorTeleport) {
+            status(session, `farm_recovery_${watch.method}`);
+            return true;
+        }
+        watch.castToken = null;
+        watch.stalledMs = 0;
+        watch.retryAt = now + 60000;
+    }
+    if (paused || bot.state.fetchCasts() || bot.state.fetchSeated() || session.recoveryLocked
+        || now < Number(session.vassalBlockedUntil || 0)
+        || run.phase === 'shortage' || session.vassalStatus === 'working_inventory_encumbered') {
+        watch.state = 'paused';
+        return false;
+    }
+    if (watch.exhausted) {
+        watch.state = 'exhausted';
+        status(session, 'farm_recovery_exhausted_new_order_required');
+        return true;
+    }
+    watch.state = 'monitoring';
+    // Count observed work time, never downtime, combat, rest or a provider /
+    // transaction hold. Replans and target/zone changes do not restart it.
+    if (!wasPaused && !gainedExp && !moved && elapsed <= 5000) watch.stalledMs += Math.max(0, elapsed);
+    if (watch.stalledMs < FARM_STALL_MS || now < Number(watch.retryAt || 0)) return false;
+    if (watch.attempts >= MAX_FARM_RECOVERIES) {
+        watch.exhausted = true;
+        bot.automation.abortAll(bot);
+        status(session, 'farm_recovery_exhausted_new_order_required');
+        return true;
+    }
+    bot.attack.abortCast(session, bot);
+    bot.attack.clearTimers();
+    bot.automation.abortAll(bot);
+    invoke('GameServer/Bot/AI/PartyCompanionService').cancelGroundPickup(session);
+    session.currentTargetId = undefined;
+    bot.unselect();
+    Navigation.clear(session);
+    Approach.reset(session);
+    session.townRoutePlan = null;
+    const current = fence(session, row);
+    const isCurrent = () => current() && eligible(session, row) && session.vassalRun === run
+        && !session.activeTrade && !session.trade && !session.activeNegotiation;
+    const method = Travel.recover(session, bot, { isCurrent, onPhysicalArrival: () => {
+        if (!isCurrent()) return;
+        watch.castToken = null;
+        watch.state = 'monitoring';
+        watch.stalledMs = 0;
+        watch.point = Areas.pointOf(bot);
+        watch.at = Date.now();
+        run.phase = 'town';
+        session.plan = 'hunting';
+        status(session, 'farm_recovery_arrived');
+    } });
+    if (method === 'deferred') {
+        watch.retryAt = now + 60000;
+        status(session, 'farm_recovery_deferred');
+        return false;
+    }
+    watch.attempts++;
+    watch.state = 'casting';
+    watch.method = method;
+    watch.from = point;
+    watch.castToken = session.townEscape.token;
+    const area = Areas.find(row.areaId);
+    run.blockedGatherPoints ||= {};
+    for (const zone of area?.zones || []) {
+        if (Areas.containsZone(zone, bot)) {
+            run.blockedGatherPoints[`${zone.selfId}:${Math.round(point.locX / 128)}:${Math.round(point.locY / 128)}`]
+                = now + 30 * 60 * 1000;
+        }
+    }
+    run.zoneIndex = (Number(run.zoneIndex || 0) + 1) % Math.max(1, area?.zones.length || 0);
+    run.gatherTravel = null;
+    status(session, `farm_recovery_${method}`);
+    return true;
+}
 function died(session) {
     if (session.vassalRest) { session.vassalRest.remaining = SAFE_REST_MS; session.vassalRest.at = null; }
     session.vassalRun = null;
@@ -512,6 +613,16 @@ function tick(session, Generics, BotAI) {
     const run = session.vassalRun;
     const defending = invoke('GameServer/Bot/AI/BotPvpDefense').tick(session, bot, Generics, BotAI);
     const incoming = invoke('GameServer/Bot/AI/PartyAwareness').npcThreateningActor(session);
+    const busy = defending || incoming || bot.state.fetchHits?.() || session.plan === 'fleeing'
+        || session.activeTrade || session.trade || session.activeNegotiation;
+    try {
+        if (eligible(session, row) && farmWatchdog(session, row, run, !!busy)) return;
+    } catch (error) {
+        status(session, error.message);
+        session.vassalBlockedUntil = Date.now() + 30000;
+        utils.infoWarn('Vassal', 'duty blocked for %s: %s', bot.fetchName(), error.message);
+        return;
+    }
     if (defending || incoming || bot.state.fetchHits?.() || (session.plan === 'fleeing')) {
         if (session.vassalRest) session.vassalRest.at = null;
         seated(session, false);

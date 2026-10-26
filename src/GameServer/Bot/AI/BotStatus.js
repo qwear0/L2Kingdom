@@ -386,6 +386,14 @@ const BotStatus = {
                 followHeldAt: session.lastFollowMoveHeldAt || null,
                 townRoute: session.townRoutePlan || null,
                 pathfinding: session.lastPathfinding || null,
+                farmRecovery: session.vassalRun?.watchdog ? {
+                    state: session.vassalRun.watchdog.state,
+                    stalledMs: session.vassalRun.watchdog.stalledMs,
+                    attempts: session.vassalRun.watchdog.attempts,
+                    method: session.vassalRun.watchdog.method || null,
+                    from: session.vassalRun.watchdog.from || null,
+                    status: session.vassalStatus || null
+                } : null,
                 pathSummary: (invoke('GameServer/Bot/Population/PopulationConfig').developerDiagnostics === true) ? TownPathfinder.describeDiagnostics(session.lastPathfinding?.townRoute) : null,
                 retreat: session.lastRetreatPlan ? {
                     threatId: session.lastRetreatPlan.threatId,

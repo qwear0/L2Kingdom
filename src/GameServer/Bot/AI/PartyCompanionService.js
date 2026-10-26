@@ -5,6 +5,8 @@ const PartyCombatState = invoke('GameServer/Bot/AI/PartyCombatState');
 const BotRoles = invoke('GameServer/Bot/AI/BotRoles');
 const BotEventJournal = invoke('GameServer/Bot/AI/BotEventJournal');
 const Karma = invoke('GameServer/Karma');
+const Geodata = invoke('GameServer/Geodata/GeodataEngine');
+const Navigation = invoke('GameServer/Bot/AI/CompanionNavigationRecovery');
 
 const DEFAULT_PARTY_DISTRIBUTION = 1;
 const DEFAULT_PARTY_SETTINGS = {
@@ -281,7 +283,7 @@ function canPickupLoot(session) {
 function cancelGroundPickup(session) {
     const actor = session?.actor;
     if (!actor) return;
-    if (session.partyGroundPickupInProgress || actor.storedPickup) {
+    if (session.partyGroundPickupInProgress || session.partyGroundPickupRoute || actor.storedPickup) {
         // Support may already own automation after interrupting a pickup.
         if (!actor.state?.fetchCasts?.()) actor.automation?.abortAll?.(actor);
         actor.state?.setPickinUp?.(false);
@@ -290,6 +292,7 @@ function cancelGroundPickup(session) {
     session.partyGroundPickupQueue = [];
     session.partyGroundPickupInProgress = false;
     session.partyGroundPickupDeadlineAt = 0;
+    session.partyGroundPickupRoute = null;
     delete actor.storedPickup;
 }
 
@@ -543,6 +546,36 @@ function startQueuedGroundPickup(pickerSession) {
         pickerSession.partyGroundPickupDeadlineAt = 0;
         return startQueuedGroundPickup(pickerSession);
     }
+    if (picker.state?.fetchSeated?.()) {
+        picker.state.setSeated(false);
+        pickerSession.dataSendToMeAndOthers?.(ServerResponse.sitAndStand(picker), picker);
+    }
+    const from = { locX: picker.fetchLocX(), locY: picker.fetchLocY(), locZ: picker.fetchLocZ() };
+    const destination = { locX: queuedItem.fetchLocX(), locY: queuedItem.fetchLocY(), locZ: queuedItem.fetchLocZ() };
+    if (!Geodata.walkSegment(from, destination)) {
+        let route = pickerSession.partyGroundPickupRoute;
+        if (route?.id !== pickup.id) {
+            Navigation.clear(pickerSession);
+            route = pickerSession.partyGroundPickupRoute = { id: pickup.id, expiresAt: now + 30000 };
+        }
+        const navigation = Navigation.move(pickerSession, picker, destination, 'ground_loot', {
+            targetActor: null, arrivalRadius: 36 + Math.max(0, Number(picker.fetchRadius?.()) || 0)
+        });
+        if (navigation.status === 'exhausted' || now >= route.expiresAt) {
+            picker.automation.abortAll(picker);
+            Navigation.clear(pickerSession);
+            pickerSession.partyGroundPickupRoute = null;
+            queue.shift();
+            if (!groundPickupBackoff.has(leaderSession)) groundPickupBackoff.set(leaderSession, new Map());
+            groundPickupBackoff.get(leaderSession).set(Number(pickup.id), now + 30000);
+            return false;
+        }
+        return true;
+    }
+    if (pickerSession.partyGroundPickupRoute) {
+        pickerSession.partyGroundPickupRoute = null;
+        Navigation.clear(pickerSession);
+    }
     pickerSession.partyGroundPickupInProgress = true;
     if (partyCombatInProgress(leaderSession) || hasCampThreat(leaderSession)) {
         pickerSession.roleDecision = {
@@ -553,10 +586,6 @@ function startQueuedGroundPickup(pickerSession) {
     pickerSession.partyGroundPickupDeadlineAt = now + groundPickupTimeoutMs(picker, pickup);
     const attempt = Number(pickerSession.partyGroundPickupAttempt || 0) + 1;
     pickerSession.partyGroundPickupAttempt = attempt;
-    if (picker.state?.fetchSeated?.()) {
-        picker.state.setSeated(false);
-        pickerSession.dataSendToMeAndOthers?.(ServerResponse.sitAndStand(picker), picker);
-    }
     const Generics = invoke(path.actor);
     Generics.stopAutomation(pickerSession, picker);
     Generics.pickupExec(pickerSession, picker, pickup, (result) => {
@@ -655,6 +684,21 @@ function formationTargetFor(companionSession) {
         locZ: leader.fetchLocZ(),
         slot: slot.index
     };
+}
+
+function teleportTargetFor(companionSession) {
+    const leader = companionSession?.followPlayerSession?.actor;
+    const target = formationTargetFor(companionSession);
+    if (!leader || !target) return null;
+    const from = { locX: leader.fetchLocX(), locY: leader.fetchLocY(), locZ: leader.fetchLocZ() };
+    // Formation offsets are walking preferences, not trusted landing points.
+    // Shrink toward the leader rather than placing a companion inside a wall.
+    for (const scale of [1, 0.5, 0.25, 0]) {
+        const point = Geodata.walkSegment(from, { locX: Math.round(from.locX + (target.locX - from.locX) * scale),
+            locY: Math.round(from.locY + (target.locY - from.locY) * scale), locZ: from.locZ });
+        if (point) return point;
+    }
+    return null;
 }
 
 function regroupDirective(leaderSession, now = Date.now()) {
@@ -920,6 +964,7 @@ const PartyCompanionService = {
     formationSlotFor,
 
     formationTargetFor,
+    teleportTargetFor,
 
     staysOutOfTown,
 
@@ -956,6 +1001,7 @@ const PartyCompanionService = {
     getSettings,
 
     canPickupLoot,
+    cancelGroundPickup,
 
     updateSettings,
 
@@ -1050,7 +1096,7 @@ const PartyCompanionService = {
 
     bringToLeader(leaderSession, companionSession) {
         if (!isActiveCompanion(companionSession, leaderSession)) return false;
-        const destination = formationTargetFor(companionSession);
+        const destination = teleportTargetFor(companionSession);
         if (!destination || staysOutOfTown(companionSession.actor, destination)) return false;
 
         companionSession.lastFollowMoveTarget = null;

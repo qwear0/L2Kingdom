@@ -24,11 +24,16 @@ function awardDrop(world, session, npc, selfId, amount) {
 }
 
 function spawnGroundDrop(world, session, npc, selfId, amount) {
-    const point = new SpeckMath.Circle(npc.fetchLocX(), npc.fetchLocY(), 50).createPointWithin();
-    const coords = point.toCoords();
-    // Resolve the scattered point on the corpse's floor. Copying NPC Z (or
-    // subtracting from it) leaves loot floating on slopes or below the floor.
-    coords.locZ = GeodataEngine.getHeight(coords.locX, coords.locY, npc.fetchLocZ());
+    const origin = { locX: npc.fetchLocX(), locY: npc.fetchLocY(), locZ: npc.fetchLocZ() };
+    let coords = origin;
+    // A nearest-height lookup can scatter loot onto an adjacent roof. Keep
+    // scatter on a walkable continuation of the corpse's floor; if bounded
+    // attempts fail, drop at the corpse instead of inventing another layer.
+    for (let attempt = 0; attempt < 6; attempt++) {
+        const point = new SpeckMath.Circle(origin.locX, origin.locY, 50).createPointWithin().toCoords();
+        const destination = GeodataEngine.walkSegment(origin, { ...point, locZ: origin.locZ });
+        if (destination) { coords = destination; break; }
+    }
     const leaderSession = PartyCompanionService.groundLootLeader(session);
     world.spawnItem(session, selfId, amount, {
         ...coords,

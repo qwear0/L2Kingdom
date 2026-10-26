@@ -48,7 +48,7 @@ Gathering distribution and route recovery stay within that assignment:
 - No-target relocation prefers another polygon before retrying the current one. Failed travel similarly deprioritizes its polygon while retaining the failed-point cooldown. Other polygons without safe destination candidates are skipped; the current polygon remains a fallback. Useful fights and pinned routes are not periodically interrupted to rebalance occupancy.
 - Routes pin an interior destination with room for the arrival radius and geodata-cell rounding. Stopping just outside the polygon, within an NPC's arrival radius, does not count as entering it.
 - Navigation reuses bounded waypoint retries. Exhausted routes or 30 seconds without physical progress select another point/polygon and exclude the failed point's 128-unit bucket for five minutes. A gap of more than five seconds between gathering travel ticks resets the stall clock, so time spent in combat, recovery or service work is not credited as continuous travel failure.
-- If no safe candidate is available, the duty waits and retries rather than teleporting or changing its assigned area.
+- Local route retries wait when no safe candidate is available and never change the assigned area. Prolonged physical stalls additionally use the farming recovery below.
 - Solo gatherers exclude a stalled combat target for five minutes and finish pending visibility scans before treating a zone as empty.
 
 - Joining the owner's party preserves the assigned gathering area and records pending resumption rather than replacing it with a new autonomous route.
@@ -57,6 +57,16 @@ Gathering distribution and route recovery stay within that assignment:
 - Explicit newer orders invalidate old continuations. Return/service orders detach companions; non-gather service companions become return duty after separation.
 - Solo vassal death revives fully after 12 seconds and returns the actor to Gludio. Companion death follows BotAI's resurrection-wait/town-recovery path instead.
 - Losing original-clan eligibility cancels gathering, retains cargo and returns the vassal. It does not silently rebind the vassal to a new clan or resume the old order later.
+
+### Farming stall recovery
+
+`VassalOrders.farmWatchdog` counts five minutes of observed autonomous gather-duty work without 96 units of horizontal displacement or an experience change. It also covers physical supply/town legs of that order. Replans, target changes and polygon rotation do not reset the clock. Combat, casting, seated recovery, post-party rest, owner trade, transaction/operation holds, unaffordable supplies and inventory-blocked work do not count; gaps longer than five seconds are not credited as work.
+
+- Recovery cancels the old movement/loot queue and casts a paid ordinary Scroll of Escape (20 seconds), or native skill `2099` (five minutes) when no scroll is held. A scroll is spent at cast start, including interrupted attempts, matching the existing bot travel payment rule. It is not a synthetic relog or a free instant teleport.
+- Recall uses `TownRespawn.restartCoords`, including regional karma destinations. Actor/order/party/clan eligibility, combat, trade and cast interruption fences protect completion. A new order cancels the old continuation.
+- Arrival resumes town supply/cargo processing and the same saved gathering assignment. The failed source's 128-unit destination bucket is avoided for 30 minutes.
+- At most three recovery starts are allowed without an experience change. Further stalled work holds with `farm_recovery_exhausted_new_order_required`; defense remains available. Experience progress or an explicit new order renews the allowance. The watchdog is live-session state, not downtime credit or a persisted retry ledger.
+- Bot detail exposes the state, elapsed work, attempts, last method/source and duty status in `movement.farmRecovery` even when developer movement traces are disabled.
 
 Known wording mismatch: `CastellanDialog.js` currently says “one minute” in its home text, while `VassalOrders.SAFE_REST_MS` is ten minutes. The implementation value above is the documented contract; the UI wording has not been repaired by this documentation-only change.
 

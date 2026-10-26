@@ -1158,9 +1158,8 @@ const FollowingState = {
             recordRoleDecision(session, bot, 'follow_leader', distance > FOLLOW_TELEPORT_DISTANCE ? 'catch_up' : 'unstuck');
             const TeleportTo = invoke('GameServer/Actor/Generics/TeleportTo');
             if (TeleportTo && typeof TeleportTo === 'function') {
-                const targetLoc = {
-                    ...followTargetFor(session, player)
-                };
+                const targetLoc = PartyCompanionService.teleportTargetFor(session);
+                if (!targetLoc) return false;
                 TeleportTo(session, bot, targetLoc);
                 BotPartyChat.announce(session, {
                     priority: 'informational',

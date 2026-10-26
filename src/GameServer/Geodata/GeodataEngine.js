@@ -445,6 +445,55 @@ const GeodataEngine = {
         return !hasLayerData || Math.abs(cz - targetCell.z) <= MAX_LAYER_STEP;
     },
 
+    // Follow the source floor through every cell crossed by the actual line,
+    // not a rounded visibility ray. At corners both sides must be walkable;
+    // otherwise smoothing/interpolation can cut through an isolated roof cell.
+    // Omitting to.locZ follows terrain without an interpolated-height snap.
+    walkSegment(from, to) {
+        if (![from.locX, from.locY, from.locZ, to.locX, to.locY].every(Number.isFinite)) return null;
+        let cx = from.locX >> 4, cy = from.locY >> 4;
+        const endX = to.locX >> 4, endY = to.locY >> 4;
+        let cell = this.getCellData(from.locX, from.locY, from.locZ);
+        if (!cell.nswe || Math.abs(cell.z - from.locZ) > MAX_LAYER_STEP) return null;
+        const dx = to.locX - from.locX, dy = to.locY - from.locY;
+        const sx = Math.sign(dx), sy = Math.sign(dy);
+        const deltaX = dx ? 16 / Math.abs(dx) : Infinity;
+        const deltaY = dy ? 16 / Math.abs(dy) : Infinity;
+        let nextX = dx ? (((cx + (sx > 0 ? 1 : 0)) << 4) - from.locX) / dx : Infinity;
+        let nextY = dy ? (((cy + (sy > 0 ? 1 : 0)) << 4) - from.locY) / dy : Infinity;
+        const cross = (source, x, y, stepX, stepY) => {
+            const bit = stepX ? (stepX > 0 ? 1 : 2) : (stepY > 0 ? 4 : 8);
+            const opposite = stepX ? (stepX > 0 ? 2 : 1) : (stepY > 0 ? 8 : 4);
+            if (!(source.nswe & bit)) return null;
+            const target = this.getCellData((x << 4) + 8, (y << 4) + 8, source.z);
+            return (target.nswe & opposite) && Math.abs(target.z - source.z) <= MAX_LAYER_STEP ? target : null;
+        };
+        while (cx !== endX || cy !== endY) {
+            if (cy === endY || cx !== endX && nextX < nextY - 1e-10) {
+                cell = cross(cell, cx + sx, cy, sx, 0);
+                cx += sx;
+                nextX += deltaX;
+            } else if (cx === endX || nextY < nextX - 1e-10) {
+                cell = cross(cell, cx, cy + sy, 0, sy);
+                cy += sy;
+                nextY += deltaY;
+            } else {
+                const horizontal = cross(cell, cx + sx, cy, sx, 0);
+                const vertical = cross(cell, cx, cy + sy, 0, sy);
+                const viaX = horizontal && cross(horizontal, cx + sx, cy + sy, 0, sy);
+                const viaY = vertical && cross(vertical, cx + sx, cy + sy, sx, 0);
+                cell = viaX && viaY && viaX.z === viaY.z ? viaX : null;
+                cx += sx;
+                cy += sy;
+                nextX += deltaX;
+                nextY += deltaY;
+            }
+            if (!cell) return null;
+        }
+        if (Number.isFinite(to.locZ) && Math.abs(cell.z - to.locZ) > MAX_LAYER_STEP) return null;
+        return { locX: to.locX, locY: to.locY, locZ: cell.z };
+    },
+
     findPath(startX, startY, startZ, endX, endY, endZ, maxNodes = 2000, options = {}) {
         const checkBudget = typeof options.checkBudget === 'function' ? options.checkBudget : null;
         checkBudget?.();
@@ -615,7 +664,7 @@ const GeodataEngine = {
                     if ((checkIdx & 31) === 0) checkBudget?.();
                     const startPt = pathPoints[currentIdx];
                     const endPt = pathPoints[checkIdx];
-                    if (this.hasLineOfSight(startPt.locX, startPt.locY, startPt.locZ, endPt.locX, endPt.locY, endPt.locZ)) {
+                    if (this.walkSegment(startPt, endPt)) {
                         break;
                     }
                     checkIdx--;
