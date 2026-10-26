@@ -29,10 +29,10 @@ function render(session, page = 0) {
         body += command('New session (clear both points)', 'new') + '<br>'
             + command('Set zone center here', 'center') + '<br>'
             + command('Set rest point here', 'point') + '<br>'
-            + 'Radius: ' + [300, 600, 900].map(radius => command(String(radius), `radius ${radius}`)).join(' / ') + '<br>'
+            + 'Radius: ' + [400, 800, 1200].map(radius => command(String(radius), `radius ${radius}`)).join(' / ') + '<br>'
             + Html.button('Start hunting', `${prefix} start`) + '<br>';
         body += 'Start requires both points. Stop preserves them; New session clears them.<br>'
-            + 'Recovery: player HP &lt;35% or MP &lt;20%; resume at 95% HP and MP. Party recovery also pauses pulls.<br>'
+            + 'Recovery: player HP &lt;35%; resume at 95%. MP: 20%/95% only for an allowed MP-cost skill or bow attack. Party recovery also pauses pulls.<br>'
             + command('Use basic attacks only', 'allow 0') + '<br>';
         body += Html.section('Allow one learned single-target skill', skills.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
             .map(skill => command(`${skill.fetchSelfId() === controller.allowedSkillId ? 'ON' : 'OFF'} ${skill.fetchName()}`,

@@ -11,7 +11,7 @@ const NpcObjectIndex = require('../World/NpcObjectIndex');
 const loc = actor => ({ locX: actor.fetchLocX(), locY: actor.fetchLocY(), locZ: actor.fetchLocZ() });
 const distance = (a, b) => Math.hypot(a.locX - b.locX, a.locY - b.locY);
 const MAX_SAFE_REST_MS = 6 * 60 * 60 * 1000;
-const DEFENCE_RADIUS = 1200;
+const DEFENCE_RADIUS = 400;
 const MAX_POINT_DISTANCE = 3000;
 
 class PlayerAutoFight {
@@ -26,7 +26,7 @@ class PlayerAutoFight {
         this.reason = 'stopped';
         this.center = null;
         this.point = null;
-        this.radius = 600;
+        this.radius = 800;
         this.allowedSkillId = null;
         this.run = null;
     }
@@ -95,18 +95,25 @@ class PlayerAutoFight {
 
     canAcquire(target, source = this.actor) {
         const run = this.run;
-        return !!run && this.available() && !run.recovery && !this.needsRecovery()
+        return !!run && this.available() && !run.recovery && !run.defenceAnchor && !this.needsRecovery()
             && !run.wait && ['seeking', 'fighting'].includes(run.state)
             && this.ordinaryMonster(target) && this.inside(target) && this.inside(source)
             && !this.foreignEngagement(target) && Number(run.rejected.get(target.fetchId()) || 0) <= Date.now();
     }
 
+    defending() {
+        const run = this.run;
+        return !!run && (!!run.defenceAnchor || !['seeking', 'fighting'].includes(run.state)
+            || (run.state === 'seeking' && !this.inside(this.actor)));
+    }
+
     legalTarget(target, source = this.actor) {
         const run = this.run;
         if (!run || !this.ordinaryMonster(target) || Math.abs(target.fetchLocZ() - source.fetchLocZ()) > 64) return false;
-        if (this.threatening(target)) {
-            return distance(loc(target), run.center) <= DEFENCE_RADIUS
-                && distance(loc(source), run.center) <= DEFENCE_RADIUS;
+        if (this.threatening(target) && this.defending()) run.defenceAnchor ||= loc(this.actor);
+        if (run.defenceAnchor) {
+            return this.engaged(target) && distance(loc(target), run.defenceAnchor) <= DEFENCE_RADIUS
+                && distance(loc(source), run.defenceAnchor) <= DEFENCE_RADIUS;
         }
         if (this.engaged(target)) return this.inside(target, 200) && this.inside(source, 200);
         return this.canAcquire(target, source);
@@ -156,16 +163,24 @@ class PlayerAutoFight {
     }
 
     setRadius(radius) {
-        if (this.run || ![300, 600, 900].includes(radius)) return false;
+        if (this.run || ![400, 800, 1200].includes(radius)) return false;
         this.radius = radius;
         return true;
+    }
+
+    usesMana() {
+        const actor = this.actor;
+        const skill = actor.skillset.fetchSkill(this.allowedSkillId);
+        if (this.allowsSkill(skill) && actor.attack.skillMpCost(actor, skill) > 0) return true;
+        return AttackRange.weaponKind(actor) === 'Weapon.Bow'
+            && invoke('GameServer/Items/C4WeaponSA').bowMpCost(actor.backpack.fetchEquippedWeapon(), () => 1) > 0;
     }
 
     needsRecovery(high = false) {
         const actor = this.actor;
         const hp = actor.fetchHp() / Math.max(1, actor.fetchMaxHp());
         const mp = actor.fetchMp() / Math.max(1, actor.fetchMaxMp());
-        if (hp < (high ? 0.95 : 0.35) || mp < (high ? 0.95 : 0.20)) return true;
+        if (hp < (high ? 0.95 : 0.35) || (this.usesMana() && mp < (high ? 0.95 : 0.20))) return true;
         return PartyAwareness.partyActors(this.session).some(member => member !== actor && RestPolicy.needsRest(member,
             member.fetchHp() / Math.max(1, member.fetchMaxHp()), member.fetchMp() / Math.max(1, member.fetchMaxMp()),
             { party: true, locked: high }));
@@ -195,7 +210,7 @@ class PlayerAutoFight {
         const run = this.run = { generation: ++this.generation, kind: 'hunt', state: 'seeking',
             center: { ...this.center }, rest: { ...this.point }, radius: this.radius,
             engaged: new Map(), rejected: new Map(), recovery: false, nextScanAt: 0, nextActionAt: 0,
-            safeRestMs: 0, fixedFailures: {} };
+            safeRestMs: 0, fixedFailures: {}, defenceAnchor: null };
         this.renewOwner(run);
         this.reason = 'seeking';
         invoke('GameServer/Geodata/PlayerTransitionRecovery').cancel(session);
@@ -252,8 +267,10 @@ class PlayerAutoFight {
             length += distance(previous, waypoint);
             if (Math.abs(previous.locZ - waypoint.locZ) > 64) return false;
             if (run.route.purpose === 'candidate') {
-                const limit = this.threatening(run.approach.target) ? DEFENCE_RADIUS : run.radius + 200;
-                if (distance(waypoint, run.center) > limit) return false;
+                if (!this.legalTarget(run.approach.target)) return false;
+                const anchor = run.defenceAnchor || run.center;
+                const limit = run.defenceAnchor ? DEFENCE_RADIUS : run.radius + 200;
+                if (distance(waypoint, anchor) > limit) return false;
             }
             previous = waypoint;
         }
@@ -356,7 +373,7 @@ class PlayerAutoFight {
         const partyThreat = PartyAwareness.findThreatTargetingPartyProjected(this.session);
         if (partyThreat?.actor) nearby.set(partyThreat.actor.fetchId(), partyThreat.actor);
         for (const member of members) {
-            if (distance(loc(member), run.center) > DEFENCE_RADIUS) continue;
+            if (distance(loc(member), loc(this.actor)) > 1500) continue;
             for (const target of World.fetchNpcsInRadius(member.fetchLocX(), member.fetchLocY(), 1500)) nearby.set(target.fetchId(), target);
         }
         const active = [];
@@ -449,8 +466,12 @@ class PlayerAutoFight {
         const encounter = this.encounter(run);
         if (run.dispatched && !run.nativeStarted && !run.lookupPending && !run.route) this.rejectCandidate(run);
         const threats = encounter.filter(target => this.threatening(target));
+        // Keep the interruption point through pursuit, adds and accepted native
+        // actions; only a finished encounter may release the defence leash.
+        if (!encounter.length) run.defenceAnchor = null;
+        else if (threats.length && this.defending()) run.defenceAnchor ||= loc(actor);
         if (threats.some(target => !this.ordinaryMonster(target))) run.wait = 'unsupported_threat';
-        else if (threats.some(target => distance(loc(target), run.center) > DEFENCE_RADIUS)) run.wait = 'defence_leash';
+        else if (threats.some(target => !this.legalTarget(target))) run.wait = 'defence_leash';
         const readyTarget = target => this.legalTarget(target) && Number(run.rejected.get(target.fetchId()) || 0) <= now;
         const defensive = threats.find(readyTarget);
         if (encounter.length || run.route || run.state !== 'resting') run.safeRestSince = null;
