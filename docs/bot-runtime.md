@@ -47,6 +47,8 @@ Post-party safe rest measures eligible live time, not elapsed server downtime. S
 
 While a connected leader's auto-fight run is active, `Actor/PlayerAutoFightPolicy.js` adds temporary zone/recovery constraints to companion designated pulls, the tank fallback and native offensive recipient expansion. Recovery suppresses routine buffs/charge preparation and non-emergency Recharge without rewriting pull settings or detached vassal duties. Inspection is not an assist target. See [auto-fight ownership and limits](world-combat.md#connected-player-auto-fight-p2-bounded-hunting); ordinary behavior resumes outside the run.
 
+New player/companion targets under that run also pause while `PartyPulling.hasDeadPartyMember` detects a fallen party member or `partyRevivalAttempt` is pending; already engaged combat and defensive actions remain legal. Companion Sweeper is corpse collection, not offensive initiation: it retains native corpse, spoil ownership, range and resource checks without applying the live-monster acquisition predicate. Other corpse-targeted offensive skills are not exempt.
+
 The source-adjacent [class policy](../src/GameServer/Bot/AI/CLASS_POLICY.md) describes consumers and approximations. Engineering preference scores are not historical C4 facts, optimal rotations or gameplay certification.
 
 ## Retained cold worker contract

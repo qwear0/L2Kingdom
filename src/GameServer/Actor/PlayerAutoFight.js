@@ -97,6 +97,8 @@ class PlayerAutoFight {
         const run = this.run;
         return !!run && this.available() && !run.recovery && !run.defenceAnchor && !this.needsRecovery()
             && !run.wait && ['seeking', 'fighting'].includes(run.state)
+            && !this.session.partyRevivalAttempt
+            && !invoke('GameServer/Bot/AI/PartyPulling').hasDeadPartyMember(this.session)
             && this.ordinaryMonster(target) && this.inside(target) && this.inside(source)
             && !this.foreignEngagement(target) && Number(run.rejected.get(target.fetchId()) || 0) <= Date.now();
     }

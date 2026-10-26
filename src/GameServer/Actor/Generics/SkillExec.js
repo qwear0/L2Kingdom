@@ -60,6 +60,8 @@ function skillExec(session, actor, data) {
     World.fetchNpc(data.id).then((npc) => {
         if (!current()) return;
         if (owner) owner.run.lookupPending = false;
+        // Only Sweep is corpse collection; offensive corpse-targeted skills
+        // must still pass the live-target initiation policy.
         actor.automation.scheduleAction(session, actor, npc, skill.fetchDistance(), () => {
             if (!current()) return;
             if (SpoilSweep.isSpoilSkill(data.selfId)) {
@@ -87,8 +89,9 @@ function skillExec(session, actor, data) {
             else if (skill.fetchTargetKind() === 'enemy' && canTargetEnemyNpc(npc, data)) {
                 actor.attack.remoteHit(session, npc, skill, { actionOwner: owner });
             }
-        }, { action: 'skill', actionOwner: owner, allowDeadTarget: SpoilSweep.isSweepSkill(data.selfId)
-            && String(session?.accountId || '').startsWith('bot_') });
+        }, { action: SpoilSweep.isSweepSkill(data.selfId) ? 'sweep' : 'skill', actionOwner: owner,
+            allowDeadTarget: SpoilSweep.isSweepSkill(data.selfId)
+                && String(session?.accountId || '').startsWith('bot_') });
     }).catch((error) => {
         if (!current()) return;
         if (owner) {
