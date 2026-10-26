@@ -231,6 +231,7 @@ const BotAI = {
     },
 
     stop(session) {
+        if (session.journey) require('./Travel/JourneyExecutor').suspend(session, 'ai_stop');
         session.pendingShoppingMeeting?.controller.abort();
         invoke('GameServer/Bot/AI/TownNpcApproach').reset(session);
         invoke('GameServer/Bot/AI/TownTraffic').remove(Number(session.actor?.fetchId?.()));
@@ -397,16 +398,16 @@ const BotAI = {
     },
 
     tick(session) {
-        // Position changes only when TeleportTo completes. Damage wakeups in
-        // that interval must not restart actions in the previous raid region.
-        if (session.pendingActorTeleport || session.followPlayerSession?.pendingActorTeleport) return;
         const bot = session.actor;
         if (!bot) return;
-        if (session.vassal && session.partyCompanion && !bot.isDead()) require('./AI/VassalOrders').enforceClan(session);
         if (session.vassal && !session.partyCompanion) {
             require('./AI/VassalOrders').tick(session, invoke(path.actor), this);
             return;
         }
+        // Independent duties also pause their clocks during native publication.
+        // Other actors must not restart actions in the previous raid region.
+        if (session.pendingActorTeleport || session.followPlayerSession?.pendingActorTeleport) return;
+        if (session.vassal && session.partyCompanion && !bot.isDead()) require('./AI/VassalOrders').enforceClan(session);
         if (session.vassal && !bot.isDead()) require('./AI/VassalOrders').useSupplies(session);
         invoke('GameServer/Bot/AI/BotClanChat').flush();
         invoke('GameServer/Bot/Economy/BotTradeChat').flush();

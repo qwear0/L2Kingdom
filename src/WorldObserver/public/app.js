@@ -3249,6 +3249,7 @@ function renderInspector() {
             ${vitalBar('MP', actor.vitals, '#57c7e8')}
         </div>
         ${renderAction(actor)}
+        ${renderJourney(actor.movement?.journey)}
         <div class="detail-grid">
             <div><span>Activity</span><strong>${text(activityLabel(actor.mode))}</strong></div>
             <div><span>Race</span><strong>${text(Leaderboards.raceName(actor))}</strong></div>
@@ -3271,6 +3272,21 @@ function renderInspector() {
     `;
     updateProfileTabs();
     if (focusedTab) els.selectedInspector.querySelector(`[data-profile-tab="${focusedTab}"]`)?.focus({ preventScroll: true });
+}
+
+function renderJourney(journey) {
+    if (!journey) return '';
+    const destination = journey.destination;
+    const label = destination.label || `${destination.locX}, ${destination.locY}, ${destination.locZ}`;
+    const keeper = journey.gatekeeper;
+    return `<section class="inspector-section"><h3>Duty journey</h3><div class="detail-grid">
+        <div><span>Destination</span><strong>${text(label)}</strong></div>
+        <div><span>State</span><strong>${text(journey.status)}${journey.reason ? ` · ${text(journey.reason)}` : ''}</strong></div>
+        <div><span>Route / leg</span><strong>${text(journey.mode || '—')} / ${text(journey.leg || '—')}</strong></div>
+        <div><span>Gatekeeper hops</span><strong>${number(journey.hop)} / ${number(journey.hops)}</strong></div>
+        ${keeper ? `<div><span>Current gatekeeper</span><strong>${text(keeper.name || keeper.npcId)} → ${text(keeper.label || keeper.destinationId)}</strong></div>` : ''}
+        <div><span>Fare paid / remaining plan</span><strong>${number(journey.paidFare)} / ${number(journey.plannedFare)} Adena${journey.paymentUncertain ? ' · payment unconfirmed' : ''}</strong></div>
+    </div></section>`;
 }
 
 function renderSelected() {

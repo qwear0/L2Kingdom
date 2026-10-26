@@ -435,4 +435,14 @@ function ensure(session, request) {
     return tick(session);
 }
 
-module.exports = { ensure, tick, suspend, cancel };
+// The duty owns its active-walk clock; exhausting one final approach must
+// still try other exits before the duty is allowed to reject its destination.
+function rejectFinalAccess(session) {
+    const state = session.journey;
+    const leg = state?.itinerary?.legs[state.index];
+    if (!state || !current(session, state) || state.flight || state.terminal || state.fatal
+        || state.status !== 'moving' || leg?.type !== 'walk') throw Error('journey_final_walk_not_active');
+    return routeFailure(session, state, leg, 'final_access_failed', Date.now());
+}
+
+module.exports = { ensure, tick, suspend, cancel, rejectFinalAccess };

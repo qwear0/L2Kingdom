@@ -9,6 +9,7 @@ const Catalog = invoke('GameServer/Bot/Economy/TownServiceCatalog');
 const Rest = invoke('GameServer/Bot/AI/RestPolicy');
 const Travel = invoke('GameServer/Bot/AI/BotTownTravel');
 const Navigation = invoke('GameServer/Bot/AI/CompanionNavigationRecovery');
+const Journey = require('../Travel/JourneyExecutor');
 const TargetMatchup = invoke('GameServer/Bot/AI/BotTargetMatchup');
 const HuntingTargetPolicy = invoke('GameServer/Bot/AI/BotHuntingTargetPolicy');
 const TargetScorer = require('./BotTargetScorer');
@@ -41,6 +42,7 @@ function status(session, reason) {
     session.lastDecision = { action: 'vassal_duty', reason, at: Date.now() };
 }
 function invalidate(session) {
+    Journey.cancel(session, 'duty_invalidated');
     session.vassalEpoch = Number(session.vassalEpoch || 0) + 1;
     session.vassalRest = null;
     session.vassalRun = null;
@@ -89,6 +91,7 @@ function acceptInventory(session, bot, result) {
 }
 function operation(session, run) {
     if (session.vassalOperation) return;
+    pauseJourney(session, 'operation');
     const bot = session.actor;
     const marker = session.vassalOperation = {};
     Promise.resolve().then(run).catch(error => {
@@ -108,6 +111,61 @@ function separated(session) {
     session.plan = 'hunting';
     invoke('GameServer/Bot/BotAI').wakeup(session, { urgent: true });
 }
+function pauseClocks(session) {
+    const run = session.vassalRun;
+    if (run?.watchdog) run.watchdog.state = 'paused';
+    if (run?.gatherTravel) run.gatherTravel.progressAt = null;
+}
+function pauseJourney(session, reason) {
+    Journey.suspend(session, reason);
+    pauseClocks(session);
+}
+function transportWaiting(session) {
+    const state = session.journey;
+    if (session.pendingActorTeleport || session.pendingPathRequest || session.townNpcQueue) return true;
+    if (!state || state.terminal) return false;
+    if (state.flight || state.paymentUncertain) return true;
+    if (state.status === 'blocked') return state.scope === 'resource';
+    if (state.status !== 'waiting') return false;
+    return ['npc_slot', 'interaction_dwell'].includes(state.reason)
+        || state.retryAt > Date.now() && Number.isFinite(state.retryAt);
+}
+function journeyTo(session, row, run, kind, destination, arrival, label) {
+    const clanEligible = eligible(session, row);
+    let goal = run.journeyGoal;
+    // Replans share the same goal's costs/exclusions. Only a new duty target,
+    // authority transition or departure after completion may start a fresh cap.
+    if (!goal || goal.kind !== kind || goal.actor !== session.actor
+        || (goal.completed && (Math.hypot(session.actor.fetchLocX() - destination.locX,
+            session.actor.fetchLocY() - destination.locY) > arrival.xy
+            || Math.abs(session.actor.fetchLocZ() - destination.locZ) > arrival.z))
+        || goal.clanEligible !== clanEligible
+        || ['locX', 'locY', 'locZ'].some(key => goal.to[key] !== destination[key])) {
+        const current = fence(session, row);
+        run.goalSequence = (run.goalSequence || 0) + 1;
+        goal = { kind, actor: session.actor, clanEligible, to: { ...destination }, label,
+            key: `${row.characterId}:${row.orderRevision}:${session.vassalEpoch}:${run.goalSequence}:${kind}` };
+        goal.isCurrent = () => current() && session.vassalRun === run && run.journeyGoal === goal
+            && eligible(session, row) === clanEligible;
+        run.journeyGoal = goal;
+    }
+    seated(session, false);
+    const result = Journey.ensure(session, { key: goal.key, to: goal.to, arrival, isCurrent: goal.isCurrent });
+    goal.completed = result.status === 'arrived';
+    if (transportWaiting(session)) pauseClocks(session);
+    if (result.status === 'blocked' || result.status === 'waiting') status(session, `journey_${result.reason || result.status}`);
+    return result;
+}
+function serviceReturn(session, row, run, kind = 'service') {
+    const goal = run.journeyGoal;
+    if (!goal || goal.kind !== kind || goal.actor !== session.actor || goal.clanEligible !== eligible(session, row)
+        || !goal.completed || Math.hypot(session.actor.fetchLocX() - Access.loc.locX,
+            session.actor.fetchLocY() - Access.loc.locY) > 1800
+        || Math.abs(session.actor.fetchLocZ() - Access.loc.locZ) > 100) {
+        if (journeyTo(session, row, run, kind, Access.loc, { xy: 1200, z: 100 }, 'Castellan (Gludio)').status !== 'arrived') return false;
+    }
+    return move(session, Access.loc, 100);
+}
 function routeBlocked(session, destination) {
     const path = session.lastPathfinding;
     if (path?.routeUsable !== false || Date.now() - Number(path.at) >= 30000
@@ -124,6 +182,7 @@ function move(session, destination, radius = 100) {
     if (routeBlocked(session, destination)) return false;
     if (!bot.state.fetchTowards() && !session.moveTimer)
         bot.moveTo({ from, to: destination, arrivalRadius: radius, pathMaxNodes: 120000 });
+    if (session.pendingPathRequest) pauseClocks(session);
     return false;
 }
 function approach(session, target, open = false) {
@@ -131,6 +190,7 @@ function approach(session, target, open = false) {
     const plan = open ? Approach.planOpen(session, session.actor, target, 'vassal')
         : Approach.plan(session, session.actor, target, 'vassal');
     if (!plan) throw Error('vassal_service_route_missing');
+    if (plan.waiting) pauseClocks(session);
     if (!plan.ready && !plan.waiting) move(session, plan.destination, plan.arrivalRadius);
     return plan.ready;
 }
@@ -197,20 +257,17 @@ function cargo(session) {
             resolveKey: `vassal:${bot.fetchId()}:${item.fetchId()}:${Date.now()}` }];
     });
 }
-function townTick(session, row, run, BotAI) {
+function townTick(session, row, run) {
     const bot = session.actor;
-    const town = { name: 'Gludio', x: -12736, y: 122816, z: -3112 };
+    const town = { locX: -12736, locY: 122816, locZ: -3112 };
     if (session.townEscape || session.pendingActorTeleport) return;
-    const distance = Math.hypot(bot.fetchLocX() - town.x, bot.fetchLocY() - town.y);
-    if (run.phase === 'town' && distance > 1800) {
+    if (Math.hypot(bot.fetchLocX() - town.locX, bot.fetchLocY() - town.locY) > 1800
+        || Math.abs(bot.fetchLocZ() - town.locZ) > 128) run.phase = 'town';
+    if (run.phase === 'town') {
         status(session, 'returning_to_gludio');
-        if (routeBlocked(session, { locX: town.x, locY: town.y })) return;
-        if (!bot.state.fetchTowards() && !session.moveTimer) Travel.request(session, bot, BotAI, null, {
-            destinationTown: town, announce: false, isCurrent: fence(session, row)
-        });
-        return;
+        if (journeyTo(session, row, run, 'town', town, { xy: 1800, z: 128 }, 'Gludio services').status !== 'arrived') return;
+        run.phase = 'supplies';
     }
-    if (run.phase === 'town') run.phase = 'supplies';
     const current = fence(session, row);
     if (run.phase === 'supplies') {
         const target = Catalog.targetForNpc(Catalog.ROLES.SELLER, 'Gludio', Access.npcId, { from: Areas.pointOf(bot) });
@@ -284,6 +341,7 @@ function townTick(session, row, run, BotAI) {
     }
 }
 function graceTick(session, row) {
+    pauseJourney(session, 'post_party_rest');
     if (useSupplies(session, { speed: false })) {
         if (session.vassalRest) session.vassalRest.at = null;
         return;
@@ -315,6 +373,7 @@ function recovery(session) {
     const bot = session.actor;
     const hp = bot.fetchHp() / Math.max(1, bot.fetchMaxHp()), mp = bot.fetchMp() / Math.max(1, bot.fetchMaxMp());
     if (Rest.needsRest(bot, hp, mp, { locked: session.plan === 'resting' || session.recoveryLocked })) {
+        pauseJourney(session, 'recovery');
         session.plan = 'resting';
         status(session, 'recovering');
         seated(session, true);
@@ -481,7 +540,7 @@ function gatherDestination(session, area, run) {
     const { point, zoneIndex } = local[0];
     return { point, zoneIndex, key: gatherPointKey(area.zones[zoneIndex], point) };
 }
-function travelToGatherPoint(session, area, run) {
+function travelToGatherPoint(session, row, area, run) {
     const bot = session.actor, now = Date.now(), point = Areas.pointOf(bot);
     const travel = run.gatherTravel || (run.gatherTravel = {});
     if (!travel.destination) {
@@ -493,33 +552,36 @@ function travelToGatherPoint(session, area, run) {
             return;
         }
         travel.progressPoint = point;
-        travel.progressAt = now;
-        Navigation.clear(session);
-        session.townRoutePlan = null;
+        travel.progressAt = null;
     }
     const destination = travel.destination;
-    const distance = Math.hypot(point.locX - destination.point.locX, point.locY - destination.point.locY);
-    if (distance <= GATHER_ARRIVAL_RADIUS && Math.abs(point.locZ - destination.point.locZ) <= 64
-        && Areas.containsZone(area.zones[destination.zoneIndex], point)) {
+    status(session, 'traveling_to_assigned_area');
+    let result = journeyTo(session, row, run, `gather:${destination.key}`, destination.point,
+        { xy: GATHER_ARRIVAL_RADIUS, z: 64 }, area.name);
+    if (result.status === 'arrived') {
+        if (!Areas.containsZone(area.zones[destination.zoneIndex], point)) throw Error('vassal_gather_arrival_outside_polygon');
         run.zoneIndex = destination.zoneIndex;
         run.gatherTravel = null;
         Navigation.clear(session);
         return;
     }
-    // Combat, recovery and service work suspend this clock; only consecutive
-    // gathering ticks can establish that a physical route has stopped moving.
-    if (now - Number(travel.lastTickAt || now) > 5000
-        || Math.hypot(point.locX - travel.progressPoint.locX, point.locY - travel.progressPoint.locY) >= 96
-        || Math.abs(point.locZ - travel.progressPoint.locZ) >= 64) {
-        travel.progressPoint = point;
-        travel.progressAt = now;
-    }
+    // Only the active final walk owns this clock. Reject one access option
+    // first; a bad transport landing is not proof that the duty point is bad.
+    if (result.status === 'moving' && result.legType === 'walk') {
+        if (travel.progressAt === null || now - Number(travel.lastTickAt || now) > 5000
+            || Math.hypot(point.locX - travel.progressPoint.locX, point.locY - travel.progressPoint.locY) >= 96
+            || Math.abs(point.locZ - travel.progressPoint.locZ) >= 64) {
+            travel.progressPoint = point;
+            travel.progressAt = now;
+        }
+        if (now - travel.progressAt >= GATHER_STALL_MS) {
+            result = Journey.rejectFinalAccess(session);
+            travel.progressAt = null;
+        }
+    } else travel.progressAt = null;
     travel.lastTickAt = now;
-    status(session, 'traveling_to_assigned_area');
-    const navigation = Navigation.move(session, bot, destination.point, 'vassal_gather', {
-        targetActor: null, arrivalRadius: GATHER_ARRIVAL_RADIUS
-    });
-    if (navigation.status !== 'exhausted' && now - travel.progressAt < GATHER_STALL_MS) return;
+    if (result.status !== 'blocked' || result.scope !== 'final_access') return;
+    Journey.cancel(session, 'gather_access_exhausted');
     blockGatherPoint(run, area, destination.point, now + GATHER_ROUTE_RETRY_MS);
     run.zoneIndex = (destination.zoneIndex + 1) % area.zones.length;
     bot.automation.abortAll(bot);
@@ -548,7 +610,7 @@ function gatherTick(session, row, run, Generics, BotAI) {
         }
     }
     if (!session.currentTargetId && (run.gatherTravel || !Areas.contains(area, bot))) {
-        travelToGatherPoint(session, area, run);
+        travelToGatherPoint(session, row, area, run);
         return;
     }
     session.plan = 'hunting';
@@ -571,7 +633,7 @@ function noTarget(session) {
     run.zoneIndex = ((currentZoneIndex >= 0 ? currentZoneIndex : Number(run.zoneIndex ?? session.actor.fetchId()))
         + 1) % area.zones.length;
     run.gatherTravel = { avoidZoneIndex: currentZoneIndex };
-    travelToGatherPoint(session, area, run);
+    travelToGatherPoint(session, row, area, run);
 }
 function farmWatchdog(session, row, run, paused) {
     if (row.order !== 'gather' || row.gatherResumePending) return false;
@@ -626,6 +688,7 @@ function farmWatchdog(session, row, run, paused) {
         status(session, 'farm_recovery_exhausted_new_order_required');
         return true;
     }
+    pauseJourney(session, 'farm_recovery');
     bot.attack.abortCast(session, bot);
     bot.attack.clearTimers();
     bot.automation.abortAll(bot);
@@ -667,6 +730,7 @@ function farmWatchdog(session, row, run, paused) {
     return true;
 }
 function died(session) {
+    Journey.cancel(session, 'death');
     if (session.vassalRest) { session.vassalRest.remaining = SAFE_REST_MS; session.vassalRest.at = null; }
     session.vassalRun = null;
 }
@@ -684,8 +748,10 @@ function enforceClan(session) {
 }
 function tick(session, Generics, BotAI) {
     const bot = session.actor, row = rowFor(session);
-    if (!row || session.vassalAdmission || session.vassalOperation) return;
+    if (session.pendingActorTeleport) { pauseClocks(session); return; }
+    if (!row || session.vassalAdmission || session.vassalOperation) { pauseJourney(session, 'operation'); return; }
     if (session.vassalReceipt) {
+        pauseJourney(session, 'inventory_publication');
         const receipt = session.vassalReceipt;
         acceptInventory(session, receipt.bot, receipt.result);
         return;
@@ -708,19 +774,20 @@ function tick(session, Generics, BotAI) {
             : row.order === 'return' ? 'town' : 'service' };
     }
     const run = session.vassalRun;
+    if (Travel.hasCombatThreat(session, bot) || session.plan === 'fleeing'
+        || session.activeTrade || session.trade || session.activeNegotiation) pauseJourney(session, 'combat_or_trade');
     const defending = invoke('GameServer/Bot/AI/BotPvpDefense').tick(session, bot, Generics, BotAI);
     const incoming = invoke('GameServer/Bot/AI/PartyAwareness').npcThreateningActor(session);
     const busy = defending || incoming || bot.state.fetchHits?.() || session.plan === 'fleeing'
         || session.activeTrade || session.trade || session.activeNegotiation;
     try {
-        if (eligible(session, row) && farmWatchdog(session, row, run, !!busy)) return;
+        if (eligible(session, row) && farmWatchdog(session, row, run, !!busy || transportWaiting(session))) return;
     } catch (error) {
-        status(session, error.message);
-        session.vassalBlockedUntil = Date.now() + 30000;
-        utils.infoWarn('Vassal', 'duty blocked for %s: %s', bot.fetchName(), error.message);
+        dutyError(session, bot, error);
         return;
     }
     if (defending || incoming || bot.state.fetchHits?.() || (session.plan === 'fleeing')) {
+        pauseJourney(session, 'combat');
         if (session.vassalRest) session.vassalRest.at = null;
         seated(session, false);
         if (!defending) {
@@ -733,20 +800,33 @@ function tick(session, Generics, BotAI) {
         return;
     }
     if (session.activeTrade || session.trade || session.activeNegotiation) {
+        pauseJourney(session, 'trade');
         if (session.vassalRest) session.vassalRest.at = null;
         status(session, 'owner_trade');
         return;
     }
-    if (Date.now() < Number(session.vassalBlockedUntil || 0)) return;
+    if (Date.now() < Number(session.vassalBlockedUntil || 0)) { pauseJourney(session, 'duty_backoff'); return; }
     if (enforceClan(session)) {
-        if (!session.vassalOperation && move(session, Access.loc, 100)) seated(session, false);
+        if (session.vassalOperation || session.vassalRun !== run) return;
+        try { serviceReturn(session, row, run, 'clan_return'); }
+        catch (error) { dutyError(session, bot, error); }
+        return;
+    }
+    if (session.journey?.flight?.phase === 'casting') {
+        pauseClocks(session);
+        try { Journey.tick(session); }
+        catch (error) { dutyError(session, bot, error); }
         return;
     }
     if (row.order === 'gather' && row.gatherResumePending) { graceTick(session, row); return; }
+    if (session.pendingSweeps?.size) {
+        pauseJourney(session, 'corpse_processing');
+        if (invoke('GameServer/Bot/AI/PendingSweep').tick(session, bot, Generics, BotAI)) return;
+    }
     if (run.phase !== 'gather') {
         // A supply trip must finish the defensive encounter, including corpse work,
         // before travel/contact checks can stop treating the selected target as combat.
-        if (invoke('GameServer/Bot/AI/PendingSweep').tick(session, bot, Generics, BotAI)) return;
+        if (session.currentTargetId) pauseJourney(session, 'target_processing');
         if (session.currentTargetId) {
             invoke('GameServer/Bot/AI/States/HuntingState').tickTarget(session, bot, Generics, BotAI, { allowRetarget: false });
             return;
@@ -757,9 +837,10 @@ function tick(session, Generics, BotAI) {
     invoke('GameServer/Bot/AI/BotEquipmentUpgrade').applyBestUpgrades(session);
     const Party = invoke('GameServer/Bot/AI/PartyCompanionService');
     Party.reconcileGroundLoot(session);
+    if (session.partyGroundPickupQueue?.length || session.partyGroundPickupInProgress) pauseJourney(session, 'ground_pickup');
     if (Party.startQueuedGroundPickup(session)) return;
     try {
-        if (['town', 'supplies', 'warehouse', 'done'].includes(run.phase)) townTick(session, row, run, BotAI);
+        if (['town', 'supplies', 'warehouse', 'done'].includes(run.phase)) townTick(session, row, run);
         else if (run.phase === 'gather') gatherTick(session, row, run, Generics, BotAI);
         else if (run.phase === 'shortage') {
             if (!requiredSupplyMissing(bot)) { run.phase = 'gather'; return; }
@@ -768,20 +849,24 @@ function tick(session, Generics, BotAI) {
                 return;
             }
             status(session, 'required_supplies_unaffordable');
-            move(session, Access.loc, 100);
+            serviceReturn(session, row, run, 'shortage');
         } else {
             status(session, 'returning_to_castellan');
-            if (move(session, Access.loc, 100)) {
+            if (serviceReturn(session, row, run)) {
                 status(session, 'waiting_at_castellan');
                 if (row.order === 'return') operation(session, () => Registry.replaceNonGatherOrder(row.ownerCharacterId,
                     row.characterId, row.orderRevision, 'service'));
             }
         }
     } catch (error) {
-        status(session, error.message);
-        session.vassalBlockedUntil = Date.now() + 30000;
-        utils.infoWarn('Vassal', 'duty blocked for %s: %s', bot.fetchName(), error.message);
+        dutyError(session, bot, error);
     }
+}
+function dutyError(session, bot, error) {
+    pauseJourney(session, 'duty_error');
+    status(session, error.message);
+    session.vassalBlockedUntil = Date.now() + 30000;
+    utils.infoWarn('Vassal', 'duty blocked for %s: %s', bot.fetchName(), error.message);
 }
 function useSupplies(session, { speed = true } = {}) {
     const bot = session.actor;
@@ -807,6 +892,7 @@ function useSupplies(session, { speed = true } = {}) {
             // Service/rest ticks must not drain speed stock while standing still.
             if (!session.partyCompanion && session.vassalRun?.phase === 'service') continue;
         }
+        if (!session.partyCompanion) pauseJourney(session, 'supply_use');
         bot.backpack.useItem(session, item.fetchId());
         return true;
     }

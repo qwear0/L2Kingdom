@@ -17,6 +17,29 @@ const BotTargetScorer = invoke('GameServer/Bot/AI/BotTargetScorer');
 const BotRaidSafety = invoke('GameServer/Bot/AI/BotRaidSafety');
 const NpcObjectIndex = require('../../World/NpcObjectIndex');
 
+function journeySummary(session) {
+    const state = session.journey;
+    if (!state || state.actor !== session.actor) return null;
+    const legs = state.itinerary?.legs || [], leg = legs[state.index];
+    const goal = session.vassalRun?.journeyGoal;
+    let hop = 0, hops = 0;
+    for (let index = 0; index < legs.length; index++) {
+        if (legs[index].type !== 'gatekeeper') continue;
+        hops++;
+        if (index <= state.index) hop++;
+    }
+    return {
+        destination: { ...state.request.to, label: goal?.key === state.key ? goal.label : null },
+        status: state.status, reason: state.reason || null, scope: state.scope || null,
+        mode: state.itinerary?.mode || null, leg: leg?.type || null,
+        gatekeeper: leg?.type === 'gatekeeper' ? { npcId: leg.npcId,
+            name: leg.source.name, destinationId: leg.destinationId, label: leg.label } : null,
+        hop, hops, plannedFare: state.plannedFare, paidFare: state.paidFare,
+        paymentUncertain: state.paymentUncertain === true,
+        retryAt: Number.isFinite(state.retryAt) ? state.retryAt : null
+    };
+}
+
 function ratio(value, max) {
     if (!max) return 0;
     return Math.max(0, Math.min(1, value / max));
@@ -386,6 +409,7 @@ const BotStatus = {
                 followHeldAt: session.lastFollowMoveHeldAt || null,
                 townRoute: session.townRoutePlan || null,
                 pathfinding: session.lastPathfinding || null,
+                journey: journeySummary(session),
                 farmRecovery: session.vassalRun?.watchdog ? {
                     state: session.vassalRun.watchdog.state,
                     stalledMs: session.vassalRun.watchdog.stalledMs,
