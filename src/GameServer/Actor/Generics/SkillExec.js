@@ -75,7 +75,7 @@ function skillExec(session, actor, data) {
         actor.automation.scheduleAction(session, actor, npc, skill.fetchDistance(), () => {
             if (!current()) return;
             if (SpoilSweep.isSpoilSkill(data.selfId)) {
-                SpoilSweep.castSpoil(session, actor, npc, skill);
+                SpoilSweep.castSpoil(session, actor, npc, skill, owner);
                 return;
             }
 
@@ -84,12 +84,12 @@ function skillExec(session, actor, data) {
                 const nearby = radius > 0
                     ? actor.attack.fetchSkillTargetsInRadius(actor, npc.fetchLocX(), npc.fetchLocY(), radius)
                     : [];
-                SpoilSweep.castSpoilTargets(session, actor, [npc, ...nearby], skill);
+                SpoilSweep.castSpoilTargets(session, actor, [npc, ...nearby], skill, owner);
                 return;
             }
 
             if (SpoilSweep.isSweepSkill(data.selfId)) {
-                SpoilSweep.castSweep(session, actor, npc, skill);
+                SpoilSweep.castSweep(session, actor, npc, skill, owner);
                 return;
             }
 

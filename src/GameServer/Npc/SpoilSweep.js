@@ -74,8 +74,9 @@ function spendSkillMp(session, actor, skill) {
     return true;
 }
 
-function castUtilitySkill(session, actor, target, skill, effect, offensiveTargets = null) {
-    const autoFight = offensiveTargets && invoke('GameServer/Actor/PlayerAutoFightPolicy').forAction(session, actor);
+function castUtilitySkill(session, actor, target, skill, effect, offensiveTargets = null, actionOwner = null) {
+    if (!invoke('GameServer/Actor/PlayerActionOwner').current(session, actor, actionOwner)) return;
+    const autoFight = offensiveTargets && invoke('GameServer/Actor/PlayerAutoFightPolicy').forAction(session, actor, actionOwner);
     if (autoFight && !autoFight.canInitiate(offensiveTargets, actor)) return;
     if (actor.state.fetchCasts()) {
         session.dataSendToMe(ServerResponse.actionFailed());
@@ -87,19 +88,17 @@ function castUtilitySkill(session, actor, target, skill, effect, offensiveTarget
         return;
     }
 
+    // Utility casts bypass Attack.remoteHit. Admit/register offensive recipients
+    // before entering casting state; Sweep needs tracking, not a live-target claim.
+    const cast = autoFight || actionOwner ? { target, skill, autoFightTargets: offensiveTargets || [] } : null;
+    if (autoFight) autoFight.acceptTargets(offensiveTargets);
+
     skill.setCalculatedHitTime(skill.fetchHitTime());
     session.dataSendToMeAndOthers(ServerResponse.skillStarted(actor, target.fetchId(), skill), actor);
     session.dataSendToMe(ServerResponse.skillDurationBar(skill.fetchCalculatedHitTime()));
     actor.state.setCasts(true);
     HotPartyCastTracker.begin(session, actor, target, skill);
-    // Utility casts bypass Attack.remoteHit. Track their accepted recipients
-    // too, so recovery cannot overlook a companion's in-flight Spoil Festival.
-    const actionOwner = actor.playerAutoFight?.run?.owner;
-    const cast = autoFight || actionOwner ? { target, skill, autoFightTargets: offensiveTargets || [] } : null;
-    if (cast) {
-        actor.attack.activeCast = cast;
-        autoFight.acceptTargets(offensiveTargets);
-    }
+    if (cast) actor.attack.activeCast = cast;
 
     actor.attack.queueTimer(() => {
         if (cast && actor.attack.activeCast !== cast) return;
@@ -200,11 +199,11 @@ const SpoilSweep = {
         return this.isSweepable(npc) ? Math.max(corpseTime, SPOILED_CORPSE_TIME) : corpseTime;
     },
 
-    castSpoil(session, actor, npc, skill) {
-        this.castSpoilTargets(session, actor, [npc], skill);
+    castSpoil(session, actor, npc, skill, actionOwner = null) {
+        this.castSpoilTargets(session, actor, [npc], skill, actionOwner);
     },
 
-    castSpoilTargets(session, actor, targets, skill) {
+    castSpoilTargets(session, actor, targets, skill, actionOwner = null) {
         const eligible = [...new Map((targets || []).filter(Boolean)
             .map((npc) => [npc.fetchId?.(), npc]))].map(([, npc]) => npc)
             .filter((npc) => npc.fetchAttackable?.() && !npc.isDead?.() && hasSpoils(npc) && !npc.model?.spoil?.spoiled);
@@ -234,10 +233,10 @@ const SpoilSweep = {
                 .catch(error => utils.infoWarn('Quest', 'skill callback failed: %s', error.message));
             if (invoke('GameServer/Bot/Population/PopulationConfig').developerDiagnostics === true) console.info('SpoilSweep :: %s spoiled %d of %d targets with %s', actor.fetchName(), landed, spoiled.length, skill.fetchName());
             if (landed > 0) ConsoleText.transmit(session, ConsoleText.caption.spoilActivated);
-        }, eligible);
+        }, eligible, actionOwner);
     },
 
-    castSweep(session, actor, npc, skill) {
+    castSweep(session, actor, npc, skill, actionOwner = null) {
         // A hot bot may finish its queued approach after the corpse decayed.
         const expiredBotCorpse = () => String(session?.accountId || '').startsWith('bot_')
             && (npc.corpseDecayState === 'removed'
@@ -286,7 +285,7 @@ const SpoilSweep = {
             const World = invoke('GameServer/World/World');
             NpcObjectIndex.remove(World, npc);
             World.npc.spawns = World.npc.spawns.filter((ob) => ob.fetchId() !== npc.fetchId());
-        });
+        }, null, actionOwner);
     }
 };
 
