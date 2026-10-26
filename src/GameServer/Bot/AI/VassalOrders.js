@@ -224,10 +224,25 @@ function townTick(session, row, run, BotAI) {
         const transfers = cargo(session);
         if (!transfers.length) run.phase = 'done';
         else {
-            const target = Catalog.targetFor(Catalog.ROLES.WAREHOUSE, 'Gludio', {
-                from: Areas.pointOf(bot), excludedNpcSelfIds: [Access.npcId]
-            });
-            if (!target) throw Error('vassal_warehouse_missing');
+            const npcs = invoke('GameServer/World/World').npc.spawns;
+            const available = target => target?.actorId && npcs.some(npc =>
+                Number(npc.fetchId()) === Number(target.actorId)
+                && Number(npc.fetchSelfId()) === Number(target.npcSelfId) && !npc.isDead()
+                && Math.hypot(npc.fetchLocX() - target.locX, npc.fetchLocY() - target.locY) <= 32
+                && Math.abs(npc.fetchLocZ() - target.locZ) <= 64);
+            // Facing warehouse counters can make the other NPC closer during approach.
+            // Keep one target for the visit so proximity changes cannot reset staging.
+            let target = run.warehouseTarget;
+            if (!available(target)) {
+                Approach.reset(session);
+                delete run.warehouseTarget;
+                target = Catalog.candidates(Catalog.ROLES.WAREHOUSE, 'Gludio', {
+                    from: Areas.pointOf(bot), excludedNpcSelfIds: [Access.npcId]
+                }).map(candidate => Catalog.targetFromRow(candidate, Catalog.ROLES.WAREHOUSE, { worldSpawns: npcs }))
+                    .find(available);
+                if (!target) throw Error('vassal_warehouse_missing');
+                run.warehouseTarget = target;
+            }
             status(session, 'depositing_clan_cargo');
             if (!approach(session, target)) return;
             operation(session, async () => {
@@ -245,6 +260,7 @@ function townTick(session, row, run, BotAI) {
         }
     }
     if (run.phase === 'done') {
+        delete run.warehouseTarget;
         session.vassalNextRestockAt = Date.now() + TOWN_RETRY_MS;
         Approach.reset(session);
         if (row.order === 'gather') {
