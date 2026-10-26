@@ -189,8 +189,11 @@ function startPathMovement({ session, actor, path, isClose, moveGoal }) {
 
         if (moveGoal) moveGoal.waypoint = { ...nextLoc };
         const segmentCoords = { from: currentLoc, to: nextLoc };
-        const movePacket = ServerResponse.moveToLocation(actor.fetchId(), segmentCoords);
-        session.dataSendToMeAndOthers(movePacket, actor);
+        if (session.botSession === true && typeof session.dataSendToOthersLazy === 'function') {
+            session.dataSendToOthersLazy(() => ServerResponse.moveToLocation(actor.fetchId(), segmentCoords), actor);
+        } else {
+            session.dataSendToMeAndOthers(ServerResponse.moveToLocation(actor.fetchId(), segmentCoords), actor);
+        }
 
         const speed = actor.fetchCollectiveRunSpd() || 120;
         const duration = Math.max(1, (distance / speed) * 1000);
@@ -244,9 +247,15 @@ function startPathMovement({ session, actor, path, isClose, moveGoal }) {
                     }
                     if (adjustment?.waitMs) {
                         TownTraffic.update(Number(actor.fetchId()), point);
-                        session.dataSendToMeAndOthers(ServerResponse.stopMove(actor.fetchId(), {
-                            ...point, head: actor.fetchHead?.() || 0
-                        }), actor);
+                        if (session.botSession === true && typeof session.dataSendToOthersLazy === 'function') {
+                            session.dataSendToOthersLazy(() => ServerResponse.stopMove(actor.fetchId(), {
+                                ...point, head: actor.fetchHead?.() || 0
+                            }), actor);
+                        } else {
+                            session.dataSendToMeAndOthers(ServerResponse.stopMove(actor.fetchId(), {
+                                ...point, head: actor.fetchHead?.() || 0
+                            }), actor);
+                        }
                         session.moveTimer = setTimeout(() => moveAlongPath(index), adjustment.waitMs);
                         return;
                     }

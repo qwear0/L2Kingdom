@@ -355,10 +355,12 @@ function refreshAfterEquipment(session, upgrades) {
 
     session.lastEquipmentUpgradeAt = Date.now();
 
-    if (session.dataSendToOthers) {
+    if (session.botSession === true && typeof session.dataSendToOthersLazy === 'function') {
+        session.dataSendToOthersLazy(() => ServerResponse.charInfo(actor), actor);
+    } else if (session.dataSendToOthers) {
         session.dataSendToOthers(ServerResponse.charInfo(actor), actor);
     }
-    if (session.dataSendToMe) {
+    if (session.botSession !== true && session.dataSendToMe) {
         session.dataSendToMe(ServerResponse.itemsList(actor.backpack.fetchItems()));
     }
 

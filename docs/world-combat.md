@@ -23,7 +23,7 @@ Read this before changing spatial publication, native actions or effect timing. 
 2. `Model/Actor.setLocXYZ` batches coordinate publication through `World.updateUserLocation`.
 3. `World/CharacterLocationRuntime.js` binds the shared `CharacterLocationIndex.js` used for spatial lookup.
 4. Actor lifecycle publication and movement are different events. A location update does not recreate the actor or emit all lifecycle-publication events.
-5. `World/ActorVisibility.js` tracks real client recipients, sends appearance/removal and current movement information. `NpcVisibility.js` handles the NPC side.
+5. `World/ActorVisibility.js` tracks real client recipients, sends appearance/removal and current movement information. `NpcVisibility.js` handles the NPC side. Internal bot waypoint/traffic-stop and equipment-appearance broadcasts select recipients before constructing one shared packet body, using `BotSession.dataSendToOthersLazy`; with no recipients, no body/framing or packet trace is built. The eager bot API shares the same visibility/tracking/send path. Authoritative movement and equipment/shot side effects still run; late entrants get current appearance/movement from visibility publication. Self-only equipment `itemsList` is omitted only for internal bot sessions. Human sessions, including server-controlled movement, retain eager self-delivery. No recipient set is cached across sends and no exact skipped-byte count is inferred for unbuilt packets.
 
 Registration/current-actor identity guards prevent an old actor from publishing into a replacement session. Sending packets to “nearby users” must respect current online/visibility state, not an arbitrary persisted or observer actor collection.
 

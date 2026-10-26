@@ -28,6 +28,14 @@ class BotSession {
     }
 
     dataSendToOthers(data, creature) {
+        this.broadcastToOthers(data, creature);
+    }
+
+    dataSendToOthersLazy(createPacket, creature) {
+        this.broadcastToOthers(null, creature, createPacket);
+    }
+
+    broadcastToOthers(data, creature, createPacket = null) {
         if (this.populationStaging) return;
         const visibleUsers = typeof World.fetchVisibleRealPlayers === 'function'
             ? World.fetchVisibleRealPlayers(this, creature)
@@ -43,6 +51,7 @@ class BotSession {
             HotActorLodPolicy.recordPacketBroadcast(0, data?.length || 0);
             return;
         }
+        if (createPacket) data = createPacket();
         const packet = this.packData(data);
         recipients.forEach((user) => {
             if (user.socket && typeof user.socket.write === 'function') {
