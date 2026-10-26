@@ -2,8 +2,8 @@ const Speech = invoke('GameServer/Bot/AI/BotSpeechTemplates');
 const ServerResponse = invoke('GameServer/Network/Response');
 const SpeckMath      = invoke('GameServer/SpeckMath');
 const BotRoles       = invoke('GameServer/Bot/AI/BotRoles');
-const RestPolicy     = invoke('GameServer/Bot/AI/RestPolicy');
 const PartyAwareness = invoke('GameServer/Bot/AI/PartyAwareness');
+const ThreatAssessment = invoke('GameServer/Bot/AI/BotThreatAssessment');
 const PartyCompanionService = invoke('GameServer/Bot/AI/PartyCompanionService');
 const PartyPulling = invoke('GameServer/Bot/AI/PartyPulling');
 const EffectStore    = invoke('GameServer/Effects/EffectStore');
@@ -73,13 +73,6 @@ function maybeCastManaRegeneration(session, bot, Generics) {
     return true;
 }
 
-function needsRecovery(session, bot) {
-    return RestPolicy.needsRest(bot,
-        bot.fetchHp() / Math.max(1, bot.fetchMaxHp()),
-        bot.fetchMp() / Math.max(1, bot.fetchMaxMp()),
-        { locked: !!session.recoveryLocked });
-}
-
 function canRecoverAtNewbieGuide(bot, BotAI) {
     if (Number(bot?.fetchLevel?.() || 0) > NEWBIE_GUIDE_RECOVERY_MAX_LEVEL) return false;
     const guide = BotAI.getClosestNewbieGuide?.(bot.fetchLocX(), bot.fetchLocY());
@@ -108,17 +101,26 @@ function beginNewbieGuideRecovery(session, bot, playerSession) {
     bot.automation?.abortAll?.(bot);
 }
 
-function retreatFromThreat(session, bot, threat) {
+function retreatFromThreat(session, bot, threat, reason) {
     standUp(session, bot);
+    bot.attack?.abortCast?.(session, bot);
+    bot.attack?.clearTimers?.();
+    bot.automation?.abortAll?.(bot);
+    bot.state.setHits(false);
+    bot.state.setCasts(false);
     session.plan = 'fleeing';
     session.recoveryLocked = true;
     session.fleeStart = Date.now();
+    session.retreatContext = { at: session.fleeStart, kind: 'npc', reason,
+        threatId: threat.fetchId(), threatName: threat.fetchName?.() || null,
+        hpRatio: bot.fetchHp() / Math.max(1, bot.fetchMaxHp()),
+        mpRatio: bot.fetchMp() / Math.max(1, bot.fetchMaxMp()) };
     session.currentTargetId = undefined;
     session.incomingThreatId = undefined;
     session.incomingThreatAt = undefined;
     bot.unselect?.();
     BotRetreatPlanner.retreat(session, bot, threat, { distance: EMERGENCY_RETREAT_DISTANCE });
-    recordWakeDecision(session, bot, 'retreat', 'critical_resources_under_attack', {
+    recordWakeDecision(session, bot, 'retreat', reason, {
         targetId: threat.fetchId(),
         hpRatio: bot.fetchHp() / Math.max(1, bot.fetchMaxHp()),
         mpRatio: bot.fetchMp() / Math.max(1, bot.fetchMaxMp())
@@ -225,7 +227,7 @@ module.exports = {
         }
 
         if (!session.followPlayerSession && session.partyCompanion !== true) {
-            const threat = PartyAwareness.npcThreateningActor(session);
+            let threat = PartyAwareness.npcThreateningActor(session);
             if (threat) {
                 if (BotRaidSafety.retreat(session, bot, threat, { distance: EMERGENCY_RETREAT_DISTANCE })) {
                     recordWakeDecision(session, bot, 'retreat', 'raid_entity_protected', {
@@ -233,10 +235,15 @@ module.exports = {
                     });
                     return;
                 }
-                if (needsRecovery(session, bot)) {
-                    retreatFromThreat(session, bot, threat);
+                const threats = PartyAwareness.npcsTargetingActor(session);
+                if (!threats.includes(threat)) threats.push(threat);
+                const assessment = ThreatAssessment.evaluate(session, bot, threats, { recovering: true });
+                if (!assessment.canFight) {
+                    retreatFromThreat(session, bot, threat, assessment.reason);
                     return;
                 }
+                threat = threats.find(npc => Number(npc.fetchId()) === assessment.targetId) || threat;
+                session.recoveryLocked = false;
                 session.plan = 'hunting';
                 session.currentTargetId = threat.fetchId();
                 session.townGossip = false;

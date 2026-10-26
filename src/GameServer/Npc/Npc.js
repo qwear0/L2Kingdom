@@ -14,6 +14,8 @@ const EffectStore    = invoke('GameServer/Effects/EffectStore');
 const EffectTicker   = invoke('GameServer/Effects/EffectTicker');
 const EffectRestrictions = invoke('GameServer/Effects/EffectRestrictions');
 const TownGuard = invoke('GameServer/Npc/TownGuard');
+const NpcReturnHome = require('./NpcReturnHome');
+let movementWorld;
 const PathfindingWorkerPool = invoke('GameServer/Geodata/PathfindingWorkerPool');
 const AttackHelper   = new Attack();
 
@@ -63,6 +65,7 @@ class Npc extends NpcModel {
         this.attack = new Attack();
 
         this.setId(id);
+        this.spawnOrigin = { locX: this.fetchLocX(), locY: this.fetchLocY(), locZ: this.fetchLocZ() };
         this.fillupVitals();
 
         // User preferences
@@ -86,6 +89,7 @@ class Npc extends NpcModel {
     }
 
     destructor(session) {
+        NpcReturnHome.cancel(this);
         clearInterval(this.timer.babyHeal);
         clearInterval(this.timer.followOwner);
         this.timer.followOwner = undefined;
@@ -101,6 +105,18 @@ class Npc extends NpcModel {
         // not leave effect timers that later refresh a removed NPC.
         EffectTicker.clearAll(this);
         this.abortCombatState(session);
+    }
+
+    setLocXYZ(coords) {
+        super.setLocXYZ(coords);
+        // Keep only already published NPCs indexed. Late movement cleanup
+        // must not reinsert a despawned actor into the live world.
+        if (!movementWorld?.npc) movementWorld = invoke('GameServer/World/World');
+        movementWorld.updateNpcPosition?.(this);
+    }
+
+    fetchAttackable() {
+        return !this.returningHome && super.fetchAttackable();
     }
 
     showLevelTitle() {
@@ -142,7 +158,7 @@ class Npc extends NpcModel {
     canEngageCombat() {
         // Lisvus gives ordinary L2NpcInstance/L2FolkInstance no retaliatory
         // AI. Guards inherit L2Attackable; owned summons have their own AI.
-        return this.fetchAttackable() || TownGuard.isTownGuard(this) || this.fetchIsSummon();
+        return !this.returningHome && (this.fetchAttackable() || TownGuard.isTownGuard(this) || this.fetchIsSummon());
     }
 
     ensureAggroEntry(actor) {
@@ -335,9 +351,13 @@ class Npc extends NpcModel {
             let activeTarget = initialTarget;
 
             this.timer.combat = setInterval(() => {
+                if (NpcReturnHome.outsideLeash(this)) {
+                    NpcReturnHome.start(this, session, 'spawn_leash');
+                    return;
+                }
                 const actor = this.fetchCombatTarget();
                 if (!actor) {
-                    this.abortCombatState(session);
+                    if (!NpcReturnHome.start(this, session, 'target_lost')) this.abortCombatState(session);
                     return;
                 }
 
@@ -355,12 +375,14 @@ class Npc extends NpcModel {
                 // combat here pins its target to the corpse indefinitely and
                 // makes party resurrection believe the fight never ended.
                 if (actor?.isDead?.() || actor?.state?.fetchDead?.() || actor?.fakeDeath) {
-                    this.abortCombatState(session);
+                    if (!NpcReturnHome.start(this, session, 'target_lost')) this.abortCombatState(session);
                     return;
                 }
 
                 if (new SpeckMath.Point(this.fetchLocX(), this.fetchLocY()).distance(new SpeckMath.Point(actor.fetchLocX(), actor.fetchLocY())) >= 1500) {
-                    this.abortCombatState(session, { preserveAggro: true }); // Actor is out of reach
+                    if (!NpcReturnHome.start(this, session, 'target_out_of_reach')) {
+                        this.abortCombatState(session, { preserveAggro: true });
+                    }
                     return;
                 }
 
@@ -456,7 +478,9 @@ class Npc extends NpcModel {
                                         );
                                         nextPathRetryAt = Date.now() + retryDelay;
                                         if (Date.now() - pathFailureStartedAt >= NPC_PATH_FAILURE_TIMEOUT_MS) {
-                                            this.abortCombatState(session, { preserveAggro: true });
+                                            if (!NpcReturnHome.start(this, session, 'target_unreachable')) {
+                                                this.abortCombatState(session, { preserveAggro: true });
+                                            }
                                         }
                                         return;
                                     }

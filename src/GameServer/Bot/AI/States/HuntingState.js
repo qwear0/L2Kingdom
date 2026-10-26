@@ -10,6 +10,7 @@ const Karma          = invoke('GameServer/Karma');
 const DecisionService = invoke('GameServer/Bot/AI/BotDecisionService');
 const BotBuffs       = invoke('GameServer/Bot/AI/BotBuffs');
 const PartyAwareness = invoke('GameServer/Bot/AI/PartyAwareness');
+const ThreatAssessment = invoke('GameServer/Bot/AI/BotThreatAssessment');
 const BotTargetScorer = invoke('GameServer/Bot/AI/BotTargetScorer');
 const TargetMatchup = invoke('GameServer/Bot/AI/BotTargetMatchup');
 const EncounterReadiness = invoke('GameServer/Bot/AI/BotEncounterReadiness');
@@ -555,15 +556,27 @@ function needsEmergencyRetreat(bot) {
         bot.fetchMp() / Math.max(1, bot.fetchMaxMp()));
 }
 
-function retreatFromThreat(session, bot, threat) {
+function retreatFromThreat(session, bot, threat, reason = 'critical_resources', assessment = null) {
     if (bot.state.fetchSeated()) {
         bot.state.setSeated(false);
         session.dataSendToOthers(ServerResponse.sitAndStand(bot), bot);
     }
     clearTarget(session, bot, session.currentTargetId);
+    bot.attack?.abortCast?.(session, bot);
+    bot.attack?.clearTimers?.();
+    bot.automation?.abortAll?.(bot);
+    bot.state.setHits(false);
+    bot.state.setCasts(false);
     session.plan = 'fleeing';
     session.recoveryLocked = true;
     session.fleeStart = Date.now();
+    session.lastRetreatAssessment = assessment ? { ...assessment, at: session.fleeStart } : null;
+    session.lastRetreatEvaluationAt = undefined;
+    session.retreatPursuerIds = undefined;
+    session.retreatContext = { at: session.fleeStart, kind: 'npc', reason,
+        threatId: threat.fetchId(), threatName: threat.fetchName?.() || null,
+        hpRatio: bot.fetchHp() / Math.max(1, bot.fetchMaxHp()),
+        mpRatio: bot.fetchMp() / Math.max(1, bot.fetchMaxMp()) };
     session.incomingThreatId = undefined;
     session.incomingThreatAt = undefined;
     BotRetreatPlanner.retreat(session, bot, threat, { distance: EMERGENCY_RETREAT_DISTANCE });
@@ -623,6 +636,10 @@ function tickTarget(session, bot, Generics, BotAI, { allowRetarget = true } = {}
                     targetId,
                     at: Date.now()
                 };
+            } else if (!npc.isDead() && npc.fetchAttackable?.() !== true) {
+                bot.automation.abortAll(bot);
+                bot.attack?.clearTimers?.();
+                clearTarget(session, bot, targetId);
             } else if (npc.isDead()) {
                 const corpseSkill = SummonerTactics.corpseSummonSkill(bot, npc);
                 if (corpseSkill) {
@@ -878,7 +895,7 @@ module.exports = {
 
         // 3. Immediate self-defense outranks recovery. Sitting while a mob is
         // actively hitting the bot only turns the recovery state into a death loop.
-        const incomingMonster = isSoloHunter(session)
+        let incomingMonster = isSoloHunter(session)
             ? PartyAwareness.npcThreateningActor(session)
             : PartyAwareness.recentIncomingNpc(session);
         if (incomingMonster) {
@@ -895,12 +912,18 @@ module.exports = {
                     equipment: equippedItems(bot)
                 })
                 : { allowed: true };
-            if (!groundSafety.allowed || needsEmergencyRetreat(bot)) {
+            const threats = PartyAwareness.npcsTargetingActor(session);
+            if (!threats.includes(incomingMonster)) threats.push(incomingMonster);
+            const assessment = groundSafety.allowed && isSoloHunter(session)
+                ? ThreatAssessment.evaluate(session, bot, threats) : null;
+            if (!groundSafety.allowed || needsEmergencyRetreat(bot) || assessment?.canFight === false) {
                 if (groundSafety.allowed && isSoloHunter(session) &&
                     BotEmergencyFinisher.tryFinish(session, bot, incomingMonster, Generics, BotAI)) return;
-                retreatFromThreat(session, bot, incomingMonster);
+                retreatFromThreat(session, bot, incomingMonster, !groundSafety.allowed ? 'unsafe_hunting_ground'
+                    : assessment?.reason || 'critical_resources', assessment);
                 return;
             }
+            incomingMonster = threats.find(npc => Number(npc.fetchId()) === assessment?.targetId) || incomingMonster;
             assignTarget(session, bot, incomingMonster);
             if (bot.state.fetchSeated()) {
                 bot.state.setSeated(false);

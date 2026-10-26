@@ -126,7 +126,7 @@ function prune(actor) {
 }
 
 function apply(actor, effect) {
-    if (!actor) return null;
+    if (!actor || actor.returningHome) return null;
     const normalized = normalize(effect);
     if (!normalized.key || !normalized.id) return null;
     const store = prune(actor);

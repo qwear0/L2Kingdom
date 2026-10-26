@@ -554,6 +554,7 @@ class Attack {
     }
 
     applyRemoteCastEffect(session, actor, target, skill, { corpseAreaCast, raidParty, shotState, magicSkill, selfEffectOnly, castWeapon }) {
+        if (target.returningHome) return;
         if ((skill.fetchTargetKind?.() === 'enemy' || corpseAreaCast)
             && !invoke('GameServer/Clan/ClanRaidRoster').beforeOffensiveEffect(session, actor, target, raidParty)) return;
         if (skill.fetchTargetKind?.() === 'enemy') invoke('GameServer/Bot/AI/BotMobCompetition').record(actor, target);
@@ -1453,6 +1454,7 @@ class Attack {
     }
 
     hit(session, actor, creature, hit, context = {}) {
+        if (creature.returningHome) return;
         ConsoleText.transmit(session, ConsoleText.caption.actorHit, [{ kind: ConsoleText.kind.number, value: hit }]);
         this.tryBreakCast(creature, hit);
 

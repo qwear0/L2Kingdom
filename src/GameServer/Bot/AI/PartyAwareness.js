@@ -111,6 +111,16 @@ function recentIncomingNpc(session, npcRadius = 2500) {
     return npc;
 }
 
+function npcsTargetingActor(session, npcRadius = NPC_THREAT_RADIUS) {
+    const actor = session?.actor;
+    if (!actor) return [];
+    const id = Number(actorId(actor));
+    return (world().fetchNpcsInRadius?.(actor.fetchLocX(), actor.fetchLocY(), npcRadius) || [])
+        .filter(npc => npc.fetchAttackable?.() === true && npc.isDead?.() !== true
+            && npc.state?.fetchDead?.() !== true && npc.state?.fetchCombats?.() !== false
+            && Number(npc.fetchDestId?.()) === id);
+}
+
 function npcThreateningActor(session, npcRadius = 2500) {
     const actor = session?.actor;
     if (!actor) return null;
@@ -390,6 +400,7 @@ module.exports = {
     isPartySession,
     leaderCombatTargetId,
     npcThreateningActor,
+    npcsTargetingActor,
     partyActors,
     partySessions,
     recentIncomingNpc,

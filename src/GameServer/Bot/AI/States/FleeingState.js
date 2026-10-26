@@ -1,12 +1,13 @@
 const PartyAwareness = invoke('GameServer/Bot/AI/PartyAwareness');
 const BotRetreatPlanner = invoke('GameServer/Bot/AI/BotRetreatPlanner');
 const RestPolicy = invoke('GameServer/Bot/AI/RestPolicy');
+const ThreatAssessment = invoke('GameServer/Bot/AI/BotThreatAssessment');
 const NpcObjectIndex = require('../../../World/NpcObjectIndex');
 
 const MIN_RETREAT_MS = 1000;
 const RETREAT_REPATH_COOLDOWN_MS = 750;
-const MAX_RETREAT_MS = 30000;
-const NPC_CHASE_BREAK_DISTANCE = 1500;
+const MAX_RETREAT_LEG_MS = 30000;
+const REASSESS_MS = 1000;
 const RAID_PARTY_HOLD_DISTANCE = 1800;
 
 function stillMoving(session, bot) {
@@ -21,31 +22,50 @@ function needsRecovery(session, bot) {
 }
 
 function distance2d(first, second) {
-    const dx = first.fetchLocX() - second.fetchLocX();
-    const dy = first.fetchLocY() - second.fetchLocY();
-    return Math.sqrt((dx * dx) + (dy * dy));
+    return Math.hypot(first.fetchLocX() - second.fetchLocX(), first.fetchLocY() - second.fetchLocY());
 }
 
-function activePursuer(session, bot) {
-    const threatId = session.lastRetreatPlan?.threatId;
-    if (threatId === null || threatId === undefined) return null;
-
-    const World = invoke('GameServer/World/World');
-    const npc = NpcObjectIndex.find(World, Number(threatId));
-    if (!npc || npc.fetchAttackable?.() !== true || npc.isDead?.() || npc.state?.fetchDead?.()) return null;
-    if (Number(npc.fetchDestId?.()) !== Number(bot.fetchId())) return null;
-    return distance2d(npc, bot) < NPC_CHASE_BREAK_DISTANCE ? npc : null;
+function finishRetreat(session, bot, now, reason, target = null) {
+    bot.attack?.abortCast?.(session, bot);
+    bot.attack?.clearTimers?.();
+    bot.automation?.abortAll?.(bot);
+    bot.state?.setHits?.(false);
+    bot.state?.setCasts?.(false);
+    const following = session.raidSafetyResumePlan === 'following' && session.partyCompanion === true
+        && session.followPlayerSession;
+    const recovery = !target && (needsRecovery(session, bot) || session.raidSafetyResumePlan === 'resting');
+    if (!recovery) session.recoveryLocked = false;
+    session.plan = following ? 'following' : recovery ? 'resting' : 'hunting';
+    session.currentTargetId = target?.fetchId();
+    if (target) bot.select({ id: target.fetchId() });
+    else bot.unselect?.();
+    session.retreatContext.endedAt = now;
+    session.retreatContext.endedReason = reason;
+    session.raidSafetyResumePlan = undefined;
+    session.fleeStart = undefined;
+    session.lastRetreatRepathAt = undefined;
+    session.lastRetreatEvaluationAt = undefined;
+    session.retreatPursuerIds = undefined;
+    session.incomingThreatId = undefined;
+    session.incomingThreatAt = undefined;
 }
 
 module.exports = {
     tick(session, bot, Generics, BotAI) {
         if (session.followPlayerSession?.partyRaidEngagement?.phase === 'retreat'
             && invoke('GameServer/Bot/AI/PlayerPartyRaid').tick(session, bot, Generics, BotAI)) return;
-        if (!session.fleeStart) {
-            session.fleeStart = Date.now();
-        }
-
         const now = Date.now();
+        if (!session.fleeStart) session.fleeStart = now;
+        if (session.retreatContext?.at !== session.fleeStart) {
+            const npc = NpcObjectIndex.find(invoke('GameServer/World/World'), session.lastRetreatPlan?.threatId);
+            session.retreatContext = { at: session.fleeStart, kind: npc ? 'npc' : 'player',
+                reason: session.raidSafetyResumePlan ? 'raid_entity_protected' : 'escape_threat',
+                threatId: session.lastRetreatPlan?.threatId || null,
+                threatName: session.lastRetreatPlan?.threatName || null,
+                hpRatio: bot.fetchHp() / Math.max(1, bot.fetchMaxHp()),
+                mpRatio: bot.fetchMp() / Math.max(1, bot.fetchMaxMp()) };
+            session.lastRetreatAssessment = null;
+        }
         const moving = stillMoving(session, bot);
         const partyRaidThreat = session.raidSafetyResumePlan === 'following' && session.followPlayerSession
             ? PartyAwareness.findThreatTargetingPartyProjected(session.followPlayerSession)
@@ -57,52 +77,44 @@ module.exports = {
                 session.lastRetreatRepathAt = now;
                 BotRetreatPlanner.retreat(session, bot, partyRaidThreat.actor);
             }
-            // A companion must not run back to a leader who is still tanking a
-            // raid entity. Hold outside the danger area until that threat ends.
+            // Never send a companion back to a leader still tanking a raid.
             return;
         }
-        const incomingThreat = PartyAwareness.recentIncomingNpc(session);
-        const retreatThreat = incomingThreat || activePursuer(session, bot);
-        const threatChanged = retreatThreat &&
-            Number(retreatThreat.fetchId()) !== Number(session.lastRetreatPlan?.threatId);
-        const canRepath = now - Number(session.lastRetreatRepathAt || 0) >= RETREAT_REPATH_COOLDOWN_MS;
-        const retreatExpired = now - session.fleeStart >= MAX_RETREAT_MS;
 
-        // A fresh add invalidates the old escape direction immediately. If the
-        // original attacker is still landing hits after a completed leg, keep
-        // opening distance instead of blindly returning to combat. The hard
-        // timeout also replaces a potentially stale movement command, but it
-        // must never end the escape while the NPC still owns this target.
-        if (retreatThreat && canRepath && (!moving || threatChanged || retreatExpired)) {
-            if (retreatExpired) {
-                bot.automation?.abortAll?.(bot);
-                session.fleeStart = now;
+        // Pursuit is a live targeting state, not time since the last hit or
+        // residual hate. A monster returning home no longer owns this escape.
+        const pursuers = PartyAwareness.npcsTargetingActor(session);
+        const ids = pursuers.map(npc => Number(npc.fetchId())).sort((a, b) => a - b).join(',');
+        const groupChanged = session.retreatPursuerIds !== undefined && session.retreatPursuerIds !== ids;
+        session.retreatPursuerIds = ids;
+        const retreatThreat = pursuers.find(npc => Number(npc.fetchId()) === Number(session.lastRetreatPlan?.threatId))
+            || pursuers[0];
+        if (pursuers.length && session.retreatContext.kind === 'npc' && now - session.fleeStart >= MIN_RETREAT_MS
+            && !session.partyCompanion && !session.followPlayerSession && !session.hotBackgroundPartyId
+            && !['unsafe_hunting_ground', 'raid_entity_protected'].includes(session.retreatContext.reason)
+            && now - Number(session.lastRetreatEvaluationAt || 0) >= REASSESS_MS) {
+            session.lastRetreatEvaluationAt = now;
+            const assessment = ThreatAssessment.evaluate(session, bot, pursuers, { recovering: true });
+            if (assessment.canFight) {
+                const target = pursuers.find(npc => Number(npc.fetchId()) === assessment.targetId);
+                finishRetreat(session, bot, now, 'fight_with_reserve', target);
+                return;
             }
-            session.lastRetreatRepathAt = now;
-            BotRetreatPlanner.retreat(session, bot, retreatThreat);
+        }
+        const canRepath = now - Number(session.lastRetreatRepathAt || 0) >= RETREAT_REPATH_COOLDOWN_MS;
+        const legExpired = now - Number(session.lastRetreatPlan?.at || session.fleeStart) >= MAX_RETREAT_LEG_MS;
+        if (retreatThreat) {
+            if (canRepath && (!moving || groupChanged || legExpired)) {
+                if (legExpired) bot.automation?.abortAll?.(bot);
+                session.lastRetreatRepathAt = now;
+                BotRetreatPlanner.retreat(session, bot, retreatThreat, { threats: pursuers });
+            }
             return;
         }
-
-        // Preserve a bounded escape state even if a movement timer or native
-        // motion flag becomes stale. Thirty seconds leaves room for slowed
-        // actors and routed terrain without returning to the old seven-second
-        // mid-run combat reset.
-        if (retreatExpired) {
-            bot.automation?.abortAll?.(bot);
-        } else if (moving || now - session.fleeStart < MIN_RETREAT_MS) {
-            return;
-        }
-
-        const raidSafetyResumePlan = session.raidSafetyResumePlan;
-        const recoveryNeeded = needsRecovery(session, bot);
-        if (!recoveryNeeded && session.recoveryLocked) session.recoveryLocked = false;
-        session.plan = raidSafetyResumePlan === 'following' && session.partyCompanion === true && session.followPlayerSession
-            ? 'following'
-            : (recoveryNeeded || raidSafetyResumePlan === 'resting' ? 'resting' : 'hunting');
-        session.raidSafetyResumePlan = undefined;
-        session.fleeStart = undefined;
-        session.lastRetreatRepathAt = undefined;
-        session.incomingThreatId = undefined;
-        session.incomingThreatAt = undefined;
+        if (now - session.fleeStart < MIN_RETREAT_MS) return;
+        // Preserve the existing player/PK escape leg; only NPC pursuit has
+        // the live targeting projection above.
+        if (session.retreatContext.kind !== 'npc' && moving && !legExpired) return;
+        finishRetreat(session, bot, now, 'pursuit_ended');
     }
 };

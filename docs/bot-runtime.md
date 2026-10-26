@@ -61,6 +61,15 @@ New player/companion targets under that run also pause while `PartyPulling.hasDe
 
 The source-adjacent [class policy](../src/GameServer/Bot/AI/CLASS_POLICY.md) describes consumers and approximations. Engineering preference scores are not historical C4 facts, optimal rotations or gameplay certification.
 
+## NPC escape and defensive reassessment
+
+- `PartyAwareness.npcsTargetingActor` projects live, nearby NPCs currently targeting the actor. Escape continuation uses that state, not time since damage or residual hate; an NPC returning home is no longer a pursuer.
+- `States/FleeingState.js` stops an obsolete escape route when pursuit ends. While a solo bot is pursued, it reassesses combat at most once per second using `BotThreatAssessment.js`: current HP/MP, learned attacks, an already present summon, target resistance/remaining HP and the combined pressure of up to six attackers. Unknown combat stats or a larger group do not justify re-engagement. A recovering bot also passes the existing encounter-readiness gate; protected raids and unsafe hunting grounds are not resumed this way.
+- Hunting/resting self-defense uses the same assessment. The existing emergency-finisher policy may still justify a safe last hit instead of retreat. These are conservative estimates, not predictions of guaranteed combat outcomes.
+- `fleeStart` measures the whole escape episode. The 30-second limit replaces a stale movement leg; it neither resets the episode nor forces combat while a pursuer remains. Player/PK escape legs and party raid holds retain their separate behavior.
+- Bot status exposes the retreat threat name, initial resource ratios/reason, last assessment and episode completion reason under `movement.retreat`, without requiring developer diagnostics.
+- Ordinary static monsters and ordinary group minions have a spawn leash and physical return/reset owned by `Npc/NpcReturnHome.js`; see [world/combat](world-combat.md). No damage-inactivity timeout is used.
+
 ## Retained cold worker contract
 
 Read these only when maintaining that architecture; they are not current vassal execution instructions:

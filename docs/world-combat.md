@@ -55,6 +55,10 @@ The [observer](world-observer.md) builds its own cross-world projections and can
 
 NPCs have their own timer-driven behavior. `World/Generics/RemoveNpc.js` separates corpse decay from reward/respawn handling; respawn timing starts at death, not when the corpse becomes invisible. Do not assume a single tick determines every stage.
 
+`Npc/NpcReturnHome.js` limits ordinary static monsters and ordinary group minions to 2500 horizontal units from their actual spawn point. Leaving that radius, losing the target, breaking the existing 1500-unit target-distance envelope or exhausting the unreachable-target path budget clears combat/hate and starts a physical return through bounded asynchronous pathfinding. Return blocks reacquisition, damage and new effects, clears old effects and resets vitals/reward attribution on arrival, then applies normal spawn aggro grace. A failed home route is warned and retried every five seconds; it does not teleport or pretend arrival. There is no damage-inactivity timer. Raid bosses/minions, guards, summons/pets and dynamic quest NPCs are outside this policy.
+
+`Npc.setLocXYZ` updates the NPC spatial index only when an already published actor changes cells. Late movement cannot republish a removed NPC. Local threat/target queries therefore follow moving NPCs rather than their original spawn sectors. Bot escape and defensive reassessment are described in [bot execution](bot-runtime.md#npc-escape-and-defensive-reassessment).
+
 ## Connected-player auto-fight
 
 - Entrypoint: `.autofight` or `.menu` → `World/Generics/NpcBypasses/PlayerAutoFight.js`. Compact Hunt, Skills and Settings pages use stock HTML/HtmlKit, actor-bound epochs and consumed page revisions; no client patch or native-menu negotiation is required. Skills show paged native icons/names and immediate ON/OFF links, without an Apply step. Closing HTML does not stop a run; reopen it for Stop/status. There is no periodic forced popup.

@@ -327,6 +327,7 @@ function retreat(session, bot, threat, options = {}) {
     const result = plan(bot, threat, planOptions);
     session.lastRetreatPlan = {
         ...result,
+        threatName: threat.fetchName?.() || null,
         from: { ...result.from },
         to: { ...result.to },
         candidates: result.candidates.map((candidate) => ({ ...candidate })),

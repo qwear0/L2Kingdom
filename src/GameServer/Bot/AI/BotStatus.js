@@ -397,6 +397,10 @@ const BotStatus = {
                 pathSummary: (invoke('GameServer/Bot/Population/PopulationConfig').developerDiagnostics === true) ? TownPathfinder.describeDiagnostics(session.lastPathfinding?.townRoute) : null,
                 retreat: session.lastRetreatPlan ? {
                     threatId: session.lastRetreatPlan.threatId,
+                    threatName: session.lastRetreatPlan.threatName || null,
+                    context: session.retreatContext || null,
+                    assessment: session.lastRetreatAssessment || null,
+                    from: session.lastRetreatPlan.from,
                     to: session.lastRetreatPlan.to,
                     selectedAngle: session.lastRetreatPlan.selectedAngle,
                     movesAway: session.lastRetreatPlan.movesAway,

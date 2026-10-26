@@ -1092,6 +1092,12 @@ const World = {
         return true;
     },
 
+    updateNpcPosition(npc) {
+        const previousKey = this.npc?.gridKeys?.get(npc);
+        if (previousKey && previousKey !== this.npcGridKey(npc)
+            && NpcObjectIndex.find(this, npc.fetchId()) === npc) this.addNpcToGrid(npc);
+    },
+
     removeNpcFromGrid(npc) {
         if (!npc) return false;
         NpcObjectIndex.remove(this, npc);

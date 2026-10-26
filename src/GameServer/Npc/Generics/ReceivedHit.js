@@ -1,6 +1,6 @@
 function receivedHit(session, actor, npc, hit, options = {}) {
     if (invoke('GameServer/Effects/EffectStore').hasDebuff(npc, 'petrification')) return;
-    if (npc.state?.fetchDead?.()) return;
+    if (npc.returningHome || npc.state?.fetchDead?.()) return;
     invoke('GameServer/Progression/OverhitReward').capture(npc, actor, {
         skill: options.skill,
         damage: hit,
