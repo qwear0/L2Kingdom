@@ -40,6 +40,7 @@ const { SPOT_CELL_SIZE } = invoke('GameServer/World/WorldConstants');
 
 const TARGET_STALL_TICKS = 5;
 const TARGET_RETRY_COOLDOWN_MS = 15000;
+const VASSAL_TARGET_RETRY_COOLDOWN_MS = 5 * 60 * 1000;
 const TARGET_PROGRESS_DISTANCE = 40;
 const EMERGENCY_RETREAT_DISTANCE = 850;
 const MAX_WALK_SPOT_DISTANCE = SpotService.MAX_WALK_SPOT_DISTANCE;
@@ -529,11 +530,11 @@ function assignTarget(session, bot, target) {
     bot.select({ id: targetId });
 }
 
-function clearTarget(session, bot, targetId, retryCooldown = false) {
+function clearTarget(session, bot, targetId, retryCooldown = false, retryDelayMs = TARGET_RETRY_COOLDOWN_MS) {
     if (session.currentTargetId !== targetId) return false;
     if (retryCooldown) {
         session.targetRetryAfter = session.targetRetryAfter || {};
-        session.targetRetryAfter[targetId] = Date.now() + TARGET_RETRY_COOLDOWN_MS;
+        session.targetRetryAfter[targetId] = Date.now() + retryDelayMs;
     }
     session.currentTargetId = undefined;
     session.targetTrackId = undefined;
@@ -583,7 +584,8 @@ function targetProgressing(session, bot, target) {
     const fighting = bot.state.fetchHits() || bot.state.fetchCasts() || distance <= 180;
     const movedCloser = Number(session.targetLastDistance || Infinity) - distance >= TARGET_PROGRESS_DISTANCE;
     session.targetLastDistance = distance;
-    const shouldMeasureStall = moving || distance > 900;
+    const soloVassal = session.vassal && !session.partyCompanion;
+    const shouldMeasureStall = moving || distance > (soloVassal ? 180 : 900);
     session.targetStallTicks = fighting || movedCloser || !shouldMeasureStall
         ? 0
         : (session.targetStallTicks || 0) + 1;
@@ -650,7 +652,11 @@ function tickTarget(session, bot, Generics, BotAI, { allowRetarget = true } = {}
                     }
                 }
                 if (!targetProgressing(session, bot, npc)) {
-                    clearTarget(session, bot, targetId, true);
+                    // A short retry lets an isolated gatherer repeatedly select
+                    // the same unreachable NPC instead of trying its other zones.
+                    const retryMs = session.vassal && !session.partyCompanion
+                        ? VASSAL_TARGET_RETRY_COOLDOWN_MS : TARGET_RETRY_COOLDOWN_MS;
+                    clearTarget(session, bot, targetId, true, retryMs);
                     session.lastDecision = {
                         action: 'abandon_target',
                         reason: 'no_progress',
@@ -1017,8 +1023,8 @@ module.exports = {
                 }
                 BotAI.executeCombat(session, bot, closestMonster, Generics);
             } else {
-                if (session.vassal) { require('../VassalOrders').noTarget(session); return; }
                 if (session.huntTargetScanPending) return;
+                if (session.vassal) { require('../VassalOrders').noTarget(session); return; }
                 if (isSoloHunter(session) && session.lastEncounterReadiness?.ready === false) {
                     beginVoluntaryRecovery(session, bot, BotAI, session.lastEncounterReadiness);
                     return;

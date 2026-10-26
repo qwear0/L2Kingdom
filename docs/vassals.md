@@ -38,6 +38,13 @@ A vassal belongs to one **character**, with an original `boundClanId`. Another c
 
 `VassalOrders` owns duties; `src/GameServer/Lord/GatherAreas.js` supplies five authored gathering polygon sets. Failure to find a safe target does not authorize hunting outside the assigned area.
 
+Gathering route recovery stays within that assignment:
+
+- Routes pin an interior destination with room for the arrival radius and geodata-cell rounding. Stopping just outside the polygon, within an NPC's arrival radius, does not count as entering it.
+- Navigation reuses bounded waypoint retries. Exhausted routes or 30 seconds without physical progress select another point/polygon and exclude the failed point's 128-unit bucket for five minutes. A gap of more than five seconds between gathering travel ticks resets the stall clock, so time spent in combat, recovery or service work is not credited as continuous travel failure.
+- If no safe candidate is available, the duty waits and retries rather than teleporting or changing its assigned area.
+- Solo gatherers exclude a stalled combat target for five minutes and finish pending visibility scans before treating a zone as empty.
+
 - Joining the owner's party preserves the assigned gathering area and records pending resumption rather than replacing it with a new autonomous route.
 - Separation, including leader disconnect, starts **ten minutes of safe seated rest in place** for interrupted gatherers.
 - Threats and trade pause safe-rest accounting. Reinvitation clears live rest; pending rest is repeated after death/restart rather than credited during downtime.

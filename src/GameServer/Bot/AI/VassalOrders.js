@@ -8,8 +8,13 @@ const Approach = invoke('GameServer/Bot/AI/TownNpcApproach');
 const Catalog = invoke('GameServer/Bot/Economy/TownServiceCatalog');
 const Rest = invoke('GameServer/Bot/AI/RestPolicy');
 const Travel = invoke('GameServer/Bot/AI/BotTownTravel');
+const Navigation = invoke('GameServer/Bot/AI/CompanionNavigationRecovery');
+const Geodata = invoke('GameServer/Geodata/GeodataEngine');
 const SAFE_REST_MS = 10 * 60 * 1000;
 const TOWN_RETRY_MS = 5 * 60 * 1000;
+const GATHER_ARRIVAL_RADIUS = 16;
+const GATHER_STALL_MS = 30000;
+const GATHER_ROUTE_RETRY_MS = 5 * 60 * 1000;
 
 function rowFor(session) { return Registry.find(session.actor?.fetchId()); }
 function seated(session, value) {
@@ -49,6 +54,7 @@ function invalidate(session) {
     session.actor?.state?.setHits?.(false);
     session.actor?.attack?.resetQueuedEvent?.();
     if (session.actor) session.actor.storedAttack = null;
+    Navigation.clear(session);
     Approach.reset(session);
 }
 function fence(session, row) {
@@ -312,6 +318,92 @@ function recovery(session) {
     seated(session, false);
     return false;
 }
+function gatherPointInside(zone, point) {
+    if (!Areas.containsZone(zone, point)) return false;
+    // A* arrives at a geodata cell, not the exact NPC coordinate. Keep the
+    // whole arrival tolerance inside the polygon, including cell rounding.
+    const margin = GATHER_ARRIVAL_RADIUS + 16;
+    return zone.bounds.every((a, index, bounds) => {
+        const b = bounds[(index + 1) % bounds.length];
+        const dx = b.locX - a.locX, dy = b.locY - a.locY;
+        const along = Math.max(0, Math.min(1,
+            ((point.locX - a.locX) * dx + (point.locY - a.locY) * dy) / (dx * dx + dy * dy || 1)));
+        return Math.hypot(point.locX - a.locX - along * dx, point.locY - a.locY - along * dy) > margin;
+    });
+}
+function gatherDestination(session, area, run) {
+    const now = Date.now(), botPoint = Areas.pointOf(session.actor);
+    run.blockedGatherPoints = Object.fromEntries(Object.entries(run.blockedGatherPoints || {})
+        .filter(([, until]) => until > now));
+    const npcs = invoke('GameServer/World/World').npc.spawns.filter(npc => npc.fetchAttackable?.());
+    for (let step = 0; step < area.zones.length; step++) {
+        const zoneIndex = (Number(run.zoneIndex || 0) + step) % area.zones.length;
+        const zone = area.zones[zoneIndex];
+        const center = {
+            locX: Math.round(zone.bounds.reduce((n, p) => n + p.locX, 0) / zone.bounds.length),
+            locY: Math.round(zone.bounds.reduce((n, p) => n + p.locY, 0) / zone.bounds.length),
+            locZ: Math.round((zone.bounds[0].minZ + zone.bounds[0].maxZ) / 2)
+        };
+        center.locZ = Geodata.getHeight(center.locX, center.locY, center.locZ);
+        const candidates = [...npcs.filter(npc => Areas.containsZone(zone, npc)).map(Areas.pointOf), center]
+            .filter(point => gatherPointInside(zone, point))
+            .map(point => ({ point, zoneIndex,
+                key: `${zone.selfId}:${Math.round(point.locX / 128)}:${Math.round(point.locY / 128)}` }))
+            .filter(candidate => !run.blockedGatherPoints[candidate.key]
+                && Math.hypot(candidate.point.locX - botPoint.locX, candidate.point.locY - botPoint.locY) > 128)
+            .sort((a, b) => Math.hypot(a.point.locX - botPoint.locX, a.point.locY - botPoint.locY)
+                - Math.hypot(b.point.locX - botPoint.locX, b.point.locY - botPoint.locY));
+        if (candidates.length) return candidates[0];
+    }
+    return null;
+}
+function travelToGatherPoint(session, area, run) {
+    const bot = session.actor, now = Date.now(), point = Areas.pointOf(bot);
+    const travel = run.gatherTravel || (run.gatherTravel = {});
+    if (!travel.destination) {
+        if (now < Number(travel.retryAt || 0)) return;
+        travel.destination = gatherDestination(session, area, run);
+        if (!travel.destination) {
+            status(session, 'no_safe_gather_destination');
+            travel.retryAt = now + 30000;
+            return;
+        }
+        travel.progressPoint = point;
+        travel.progressAt = now;
+        Navigation.clear(session);
+        session.townRoutePlan = null;
+    }
+    const destination = travel.destination;
+    const distance = Math.hypot(point.locX - destination.point.locX, point.locY - destination.point.locY);
+    if (distance <= GATHER_ARRIVAL_RADIUS && Math.abs(point.locZ - destination.point.locZ) <= 64
+        && Areas.containsZone(area.zones[destination.zoneIndex], point)) {
+        run.zoneIndex = destination.zoneIndex;
+        run.gatherTravel = null;
+        Navigation.clear(session);
+        return;
+    }
+    // Combat, recovery and service work suspend this clock; only consecutive
+    // gathering ticks can establish that a physical route has stopped moving.
+    if (now - Number(travel.lastTickAt || now) > 5000
+        || Math.hypot(point.locX - travel.progressPoint.locX, point.locY - travel.progressPoint.locY) >= 96
+        || Math.abs(point.locZ - travel.progressPoint.locZ) >= 64) {
+        travel.progressPoint = point;
+        travel.progressAt = now;
+    }
+    travel.lastTickAt = now;
+    status(session, 'traveling_to_assigned_area');
+    const navigation = Navigation.move(session, bot, destination.point, 'vassal_gather', {
+        targetActor: null, arrivalRadius: GATHER_ARRIVAL_RADIUS
+    });
+    if (navigation.status !== 'exhausted' && now - travel.progressAt < GATHER_STALL_MS) return;
+    run.blockedGatherPoints[destination.key] = now + GATHER_ROUTE_RETRY_MS;
+    run.zoneIndex = (destination.zoneIndex + 1) % area.zones.length;
+    bot.automation.abortAll(bot);
+    Navigation.clear(session);
+    session.townRoutePlan = null;
+    run.gatherTravel = {};
+    status(session, 'physical_route_blocked');
+}
 function gatherTick(session, row, run, Generics, BotAI) {
     const bot = session.actor, area = Areas.find(row.areaId);
     if (!area) throw Error('gather_area_data_missing');
@@ -331,19 +423,8 @@ function gatherTick(session, row, run, Generics, BotAI) {
             return;
         }
     }
-    if (!Areas.contains(area, bot) && !session.currentTargetId) {
-        const zones = area.zones;
-        run.zoneIndex = Number(run.zoneIndex || 0) % zones.length;
-        const zone = zones[run.zoneIndex];
-        const npc = invoke('GameServer/World/World').npc.spawns.find(npc => npc.fetchAttackable?.()
-            && !npc.isDead() && Areas.containsZone(zone, npc));
-        const center = npc ? Areas.pointOf(npc) : {
-            locX: Math.round(zone.bounds.reduce((n, p) => n + p.locX, 0) / zone.bounds.length),
-            locY: Math.round(zone.bounds.reduce((n, p) => n + p.locY, 0) / zone.bounds.length),
-            locZ: Math.round((zone.bounds[0].minZ + zone.bounds[0].maxZ) / 2)
-        };
-        status(session, 'traveling_to_assigned_area');
-        move(session, center, 80);
+    if (!session.currentTargetId && (run.gatherTravel || !Areas.contains(area, bot))) {
+        travelToGatherPoint(session, area, run);
         return;
     }
     session.plan = 'hunting';
@@ -362,10 +443,7 @@ function noTarget(session) {
     if (!run || !area || Date.now() < Number(run.nextZoneAt || 0)) return;
     run.nextZoneAt = Date.now() + 30000;
     run.zoneIndex = (Number(run.zoneIndex || 0) + 1) % area.zones.length;
-    const zone = area.zones[run.zoneIndex];
-    const npc = invoke('GameServer/World/World').npc.spawns.find(npc => npc.fetchAttackable?.()
-        && !npc.isDead() && Areas.containsZone(zone, npc));
-    if (npc) move(session, Areas.pointOf(npc), 100);
+    travelToGatherPoint(session, area, run);
 }
 function died(session) {
     if (session.vassalRest) { session.vassalRest.remaining = SAFE_REST_MS; session.vassalRest.at = null; }
