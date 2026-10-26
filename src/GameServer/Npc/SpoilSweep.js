@@ -74,7 +74,9 @@ function spendSkillMp(session, actor, skill) {
     return true;
 }
 
-function castUtilitySkill(session, actor, target, skill, effect) {
+function castUtilitySkill(session, actor, target, skill, effect, offensiveTargets = null) {
+    const autoFight = offensiveTargets && invoke('GameServer/Actor/PlayerAutoFightPolicy').forAction(session, actor);
+    if (autoFight && !autoFight.canInitiate(offensiveTargets, actor)) return;
     if (actor.state.fetchCasts()) {
         session.dataSendToMe(ServerResponse.actionFailed());
         return;
@@ -90,8 +92,17 @@ function castUtilitySkill(session, actor, target, skill, effect) {
     session.dataSendToMe(ServerResponse.skillDurationBar(skill.fetchCalculatedHitTime()));
     actor.state.setCasts(true);
     HotPartyCastTracker.begin(session, actor, target, skill);
+    // Utility casts bypass Attack.remoteHit. Track their accepted recipients
+    // too, so recovery cannot overlook a companion's in-flight Spoil Festival.
+    const cast = autoFight ? { target, skill, autoFightTargets: offensiveTargets } : null;
+    if (cast) {
+        actor.attack.activeCast = cast;
+        autoFight.acceptTargets(offensiveTargets);
+    }
 
     actor.attack.queueTimer(() => {
+        if (cast && actor.attack.activeCast !== cast) return;
+        if (cast) actor.attack.activeCast = null;
         HotPartyCastTracker.clear(actor);
         actor.state.setCasts(false);
         if (actor.isDead()) {
@@ -222,7 +233,7 @@ const SpoilSweep = {
                 .catch(error => utils.infoWarn('Quest', 'skill callback failed: %s', error.message));
             if (invoke('GameServer/Bot/Population/PopulationConfig').developerDiagnostics === true) console.info('SpoilSweep :: %s spoiled %d of %d targets with %s', actor.fetchName(), landed, spoiled.length, skill.fetchName());
             if (landed > 0) ConsoleText.transmit(session, ConsoleText.caption.spoilActivated);
-        });
+        }, eligible);
     },
 
     castSweep(session, actor, npc, skill) {

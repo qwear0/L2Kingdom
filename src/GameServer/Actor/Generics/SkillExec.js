@@ -92,7 +92,7 @@ function skillExec(session, actor, data) {
     }).catch((error) => {
         if (!current()) return;
         if (owner) {
-            owner.controller.stop('skill_failed');
+            owner.controller.rejectCandidate(owner.run);
             utils.infoWarn('PlayerAutoFight', 'skill failed: %s', error?.message || String(error));
             return;
         }

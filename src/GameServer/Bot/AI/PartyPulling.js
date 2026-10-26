@@ -166,6 +166,8 @@ function observeLeaderTarget(leaderSession, settings, targetId) {
     if (!puller || puller.kind !== 'leader' || !targetId) return null;
     const target = npcById(targetId);
     if (!target || BotRaidSafety.isProtectedRaidEntity(target) || !target.fetchAttackable?.() || target.isDead?.()) return null;
+    const autoFight = invoke('GameServer/Actor/PlayerAutoFightPolicy').forLeader(leaderSession);
+    if (autoFight && (!autoFight.combatTargetId() || !autoFight.legalTarget(target))) return null;
     beginTarget(leaderSession, puller, target, 'leader');
     return target;
 }
@@ -189,6 +191,11 @@ function supportProviders(leaderSession) {
 
 function pauseReason(leaderSession, puller) {
     const state = pullState(leaderSession);
+    const autoFight = invoke('GameServer/Actor/PlayerAutoFightPolicy').forLeader(leaderSession);
+    if (autoFight && (autoFight.run.recovery || autoFight.needsRecovery() || autoFight.run.wait
+        || !['seeking', 'fighting'].includes(autoFight.run.state) || !autoFight.inside(leaderSession.actor))) {
+        return 'player_auto_fight_recovery';
+    }
     if (invoke('GameServer/Bot/AI/PartyCompanionService').regroupActive(leaderSession)) return 'party_regrouping';
     if (leaderSession?.actor?.isDead?.()) return 'party_revival';
     const recovery = leaderSession?.partyRecoveryCast;
@@ -377,7 +384,9 @@ function freeMonsters(bot) {
 
 function nearestFreeMonster(bot, leaderSession) {
     const now = Date.now();
+    const autoFight = invoke('GameServer/Actor/PlayerAutoFightPolicy').forLeader(leaderSession);
     const ranked = freeMonsters(bot)
+        .filter((npc) => !autoFight || autoFight.canAcquire(npc, bot))
         .filter((npc) => rejectedTargetUntil(leaderSession, npc.fetchId()) <= now)
         .map((npc) => scorePullTarget(bot, leaderSession, npc))
         .sort((a, b) => b.score - a.score || distance(point(bot), point(a.target)) - distance(point(bot), point(b.target)));
@@ -468,6 +477,13 @@ function tickBotPuller(session, bot, leaderSession, settings, Generics, BotAI, s
     if (!puller || puller.session !== session) return { handled: false, puller };
 
     let target = clearFinishedTarget(leaderSession);
+    const autoFight = invoke('GameServer/Actor/PlayerAutoFightPolicy').forLeader(leaderSession);
+    if (autoFight && target && !autoFight.legalTarget(target, bot) && !autoFight.threatening(target)) {
+        // Drop only the unengaged intent, not the configured pull mode/puller.
+        bot.automation?.abortAll?.(bot);
+        leaderSession.partyPullState = {};
+        target = null;
+    }
     let state = pullState(leaderSession);
     // Any mob that has already committed to the travelling puller is a valid
     // delivery. Adopt it and return immediately instead of treating its aggro
@@ -517,7 +533,8 @@ function tickBotPuller(session, bot, leaderSession, settings, Generics, BotAI, s
 
     // Recovery/add pauses may cancel an approach or an unconfirmed opening
     // hit, but must never interrupt a confirmed return leg.
-    const pause = state.phase === 'return' ? null : pauseReason(leaderSession, puller);
+    const pause = state.phase === 'return' || (autoFight && target && autoFight.engaged(target))
+        ? null : pauseReason(leaderSession, puller);
     if (pause) {
         // A rest/buff pause can happen while the puller is still travelling
         // towards an untouched mob.  Stop that movement immediately instead

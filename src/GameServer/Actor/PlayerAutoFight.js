@@ -2,13 +2,18 @@ const World = invoke('GameServer/World/World');
 const Response = invoke('GameServer/Network/Response');
 const Geodata = invoke('GameServer/Geodata/GeodataEngine');
 const AttackRange = invoke('GameServer/Actor/AttackRange');
+const PartyAwareness = invoke('GameServer/Bot/AI/PartyAwareness');
+const RestPolicy = invoke('GameServer/Bot/AI/RestPolicy');
+const Competition = invoke('GameServer/Bot/AI/BotMobCompetition');
+const Restrictions = invoke('GameServer/Effects/EffectRestrictions');
+const NpcObjectIndex = require('../World/NpcObjectIndex');
 
 const loc = actor => ({ locX: actor.fetchLocX(), locY: actor.fetchLocY(), locZ: actor.fetchLocZ() });
 const distance = (a, b) => Math.hypot(a.locX - b.locX, a.locY - b.locY);
+const MAX_SAFE_REST_MS = 6 * 60 * 60 * 1000;
+const DEFENCE_RADIUS = 1200;
+const MAX_POINT_DISTANCE = 3000;
 
-// P1 deliberately exposes one native action, not a hunting scheduler. No
-// acquisition, AoE, support, summon orders or durable preferences are enabled
-// until their encounter/recipient policies are implemented in later phases.
 class PlayerAutoFight {
     static forActor(actor) {
         return actor.playerAutoFight ||= new PlayerAutoFight(actor);
@@ -19,7 +24,9 @@ class PlayerAutoFight {
         this.session = actor.session;
         this.generation = 0;
         this.reason = 'stopped';
+        this.center = null;
         this.point = null;
+        this.radius = 600;
         this.allowedSkillId = null;
         this.run = null;
     }
@@ -34,6 +41,8 @@ class PlayerAutoFight {
             && !actor.isFlying?.() && !actor.stateWater && !actor.fetchBoatId?.() && !actor.fetchBoat?.();
     }
 
+    // P2 still allows only one learned single-target offensive skill. The
+    // shared recipient gate also protects companion AoE/polearm launches.
     eligibleSkill(skill) {
         const semantic = skill?.fetchSemantic?.();
         return !!semantic && !skill.fetchPassive() && skill.fetchTargetKind() === 'enemy'
@@ -46,12 +55,75 @@ class PlayerAutoFight {
         return this.eligibleSkill(skill) && skill.fetchSelfId() === this.allowedSkillId;
     }
 
-    legalTarget(target) {
+    ordinaryMonster(target) {
         return target?.fetchKind?.() === 'Monster' && target.fetchAttackable?.() === true
-            && !target.fetchIsSummon?.() && !target.state?.fetchDead?.()
-            && !invoke('GameServer/Bot/AI/BotRaidSafety').isProtectedRaidEntity(target)
-            && Math.abs(target.fetchLocZ() - this.actor.fetchLocZ()) <= 64
-            && distance(loc(target), loc(this.actor)) <= 600;
+            && NpcObjectIndex.find(World, target.fetchId()) === target
+            && !target.fetchIsSummon?.() && !target.state?.fetchDead?.() && !target.isDead?.()
+            && !invoke('GameServer/Bot/AI/BotRaidSafety').isProtectedRaidEntity(target);
+    }
+
+    members() {
+        const members = PartyAwareness.partyActors(this.session);
+        const SummonControl = invoke('GameServer/Npc/SummonControl');
+        return [...members, ...members.map(member => SummonControl.activeSummon(member)).filter(Boolean)];
+    }
+
+    threatening(target, members = this.members()) {
+        const targetId = Number(target.fetchDestId?.());
+        return members.some(member => targetId === Number(member.fetchId()) || Number(target.getHating?.(member)) > 0
+            || (Number(member.session?.incomingThreatId) === Number(target.fetchId())
+                && Date.now() - Number(member.session?.incomingThreatAt || 0) < 5000));
+    }
+
+    inside(target, extra = 0) {
+        const center = this.run?.center || this.center;
+        return !!center && distance(loc(target), center) <= (this.run?.radius || this.radius) + extra
+            && Math.abs(target.fetchLocZ() - center.locZ) <= 64;
+    }
+
+    engaged(target) {
+        return this.run?.engaged.get(target.fetchId()) === target || this.threatening(target);
+    }
+
+    foreignEngagement(target) {
+        const members = this.members();
+        const claim = Competition.owner(target);
+        if (claim && !members.includes(claim)) return true;
+        const id = Number(target.fetchDestId?.());
+        return id > 0 && !members.some(member => Number(member.fetchId()) === id);
+    }
+
+    canAcquire(target, source = this.actor) {
+        const run = this.run;
+        return !!run && this.available() && !run.recovery && !this.needsRecovery()
+            && !run.wait && ['seeking', 'fighting'].includes(run.state)
+            && this.ordinaryMonster(target) && this.inside(target) && this.inside(source)
+            && !this.foreignEngagement(target) && Number(run.rejected.get(target.fetchId()) || 0) <= Date.now();
+    }
+
+    legalTarget(target, source = this.actor) {
+        const run = this.run;
+        if (!run || !this.ordinaryMonster(target) || Math.abs(target.fetchLocZ() - source.fetchLocZ()) > 64) return false;
+        if (this.threatening(target)) {
+            return distance(loc(target), run.center) <= DEFENCE_RADIUS
+                && distance(loc(source), run.center) <= DEFENCE_RADIUS;
+        }
+        if (this.engaged(target)) return this.inside(target, 200) && this.inside(source, 200);
+        return this.canAcquire(target, source);
+    }
+
+    canInitiate(targets, source = this.actor) {
+        return this.available() && targets.length > 0 && targets.every(target => this.legalTarget(target, source));
+    }
+
+    acceptTargets(targets) {
+        if (!this.run) return;
+        for (const target of targets) this.run.engaged.set(target.fetchId(), target);
+    }
+
+    combatTargetId() {
+        const target = this.run?.target;
+        return target && this.legalTarget(target) ? target.fetchId() : null;
     }
 
     selectOnly(id) {
@@ -59,86 +131,294 @@ class PlayerAutoFight {
         this.actor.select({ id: Number(id), selectionOnly: true, actionOwner: this.run?.owner });
     }
 
-    rememberPoint() {
+    newSession() {
+        this.stop('new_session');
+        this.center = null;
+        this.point = null;
+        this.reason = 'setup';
+    }
+
+    rememberPoint(kind = 'rest') {
         if (this.run || !this.available()) return false;
-        this.point = loc(this.actor);
-        this.reason = 'point_set';
+        if (kind === 'center') this.center = loc(this.actor);
+        else this.point = loc(this.actor);
+        this.reason = `${kind}_set`;
         return true;
     }
 
     allowSkill(id) {
         if (this.run) return false;
+        if (id === 0) { this.allowedSkillId = null; return true; }
         const skill = this.actor.skillset.fetchSkill(Number(id));
         if (!this.eligibleSkill(skill)) return false;
         this.allowedSkillId = skill.fetchSelfId();
         return true;
     }
 
-    start(kind, targetId) {
+    setRadius(radius) {
+        if (this.run || ![300, 600, 900].includes(radius)) return false;
+        this.radius = radius;
+        return true;
+    }
+
+    needsRecovery(high = false) {
+        const actor = this.actor;
+        const hp = actor.fetchHp() / Math.max(1, actor.fetchMaxHp());
+        const mp = actor.fetchMp() / Math.max(1, actor.fetchMaxMp());
+        if (hp < (high ? 0.95 : 0.35) || mp < (high ? 0.95 : 0.20)) return true;
+        return PartyAwareness.partyActors(this.session).some(member => member !== actor && RestPolicy.needsRest(member,
+            member.fetchHp() / Math.max(1, member.fetchMaxHp()), member.fetchMp() / Math.max(1, member.fetchMaxMp()),
+            { party: true, locked: high }));
+    }
+
+    busy() {
+        const state = this.actor.state;
+        return state.fetchHits() || state.fetchCasts() || state.fetchAnimated() || state.fetchPickinUp();
+    }
+
+    start() {
         const { actor, session } = this;
         if (this.run) return false;
-        if (!this.available() || actor.state.isBlocked() || actor.state.inMotion()
+        if (!this.available() || this.busy() || actor.state.inMotion()
             || session.moveTimer || session.pendingPathRequest || actor.attack.bowReloading) {
             this.reason = 'start_blocked';
             return false;
         }
-        if (!['attack', 'skill', 'move'].includes(kind)) return false;
-        if (kind === 'move' && !this.point) { this.reason = 'missing_point'; return false; }
-        const skill = kind === 'skill' ? actor.skillset.fetchSkill(this.allowedSkillId) : null;
-        if (kind === 'skill' && !this.allowsSkill(skill)) { this.reason = 'missing_allowed_skill'; return false; }
-        if (kind === 'attack' && AttackRange.weaponKind(actor) === 'Weapon.Pole') {
-            this.reason = 'p1_single_target_only';
+        if (!this.center || !this.point) { this.reason = 'missing_points'; return false; }
+        if (distance(this.center, this.point) > MAX_POINT_DISTANCE || distance(loc(actor), this.center) > MAX_POINT_DISTANCE) {
+            this.reason = 'points_too_far';
             return false;
         }
-        // Explicit Start replaces unlaunched native requests; a passive position
-        // report must not dispatch an old stored spell during the owned route.
         invoke(path.actor).clearStoredActions(session, actor);
         actor.attack.resetQueuedEvent();
         actor.selectionRevision = Number(actor.selectionRevision || 0) + 1;
-        const run = this.run = { generation: ++this.generation, kind, targetId: Number(targetId), startedAt: Date.now() };
+        const run = this.run = { generation: ++this.generation, kind: 'hunt', state: 'seeking',
+            center: { ...this.center }, rest: { ...this.point }, radius: this.radius,
+            engaged: new Map(), rejected: new Map(), recovery: false, nextScanAt: 0, nextActionAt: 0,
+            safeRestMs: 0, fixedFailures: {} };
+        this.renewOwner(run);
+        this.reason = 'seeking';
+        invoke('GameServer/Geodata/PlayerTransitionRecovery').cancel(session);
+        PartyAwareness.invalidateThreatProjection(session);
+        this.schedule(run);
+        return true;
+    }
+
+    renewOwner(run) {
         const owner = run.owner = {
             source: 'player-auto-fight', controller: this, run,
-            isCurrent: () => this.run === run && this.generation === run.generation && this.available(),
-            approach: (target, radius, callback) => this.approach(run, target, radius, callback)
+            isCurrent: () => this.run === run && run.owner === owner
+                && this.generation === run.generation && this.available(),
+            approach: (target, radius, callback) => this.approach(run, target, radius, callback),
+            acceptRoute: route => this.acceptRoute(run, route)
         };
-        this.reason = 'resolving';
-        invoke('GameServer/Geodata/PlayerTransitionRecovery').cancel(session);
-        if (kind === 'move') {
-            this.route(run, { ...this.point });
-        } else {
-            World.fetchNpc(run.targetId).then(target => {
-                if (!owner.isCurrent()) return;
-                if (!this.legalTarget(target)) { this.stop('p1_illegal_target'); return; }
-                run.target = target;
-                const data = { id: run.targetId, actionOwner: owner, ctrl: false };
-                this.reason = 'acting';
-                run.dispatched = true;
-                const Generics = invoke(path.actor);
-                if (kind === 'attack') Generics.attackRequest(session, actor, data);
-                else Generics.skillRequest(session, actor, { ...data, selfId: skill.fetchSelfId() });
-            }).catch(error => {
-                if (!owner.isCurrent()) return;
-                this.stop('target_lookup_failed');
-                utils.infoWarn('PlayerAutoFight', 'target lookup failed: %s', error?.message || String(error));
-            });
-        }
-        this.schedule(run);
+    }
+
+    setState(run, state, reason = state) {
+        run.state = state;
+        this.reason = reason;
+    }
+
+    setSeated(seated) {
+        const { actor, session } = this;
+        if (actor.state.fetchSeated() === seated) return true;
+        if (this.busy() || actor.state.inMotion() || !Restrictions.canUseBasicAction(actor)) return false;
+        actor.state.setSeated(seated);
+        session.dataSendToMeAndOthers(Response.sitAndStand(actor), actor);
         return true;
     }
 
     approach(run, target, radius, callback) {
         if (!run.owner.isCurrent() || !this.legalTarget(target)) return false;
         run.approach = { target, radius, callback };
-        this.route(run, loc(target), { targetActor: target, arrivalRadius: Math.max(0, radius - 8) });
+        this.route(run, loc(target), 'candidate', { targetActor: target, arrivalRadius: Math.max(0, radius - 8) });
         return false;
     }
 
-    route(run, destination, options = {}) {
-        run.destination = destination;
-        run.routeDeadline = Date.now() + Math.min(120000, Math.max(5000,
-            distance(loc(this.actor), destination) / Math.max(1, this.actor.fetchCollectiveRunSpd()) * 2000 + 3000));
-        this.reason = 'moving';
+    route(run, destination, purpose, options = {}) {
+        if (!Restrictions.canMove(this.actor) || !this.setSeated(false)) return false;
+        run.route = { destination: { ...destination }, purpose, attempts: 1 + (run.fixedFailures[purpose] || 0), lastProgress: loc(this.actor),
+            progressAt: Date.now(), deadline: Date.now() + 5000 };
         this.actor.moveTo({ from: loc(this.actor), to: { ...destination }, actionOwner: run.owner, ...options });
+        return true;
+    }
+
+    // Validate the actual worker route before it can publish a segment. A
+    // short straight-line distance must not authorize an unbounded detour.
+    acceptRoute(run, route) {
+        if (!run.owner.isCurrent() || !run.route || !route?.length) return false;
+        let previous = loc(this.actor), length = 0;
+        for (const waypoint of route) {
+            length += distance(previous, waypoint);
+            if (Math.abs(previous.locZ - waypoint.locZ) > 64) return false;
+            if (run.route.purpose === 'candidate') {
+                const limit = this.threatening(run.approach.target) ? DEFENCE_RADIUS : run.radius + 200;
+                if (distance(waypoint, run.center) > limit) return false;
+            }
+            previous = waypoint;
+        }
+        const travelMs = length / Math.max(1, this.actor.fetchCollectiveRunSpd()) * 1000;
+        if (length > 6000 || travelMs > 60000) return false;
+        run.route.deadline = Date.now() + Math.min(90000, Math.max(5000, travelMs * 1.5 + 3000));
+        run.route.progressAt = Date.now();
+        return true;
+    }
+
+    clearTarget(run) {
+        const hadAction = run.target || run.lookupPending || run.route;
+        run.target = null;
+        run.dispatched = false;
+        run.lookupPending = false;
+        run.nativeStarted = false;
+        run.approach = null;
+        if (this.actor.automation.actionOwner === run.owner) this.actor.automation.abortAll(this.actor);
+        run.route = null;
+        if (hadAction) this.renewOwner(run);
+    }
+
+    rejectCandidate(run) {
+        if (this.run !== run) return;
+        if (run.target) run.rejected.set(run.target.fetchId(), Date.now() + 30000);
+        this.clearTarget(run);
+        this.setState(run, 'seeking', 'candidate_unreachable');
+    }
+
+    routeFailed(run) {
+        const route = run.route;
+        if (!route) return;
+        if (this.actor.automation.actionOwner === run.owner) this.actor.automation.abortAll(this.actor);
+        if (route.purpose === 'candidate') {
+            this.rejectCandidate(run);
+            return;
+        }
+        run.fixedFailures[route.purpose] = route.attempts;
+        if (route.attempts < 2) {
+            ++route.attempts;
+            route.progressAt = Date.now();
+            route.lastProgress = loc(this.actor);
+            route.deadline = Date.now() + 5000;
+            this.actor.moveTo({ from: loc(this.actor), to: { ...route.destination }, actionOwner: run.owner, forceRepath: true });
+            return;
+        }
+        run.route = null;
+        run.wait = 'path_blocked';
+        this.setState(run, run.state, 'path_blocked');
+    }
+
+    tickRoute(run, now) {
+        const route = run.route;
+        if (!route) return false;
+        const target = run.approach?.target;
+        if (target && !this.legalTarget(target)) { this.clearTarget(run); return false; }
+        const destination = target ? loc(target) : route.destination;
+        const arrived = distance(loc(this.actor), destination) <= (run.approach?.radius ?? 24)
+            && Math.abs(this.actor.fetchLocZ() - destination.locZ) <= 64
+            && (!target || Geodata.hasLineOfSight(this.actor.fetchLocX(), this.actor.fetchLocY(), this.actor.fetchLocZ(),
+                target.fetchLocX(), target.fetchLocY(), target.fetchLocZ()));
+        if (arrived) {
+            const approach = run.approach;
+            if (this.actor.automation.actionOwner === run.owner) this.actor.automation.abortAll(this.actor);
+            run.route = null;
+            run.approach = null;
+            if (approach) approach.callback();
+            else {
+                delete run.fixedFailures[route.purpose];
+                if (route.purpose === 'rest') this.setState(run, 'resting');
+                else this.setState(run, 'seeking');
+            }
+        } else {
+            if (distance(loc(this.actor), route.lastProgress) >= 16) {
+                route.lastProgress = loc(this.actor);
+                route.progressAt = now;
+            }
+            if (now > route.deadline || now - route.progressAt > 5000
+                || (!this.session.moveTimer && !this.session.pendingPathRequest)) this.routeFailed(run);
+        }
+        return true;
+    }
+
+    encounter(run) {
+        const members = this.members();
+        const nearby = new Map(run.engaged);
+        const pending = new Set();
+        for (const member of members) {
+            const cast = member.attack?.activeCast;
+            const swing = member.attack?.activeSwing;
+            const castTargets = cast && ['enemy', 'corpse_mob'].includes(cast.skill.fetchTargetKind())
+                ? cast.autoFightTargets || [cast.target] : [];
+            const swingTargets = member.state?.fetchHits?.() || member.attack?.bowReloading ? swing?.targets || [] : [];
+            for (const target of [...castTargets, ...swingTargets]) {
+                if (!target) continue;
+                pending.add(target);
+                nearby.set(target.fetchId(), target);
+            }
+        }
+        const partyThreat = PartyAwareness.findThreatTargetingPartyProjected(this.session);
+        if (partyThreat?.actor) nearby.set(partyThreat.actor.fetchId(), partyThreat.actor);
+        for (const member of members) {
+            if (distance(loc(member), run.center) > DEFENCE_RADIUS) continue;
+            for (const target of World.fetchNpcsInRadius(member.fetchLocX(), member.fetchLocY(), 1500)) nearby.set(target.fetchId(), target);
+        }
+        const active = [];
+        for (const [id, target] of nearby) {
+            const live = !target.state?.fetchDead?.() && !target.isDead?.();
+            const threat = live && this.threatening(target, members);
+            if (!this.ordinaryMonster(target)) {
+                run.engaged.delete(id);
+                if (threat) active.push(target);
+                continue;
+            }
+            const summonAttacking = members.some(member => member.fetchIsSummon?.()
+                && Number(member.fetchDestId?.()) === Number(id) && !!member.timer?.hit);
+            const claimed = members.includes(Competition.owner(target));
+            if (threat || claimed || summonAttacking || pending.has(target)) {
+                if (summonAttacking || pending.has(target)) run.engaged.set(id, target);
+                active.push(target);
+            } else run.engaged.delete(id);
+        }
+        return active;
+    }
+
+    executableSkill() {
+        const skill = this.actor.skillset.fetchSkill(this.allowedSkillId);
+        return this.allowsSkill(skill) && Restrictions.canCast(this.actor) && this.actor.canUseSkill(skill)
+            && this.actor.fetchMp() >= this.actor.attack.skillMpCost(this.actor, skill)
+            && !this.actor.attack.skillUseConditionFailure(this.session, this.actor, skill) ? skill : null;
+    }
+
+    basicAvailable() {
+        const actor = this.actor;
+        if (!Restrictions.canAttack(actor)) return false;
+        if (AttackRange.weaponKind(actor) !== 'Weapon.Bow') return true;
+        const BowResources = invoke('GameServer/Actor/BowResources');
+        const weapon = actor.backpack.fetchEquippedWeapon();
+        const arrowId = BowResources.ARROWS[String(weapon?.fetchRank?.() || '').toLowerCase()];
+        const arrow = arrowId && actor.backpack.fetchItemFromSelfId(arrowId);
+        return !!arrow && arrow.fetchAmount() > 0 && !arrow.fetchPetLocked?.()
+            && actor.fetchMp() >= invoke('GameServer/Items/C4WeaponSA').bowMpCost(weapon, () => 1);
+    }
+
+    dispatch(run, target, now) {
+        const actor = this.actor;
+        if (!this.setSeated(false)) return;
+        const skill = this.executableSkill();
+        if (!skill && !this.basicAvailable()) { this.reason = 'no_executable_action'; return; }
+        const targets = skill ? actor.attack.resolveSkillTargets(this.session, actor, target, skill)
+            : actor.attack.resolveMeleeTargets(actor, target);
+        if (!this.canInitiate(targets)) { this.reason = 'unsafe_recipients'; return; }
+        run.target = target;
+        this.setState(run, 'fighting');
+        run.dispatched = true;
+        run.nativeStarted = false;
+        run.lookupDeadline = now + 5000;
+        run.nextActionAt = now + 500;
+        if (run.publishedTarget !== target) {
+            run.publishedTarget = target;
+            actor.select({ id: target.fetchId(), selectionOnly: true, actionOwner: run.owner });
+        }
+        const data = { id: target.fetchId(), actionOwner: run.owner, ctrl: false };
+        if (skill) invoke(path.actor).skillRequest(this.session, actor, { ...data, selfId: skill.fetchSelfId() });
+        else invoke(path.actor).attackRequest(this.session, actor, data);
     }
 
     schedule(run) {
@@ -151,42 +431,89 @@ class PlayerAutoFight {
                 utils.infoWarn('PlayerAutoFight', 'native action failed: %s', error?.stack || error?.message || String(error));
             }
             if (this.run === run) this.schedule(run);
-        }, 100);
+        }, 250);
     }
 
     tick(run) {
-        const { actor, session } = this;
-        if (Date.now() - run.startedAt > 120000) { this.stop('action_timeout'); return; }
-        if (this.reason === 'moving') {
-            if (actor.automation.actionOwner !== run.owner) { this.stop('movement_interrupted'); return; }
-            const approach = run.approach;
-            const target = approach?.target;
-            if (target && !this.legalTarget(target)) { this.stop('target_unavailable'); return; }
-            const destination = target ? loc(target) : run.destination;
-            const arrived = distance(loc(actor), destination) <= (approach?.radius ?? 24)
-                && Math.abs(actor.fetchLocZ() - destination.locZ) <= 64
-                && (!target || Geodata.hasLineOfSight(actor.fetchLocX(), actor.fetchLocY(), actor.fetchLocZ(),
-                    target.fetchLocX(), target.fetchLocY(), target.fetchLocZ()));
-            if (arrived) {
-                if (actor.automation.actionOwner === run.owner) actor.automation.abortAll(actor);
-                run.approach = null;
-                this.reason = 'acting';
-                if (approach) approach.callback();
-                else this.stop('arrived');
-            } else if (Date.now() > run.routeDeadline || (!session.moveTimer && !session.pendingPathRequest)) {
-                this.stop('path_blocked');
-            }
+        const { actor } = this;
+        const now = Date.now();
+        for (const [id, until] of run.rejected) if (until <= now) run.rejected.delete(id);
+        if (this.needsRecovery()) run.recovery = true;
+        if (run.lookupPending && now > run.lookupDeadline) this.rejectCandidate(run);
+        if (actor.state.fetchHits() || actor.state.fetchCasts() || actor.attack.bowReloading || run.lookupPending) {
+            run.safeRestSince = null;
             return;
         }
-        if (run.dispatched && !run.lookupPending && !actor.state.fetchHits() && !actor.state.fetchCasts()
-            && !actor.attack.bowReloading && !actor.state.inMotion()) {
-            this.stop(run.nativeStarted ? 'action_complete' : 'action_rejected');
+        if (now < run.nextScanAt) return;
+        run.nextScanAt = now + 500;
+        const encounter = this.encounter(run);
+        if (run.dispatched && !run.nativeStarted && !run.lookupPending && !run.route) this.rejectCandidate(run);
+        const threats = encounter.filter(target => this.threatening(target));
+        if (threats.some(target => !this.ordinaryMonster(target))) run.wait = 'unsupported_threat';
+        else if (threats.some(target => distance(loc(target), run.center) > DEFENCE_RADIUS)) run.wait = 'defence_leash';
+        const readyTarget = target => this.legalTarget(target) && Number(run.rejected.get(target.fetchId()) || 0) <= now;
+        const defensive = threats.find(readyTarget);
+        if (encounter.length || run.route || run.state !== 'resting') run.safeRestSince = null;
+        const activeEncounter = threats.length > 0 || encounter.some(target => this.legalTarget(target));
+        if (run.route && activeEncounter && run.route.purpose !== 'candidate') {
+            if (actor.automation.actionOwner === run.owner) actor.automation.abortAll(actor);
+            run.route = null;
         }
+        if (this.tickRoute(run, now)) return;
+        if (run.target && !this.legalTarget(run.target)) this.clearTarget(run);
+        const target = defensive || encounter.find(readyTarget);
+        if (target) {
+            if (now >= run.nextActionAt) this.dispatch(run, target, now);
+            return;
+        }
+        this.clearTarget(run);
+        // An attacker outside the defence envelope is still an encounter.
+        // Never turn inability to hit it into permission to sit or pull again.
+        if (threats.length) { this.reason = run.wait || 'defence_unreachable'; return; }
+        if (run.wait) { this.reason = run.wait; return; }
+        if (run.recovery) {
+            if (run.state !== 'resting') {
+                this.setState(run, 'returning_to_rest');
+                if (!this.route(run, run.rest, 'rest')) this.reason = 'movement_restricted';
+                return;
+            }
+            if (distance(loc(actor), run.rest) > 24 || Math.abs(actor.fetchLocZ() - run.rest.locZ) > 64) {
+                this.setState(run, 'returning_to_rest');
+                return;
+            }
+            if (!this.needsRecovery(true)) {
+                run.recovery = false;
+                run.safeRestMs = 0;
+                if (!this.setSeated(false)) return;
+                this.setState(run, 'returning_to_zone');
+                this.route(run, run.center, 'zone');
+                return;
+            }
+            if (this.setSeated(true)) {
+                if (run.safeRestSince) run.safeRestMs += Math.min(1000, now - run.safeRestSince);
+                run.safeRestSince = now;
+            } else run.safeRestSince = null;
+            this.reason = 'resting';
+            if (run.safeRestMs >= MAX_SAFE_REST_MS) this.stop('recovery_timeout');
+            return;
+        }
+        if (!this.inside(actor)) {
+            this.setState(run, 'returning_to_zone');
+            if (!this.route(run, run.center, 'zone')) this.reason = 'movement_restricted';
+            return;
+        }
+        this.setState(run, 'seeking');
+        if (now < run.nextActionAt) return;
+        const candidates = World.fetchNpcsInRadius(run.center.locX, run.center.locY, run.radius)
+            .filter(candidate => this.canAcquire(candidate) && Geodata.hasLineOfSight(
+                actor.fetchLocX(), actor.fetchLocY(), actor.fetchLocZ(), candidate.fetchLocX(), candidate.fetchLocY(), candidate.fetchLocZ()))
+            .sort((a, b) => distance(loc(actor), loc(a)) - distance(loc(actor), loc(b)));
+        if (candidates.length) this.dispatch(run, candidates[0], now);
+        else this.reason = 'no_targets';
     }
 
     // Route progression owns XY. Passive client reports can contribute heading
-    // and nearby floor Z, but must not rewind a worker route or confirm arrival
-    // from an old MoveToPawn/StopMove. Outside the run, native validation is intact.
+    // and nearby floor Z, but cannot confirm arrival or rewind a worker route.
     reconcilePosition(data) {
         const run = this.run;
         if (!run?.owner.isCurrent() || this.actor.automation.actionOwner !== run.owner) return data;
@@ -214,15 +541,15 @@ class PlayerAutoFight {
             if (actor[key]?.actionOwner === owner) actor[key] = undefined;
         }
         if (actor.automation.actionOwner === owner) actor.automation.abortAll(actor);
-        // Do not purge Attack timers: a launched swing/cast follows native
-        // interruption rules. Its terminal callback may dispatch a queued
-        // manual action, but may not repeat the cancelled automatic action.
+        PartyAwareness.invalidateThreatProjection(this.session);
+        // Already accepted native swings/casts are not cancelled by Stop.
         if (this.session.actor === actor && this.session.socket?.destroyed !== true) this.session.dataSendToMe(Response.speak(actor,
-            { kind: 0, text: `Auto-fight P1: ${reason}.` }));
+            { kind: 0, text: `Auto-fight: ${reason}.` }));
     }
 
     dispose(reason = 'disposed') {
         this.stop(reason);
+        this.center = null;
         this.point = null;
         this.allowedSkillId = null;
         this.reason = reason;

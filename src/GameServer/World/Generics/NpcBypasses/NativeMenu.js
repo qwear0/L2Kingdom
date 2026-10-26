@@ -8,7 +8,7 @@ const COMMANDS = Object.freeze([
     [3, 'windows', 'Bot friends', '.bf', 'Friends and your constant party.'],
     [4, 'windows', 'Bot status', '.bs', 'Browse bots or inspect your selection.'],
     [5, 'windows', 'Item database', '.items', 'Items, drops, spoil and spawn maps.'],
-    [12, 'windows', 'Auto-fight preview', '.autofight', 'P1: one native action, not autonomous hunting.'],
+    [12, 'windows', 'Auto-fight', '.autofight', 'P2: bounded hunting with a fixed zone and rest point.'],
     [6, 'trade', 'AFK sell shop', '.afksell', 'Configure a shop in a peace zone.'],
     [7, 'trade', 'AFK buy shop', '.afkbuy', 'Configure buy orders in a peace zone.'],
     [8, 'trade', 'Stop AFK shop', '.afkstop', 'Close your active AFK shop.'],

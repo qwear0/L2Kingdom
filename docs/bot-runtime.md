@@ -45,6 +45,8 @@ Post-party safe rest measures eligible live time, not elapsed server downtime. S
 - `Bot/AI/BotDecisionService.js` provides a narrower recovery/follow/target/spot recommendation path; it is not the universal scheduler.
 - `Population/ColdClassPolicy.js` adapts retained cold profiles to shared selection without reproducing native geometry or timing.
 
+While a connected leader's auto-fight run is active, `Actor/PlayerAutoFightPolicy.js` adds temporary zone/recovery constraints to companion designated pulls, the tank fallback and native offensive recipient expansion. Recovery suppresses routine buffs/charge preparation and non-emergency Recharge without rewriting pull settings or detached vassal duties. Inspection is not an assist target. See [auto-fight ownership and limits](world-combat.md#connected-player-auto-fight-p2-bounded-hunting); ordinary behavior resumes outside the run.
+
 The source-adjacent [class policy](../src/GameServer/Bot/AI/CLASS_POLICY.md) describes consumers and approximations. Engineering preference scores are not historical C4 facts, optimal rotations or gameplay certification.
 
 ## Retained cold worker contract

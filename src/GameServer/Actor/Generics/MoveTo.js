@@ -141,7 +141,7 @@ function startPathMovement({ session, actor, path, isClose, moveGoal }) {
         // A bad layer snap must not move a connected player to another floor
         // or bypass native falling via server-side coordinate progression.
         if (moveGoal?.actionOwner && Math.abs(point.locZ - actor.fetchLocZ()) > ACTIVE_GOAL_Z_TOLERANCE) {
-            moveGoal.actionOwner.controller.stop('path_blocked');
+            moveGoal.actionOwner.controller.routeFailed(moveGoal.actionOwner.run);
             return false;
         }
         actor.setLocXYZ(point);
@@ -527,16 +527,19 @@ function moveTo(session, actor, coords) {
                     startX, startY, startZ,
                     pathTarget.locX, pathTarget.locY, pathTarget.locZ
                 );
-                const movementPath = routeFound
+                let movementPath = routeFound
                     ? candidatePath
                     : (fallbackLineOfSight ? [{ ...pathTarget }] : []);
+                const ownedRouteRejected = !!owner && !owner.acceptRoute(movementPath);
+                if (ownedRouteRejected) movementPath = [];
                 if (invoke('GameServer/Bot/Population/PopulationConfig').developerDiagnostics === true) PopulationMetrics.recordPathfindingDuration(isCompanion ? 'companion' : 'actor', Date.now() - pathStartedAt);
                 session.lastPathfinding = {
                     requestedTo,
                     routedTo: { ...pathTarget },
                     townRoute: townRouteDiagnostics,
                     pathLength: movementPath.length,
-                    routeUsable: routeFound || fallbackLineOfSight,
+                    routeUsable: !ownedRouteRejected && (routeFound || fallbackLineOfSight),
+                    ...(ownedRouteRejected ? { reason: 'auto_fight_route_budget' } : {}),
                     lowLodWarp: false,
                     distanceToPlayer,
                     destinationDistanceToPlayer,

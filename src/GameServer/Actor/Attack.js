@@ -110,13 +110,15 @@ class Attack {
         const actor = session.actor;
         const owner = options.actionOwner;
         if (!invoke('GameServer/Actor/PlayerActionOwner').current(session, actor, owner)) return;
-        if (owner && (!owner.controller.legalTarget(creature) || AttackRange.weaponKind(actor) === 'Weapon.Pole')) return;
+        if (owner && !owner.controller.legalTarget(creature)) return;
         const raidParty = invoke('GameServer/Clan/ClanRaidRoster').offensiveParty(session);
 
         if (this.blockedPvpDefense(session, actor, creature) || this.checkParticipants(actor, creature)) {
             return;
         }
 
+        const AutoFightPolicy = invoke('GameServer/Actor/PlayerAutoFightPolicy');
+        if (!AutoFightPolicy.canStart(session, actor, [creature], owner)) return;
         const attackRange = AttackRange.fetchNormalAttackRange(actor);
         const rangedAttack = AttackRange.weaponKind(actor) === 'Weapon.Bow';
         if (rangedAttack && this.bowReloading) {
@@ -139,6 +141,8 @@ class Attack {
             }
             return;
         }
+        const meleeTargets = this.resolveMeleeTargets(actor, creature);
+        if (!AutoFightPolicy.canStart(session, actor, meleeTargets, owner)) return;
         if (rangedAttack && !invoke('GameServer/Actor/BowResources').consume(session, actor)) return;
 
         // Soulshots are only reloaded after the player enables their hotbar toggle.
@@ -175,7 +179,7 @@ class Attack {
         }
         const attackWeapon = WeaponSA.equipped(actor);
         let secondaryDamageMultiplier = 0.85;
-        const hits = this.resolveMeleeTargets(actor, creature).map((target, index) => {
+        const hits = meleeTargets.map((target, index) => {
             const hitLanded = Formulas.calcHitChance(actor, target, Math.random, this.positionContext(actor, target));
             const usedSoulshot = hitLanded && !!actor.soulshotLoaded;
             const hit = this.prepareMeleeHit(actor, target, hitLanded, usedSoulshot);
@@ -190,6 +194,7 @@ class Attack {
         const primary = hits[0];
         const usedSoulshot = hits.some((entry) => entry.usedSoulshot);
         hits.forEach(({ target }) => invoke('GameServer/Bot/AI/BotMobCompetition').record(actor, target));
+        AutoFightPolicy.accepted(session, actor, meleeTargets, owner);
 
         if (rangedAttack && !session.botSession) {
             ConsoleText.transmit(session, ConsoleText.caption.shootArrow);
@@ -204,7 +209,7 @@ class Attack {
             }))
         }), actor);
         actor.state.setHits(true);
-        const swing = this.activeSwing = {};
+        const swing = this.activeSwing = { targets: meleeTargets };
 
         this.queueTimer(() => {
             if (session.actor !== actor) return;
@@ -269,7 +274,7 @@ class Attack {
                 this.bowRepeatTarget = null;
                 this.bowRepeatOwner = null;
             }
-            // Owned P1 swings yield at the native boundary, even after Stop.
+            // Owned swings yield at the native boundary, even after Stop.
             // A bow's movement was released at impact, so its later reload must
             // not clear flags belonging to a newer manual swing or cast.
             if (owner) {
@@ -355,7 +360,20 @@ class Attack {
             return;
         }
 
+        const AutoFightPolicy = invoke('GameServer/Actor/PlayerAutoFightPolicy');
+        const controller = AutoFightPolicy.forAction(session, actor, owner);
+        const offensive = skill.fetchTargetKind?.() === 'enemy' || skill.fetchTargetKind?.() === 'corpse_mob';
+        const acceptedTargets = controller && offensive ? this.resolveSkillTargets(session, actor, creature, skill) : null;
+        if (acceptedTargets && !AutoFightPolicy.canStart(session, actor, acceptedTargets, owner)) return;
+        if (controller && !offensive && (controller.run?.recovery || controller.needsRecovery())
+            && (skill.fetchSemantic?.().trait === 'buff' || skill.fetchSkillType?.() === 'charge'
+                || (skill.fetchSkillType?.() === 'manaRecharge'
+                    && !invoke('GameServer/Bot/AI/PartyAwareness').underDirectNpcAttack(creature.session)))) return;
         const magicSkill = this.beginRemoteCast(session, actor, creature, skill);
+        if (acceptedTargets) {
+            this.activeCast.autoFightTargets = acceptedTargets;
+            AutoFightPolicy.accepted(session, actor, acceptedTargets, owner);
+        }
 
         const castWeapon = WeaponSA.equipped(actor);
         const castTime = skill.fetchCalculatedHitTime();

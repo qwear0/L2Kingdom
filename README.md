@@ -352,7 +352,7 @@ and [bot execution boundary](docs/bot-runtime.md).
 
 - `.admin` - open the admin menu.
 - `.menu` - open the server command menu (stock HTML unless an optional native menu is negotiated).
-- `.autofight` - open the P1 connected-player preview: selection without attack, one basic attack, one allowed single-target learned skill, or movement to a remembered point. This is not autonomous hunting; no recovery, loot or saved preferences yet. Stop is in the same window; manual combat/movement takes over. See [native control and limitations](docs/world-combat.md#connected-player-auto-fight-p1-preview).
+- `.autofight` - open connected-player bounded hunting (P2). Explicitly set the zone center and rest point, choose radius 300/600/900, then Start. The player uses basic attacks and optionally one allowed learned single-target skill; low HP/MP pauses new party pulls and returns to the fixed rest point. Stop is in the same window; manual combat/movement takes over. No player auto-support, automatic loot or saved preferences yet. Real-client acceptance is pending. See [control, recovery and limitations](docs/world-combat.md#connected-player-auto-fight-p2-bounded-hunting).
 - `.sell` - sell all unequipped non-Adena items for 50% item value.
 - `.afksell` - open the native private-sale window and leave a persistent AFK shop at the current peace-zone location.
 - `.afkbuy` - open the native private-purchase window and reserve its Adena budget in a persistent AFK shop.

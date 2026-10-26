@@ -255,6 +255,8 @@ class Automation extends SelectedModel {
 
     scheduleAction(session, src, dst, radius, callback, options = {}) {
         const owner = options.actionOwner;
+        if (['attack', 'skill'].includes(options.action)
+            && !invoke('GameServer/Actor/PlayerAutoFightPolicy').canStart(session, src, [dst], owner)) return false;
         if (owner) {
             if (!invoke('GameServer/Actor/PlayerActionOwner').current(session, src, owner)
                 || !owner.controller.legalTarget(dst)) return false;

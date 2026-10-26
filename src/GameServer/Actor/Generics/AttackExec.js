@@ -31,7 +31,7 @@ function attackExec(session, actor, data) {
     }).catch((error) => {
         if (!current()) return;
         if (owner) {
-            owner.controller.stop('attack_failed');
+            owner.controller.rejectCandidate(owner.run);
             utils.infoWarn('PlayerAutoFight', 'attack failed: %s', error?.message || String(error));
             return;
         }

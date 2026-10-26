@@ -1176,7 +1176,9 @@ const FollowingState = {
     // A support approach or cast already in progress.
     tickPendingSupport(ctx) {
         const { session, bot, Generics, playerSession, pulling, partyThreat, leaderTargetId } = ctx;
-        if (pendingSupportShouldYield(session, bot, playerSession, pulling.puller?.actor, partyThreat || leaderTargetId)) {
+        const recoveryBuff = invoke('GameServer/Actor/PlayerAutoFightPolicy').recovering(playerSession)
+            && String(session.pendingSupportApproach?.kind || '').startsWith('buff:');
+        if (recoveryBuff || pendingSupportShouldYield(session, bot, playerSession, pulling.puller?.actor, partyThreat || leaderTargetId)) {
             clearPendingSupportApproach(session, bot, { abortMove: true });
             BotSupportPlanner.cancelSupportCast(session, bot);
         }
@@ -1408,7 +1410,8 @@ const FollowingState = {
     tickSupportAndHealing(ctx) {
         const { session, bot, Generics, playerSession, player, role, partyRaid, pulling, partyThreat, currentPartyAggroMonsters, leaderTargetId, impairments, botVitals, partyVitals } = ctx;
         let { acted, keepRoleDecision } = ctx;
-        const supportBuffTarget = timedFollowingStage('supportPlan', () => (
+        const recovering = invoke('GameServer/Actor/PlayerAutoFightPolicy').recovering(playerSession);
+        const supportBuffTarget = recovering ? null : timedFollowingStage('supportPlan', () => (
             BotSupportPlanner.nextAction(
                 bot,
                 partySupportMembers(playerSession, pulling.puller),
@@ -1432,7 +1435,7 @@ const FollowingState = {
         const emergencyHealSkill = canAffordHeal(emergencyHealCandidate) ? emergencyHealCandidate : routineHealCandidate;
         const groupHealSkill = canAffordHeal(groupHealCandidate) ? groupHealCandidate : null;
         const topOffHealSkill = groupHealSkill || routineHealSkill;
-        const safeManaPartyMember = role === 'healer' && rechargeSkill && !partyThreat && !leaderTargetId
+        const safeManaPartyMember = !recovering && role === 'healer' && rechargeSkill && !partyThreat && !leaderTargetId
             ? lowestManaPartyMember(playerSession, bot, pulling.puller?.actor)
             : null;
         // A tank remains a standing melee role, but below one taunt reserve it
@@ -1464,7 +1467,7 @@ const FollowingState = {
             partyVitals,
             healerNeedsAction
         );
-        const rebuff = !partyThreat && !leaderTargetId && !isBusy(bot)
+        const rebuff = !recovering && !partyThreat && !leaderTargetId && !isBusy(bot)
             ? timedFollowingStage('rebuffPlan', () => (
                 BotSupportPlanner.rebuffRequest(bot, PartyPulling.supportProviders(playerSession))
             ))
@@ -1767,9 +1770,12 @@ const FollowingState = {
         // the tank's otherwise useful role status every tick.
         if (!acted && !partyRaid && role === 'tank' && partySettings.pullMode === 'auto') {
             const activeMobs = currentPartyAggroMonsters().length;
-            const blockReason = PartyPulling.hasDeadPartyMember(playerSession)
-                ? 'party_revival'
-                : pullBlockReason(session, botVitals, partyVitals, activeMobs, partySettings);
+            const autoFight = invoke('GameServer/Actor/PlayerAutoFightPolicy').forLeader(playerSession);
+            const autoFightPaused = autoFight && (autoFight.run.recovery || autoFight.needsRecovery() || autoFight.run.wait
+                || !['seeking', 'fighting'].includes(autoFight.run.state) || !autoFight.inside(player));
+            const blockReason = autoFightPaused ? 'player_auto_fight_recovery'
+                : PartyPulling.hasDeadPartyMember(playerSession) ? 'party_revival'
+                    : pullBlockReason(session, botVitals, partyVitals, activeMobs, partySettings);
 
             if (blockReason) {
                 recordRoleDecision(session, bot, 'avoid_overpull', blockReason, { activeMobs });
@@ -1777,6 +1783,7 @@ const FollowingState = {
             } else {
                 const nearbyNpcs = World.fetchNpcsInRadius(player.fetchLocX(), player.fetchLocY(), 900);
                 const candidates = nearbyNpcs.filter(npc => !BotRaidSafety.isProtectedRaidEntity(npc)
+                    && (!autoFight || autoFight.canAcquire(npc, bot))
                     && npc.fetchAttackable() && !npc.isDead() && npc.fetchDestId() === undefined
                     && point(bot).distance(point(npc)) < 900)
                     .sort((a, b) => point(bot).distance(point(a)) - point(bot).distance(point(b)));

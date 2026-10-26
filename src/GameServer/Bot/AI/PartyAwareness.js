@@ -353,7 +353,10 @@ function leaderCombatTargetId(leaderSession, options = {}) {
     const leader = leaderSession?.actor;
     if (!isOnlineActor(leader)) return null;
 
-    const targetId = leader.fetchDestId?.();
+    const autoFight = invoke('GameServer/Actor/PlayerAutoFightPolicy').forLeader(leaderSession);
+    // Inspecting a monster remains selection-only during auto-fight. Assist
+    // uses the controller's committed target, never the client's target ring.
+    const targetId = autoFight ? autoFight.combatTargetId() : leader.fetchDestId?.();
     if (!targetId) return null;
     if (partyActorIds(leaderSession).has(targetId)) return null;
 
