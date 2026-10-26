@@ -44,8 +44,9 @@ function compact(queue) {
     if (pending.size === 0 || queue.head === queue.entries.length) {
         queue.entries.length = 0;
         queue.head = 0;
-    } else if (queue.head >= COMPACT_LIMIT && queue.entries.length - queue.head <= COMPACT_LIMIT) {
-        // Copy at most a bounded tail, not the entire backlog on every turn.
+    } else if (queue.head >= COMPACT_LIMIT && queue.head * 2 >= queue.entries.length) {
+        // Amortize copying against the consumed prefix. A steady backlog must
+        // still compact, or consumed entries would accumulate without bound.
         queue.entries = queue.entries.slice(queue.head);
         queue.head = 0;
     }
@@ -80,11 +81,11 @@ function drain() {
             const entry = nextEntry(deadline);
             if (!entry) break;
             pending.delete(entry.key);
-            const startedAt = DiagnosticConfig.developerDiagnostics ? performance.now() : 0;
             if (DiagnosticConfig.developerDiagnostics) {
                 counters.started += 1;
-                sample(waitSamples, startedAt - entry.queuedAt);
+                sample(waitSamples, performance.now() - entry.queuedAt);
             }
+            const startedAt = DiagnosticConfig.developerDiagnostics ? performance.now() : 0;
             try {
                 entry.task();
                 DiagnosticConfig.developerDiagnostics && (counters.completed += 1);

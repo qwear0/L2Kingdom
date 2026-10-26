@@ -68,7 +68,7 @@ async function main() {
     // without asserting exact wall-clock timing on a loaded machine.
     Object.defineProperty(performance, 'now', { configurable: true, value: () => (clock += 0.25) });
     try {
-        for (let index = 0; index < 80; index += 1) {
+        for (let index = 0; index < 1100; index += 1) {
             const key = {};
             Dispatcher.enqueue(key, () => assert.fail('canceled queue copies must not execute'));
             Dispatcher.cancel(key);
@@ -157,7 +157,11 @@ async function main() {
     console.log('Hot AI cooperative dispatcher checks passed');
 }
 
+const deadline = setTimeout(() => {
+    console.error('Hot AI dispatcher check timed out with unfinished work');
+    process.exitCode = 1;
+}, 10000);
 main().catch((error) => {
     console.error(error);
     process.exitCode = 1;
-});
+}).finally(() => clearTimeout(deadline));
