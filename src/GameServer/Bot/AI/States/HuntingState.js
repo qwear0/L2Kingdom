@@ -637,8 +637,15 @@ function tickTarget(session, bot, Generics, BotAI, { allowRetarget = true } = {}
                     at: Date.now()
                 };
             } else if (!npc.isDead() && npc.fetchAttackable?.() !== true) {
-                bot.automation.abortAll(bot);
+                // Cancelled completion timers cannot release combat flags or
+                // drain queued actions after the target becomes unattackable.
+                bot.attack?.abortCast?.(session, bot);
                 bot.attack?.clearTimers?.();
+                bot.attack?.resetQueuedEvent?.();
+                bot.storedSpell = undefined;
+                bot.automation.abortAll(bot);
+                bot.state.setHits(false);
+                bot.state.setCasts(false);
                 clearTarget(session, bot, targetId);
             } else if (npc.isDead()) {
                 const corpseSkill = SummonerTactics.corpseSummonSkill(bot, npc);
