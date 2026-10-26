@@ -24,6 +24,7 @@ function walkAndRun(session, actor) {
 }
 
 function basicAction(session, actor, data) {
+    if (![0x01, 0x28].includes(data.actionId)) invoke('GameServer/Actor/PlayerActionOwner').takeover(session, actor);
     if (actor.isDead()) {
         return;
     }

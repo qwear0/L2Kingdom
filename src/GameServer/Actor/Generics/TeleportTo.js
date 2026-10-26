@@ -83,6 +83,7 @@ function teleportTo(session, actor, coords, options = {}) {
     if (actor.isDead()) {
         return false;
     }
+    actor.playerAutoFight?.dispose('teleported');
     if (!isBotSession(session)) invoke('GameServer/Bot/AI/BotRaidSafety').endPlayerPartyRaid(session);
 
     // NOTE: Do NOT override coords.locZ with GeodataEngine.getHeight() here.

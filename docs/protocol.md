@@ -46,6 +46,12 @@ Authentication login/game-selection responses issue and compare a session key pa
 
 `Actor/Actor.js` owns actor teardown, including summons, timers and actions. Owner deletion is refused while vassals exist; see [vassal ownership](vassals.md). Buffered writes and durable status have separate owners; see [persistence](persistence.md).
 
+## Connected-player automatic action boundary
+
+`.autofight` dispatches through local chat to the stock-HTML `player-auto-fight` bypass; `NpcTalkResponse` dynamically maps that name to its handler. Pages are bound to the actor and connection epoch/revision, independently of optional native-menu negotiation. `NativeUiSession.reset` invalidates the character's page state.
+
+P1 automatic requests carry explicit run ownership, not a fake bot account/session. Client attack/skill/movement and second-click/pickup/basic-action paths stop that run before their normal action is installed. First-click inspection remains separate; automatic native execution retains its explicit target. Passive `ValidatePosition`/`StopMove` are not takeover commands: owned waypoint movement reconciles position without allowing stale reports to rewind/complete the route. Outside the run the native player path is unchanged. See [world/combat](world-combat.md#connected-player-auto-fight-p1-preview) for scope, cancellation and pending C4-client evidence.
+
 ## Client publication is not observer projection
 
 `World/ActorVisibility.js` tracks actual game-client recipients and emits `CharInfo`, movement information and `DeleteObject` as visibility changes. A character appearing in a [WorldObserver](world-observer.md) map or persisted search does not establish native client visibility, reachability or successful entry.

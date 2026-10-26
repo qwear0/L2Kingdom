@@ -125,6 +125,10 @@ function routeClanSpeech(session, data) {
 // Local chat commands (kind 0). Returns true when a command handled the
 // line, false when it is ordinary speech that goes on to the broadcast.
 function dispatchLocalCommand(session, data) {
+    if (String(data.text || '').trim().toLowerCase() === '.autofight') {
+        invoke('GameServer/World/Generics/NpcBypasses/PlayerAutoFight').open(session);
+        return true;
+    }
     if (String(data.text || '').trim().toLowerCase() === '.menu') {
         invoke('GameServer/World/Generics/NpcBypasses/NativeMenu').open(session);
         return true;

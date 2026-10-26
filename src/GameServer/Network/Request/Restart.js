@@ -2,6 +2,7 @@ const ServerResponse = invoke('GameServer/Network/Response');
 const Shared         = invoke('GameServer/Network/Shared');
 
 async function restart(session, buffer) {
+    session.actor?.playerAutoFight?.dispose('restart');
     invoke('GameServer/World/Generics/NativeUiSession').reset(session, { clearDirection: true });
 
     invoke('GameServer/World/ArenaDuelService').release(session, 'restart');

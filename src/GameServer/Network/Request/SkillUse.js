@@ -17,6 +17,7 @@ function skillUse(session, buffer) {
 }
 
 function consume(session, data) {
+    invoke('GameServer/Actor/PlayerActionOwner').takeover(session, session.actor);
     // In C4 the client activates recipe books from their skill icons; it does
     // not send RequestRecipeBookOpen from this UI path.
     const recipeBookKind = RECIPE_BOOK_SKILLS.get(Number(data.selfId));

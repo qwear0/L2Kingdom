@@ -6,6 +6,7 @@ const PathfindingWorkerPool = invoke('GameServer/Geodata/PathfindingWorkerPool')
 const TownNavigation = invoke('GameServer/Bot/AI/TownNavigation');
 const TownTransitPolicy = invoke('GameServer/Bot/AI/TownTransitPolicy');
 const TownTraffic = invoke('GameServer/Bot/AI/TownTraffic');
+const ActionOwner = invoke('GameServer/Actor/PlayerActionOwner');
 
 // World.fetchVisibleUsers broadcasts movement to observers inside this same
 // radius.  Low-detail simulation must never silently relocate a bot that is
@@ -134,8 +135,20 @@ function shouldSkipInitialWaypoint(index, path, distance, dz) {
 }
 
 function startPathMovement({ session, actor, path, isClose, moveGoal }) {
+    const current = () => session.actor === actor && (!moveGoal || session.activeMoveGoal === moveGoal)
+        && ActionOwner.current(session, actor, moveGoal?.actionOwner);
+    const advancePosition = (point) => {
+        // A bad layer snap must not move a connected player to another floor
+        // or bypass native falling via server-side coordinate progression.
+        if (moveGoal?.actionOwner && Math.abs(point.locZ - actor.fetchLocZ()) > ACTIVE_GOAL_Z_TOLERANCE) {
+            moveGoal.actionOwner.controller.stop('path_blocked');
+            return false;
+        }
+        actor.setLocXYZ(point);
+        return true;
+    };
     const moveAlongPath = (index) => {
-        if (moveGoal && session.activeMoveGoal !== moveGoal) return;
+        if (!current()) return;
         if (index >= path.length) {
             if (moveGoal?.town) TownTraffic.remove(Number(actor.fetchId()));
             session.moveTimer = null;
@@ -161,7 +174,7 @@ function startPathMovement({ session, actor, path, isClose, moveGoal }) {
         }
 
         if (distance === 0) {
-            actor.setLocXYZ(nextLoc);
+            if (!advancePosition(nextLoc)) return;
             invoke('GameServer/Bot/AI/PartyCompanionService').updatePosition(session, actor);
             moveAlongPath(index + 1);
             return;
@@ -190,11 +203,11 @@ function startPathMovement({ session, actor, path, isClose, moveGoal }) {
         });
 
         const advanceSegment = () => {
-            if (!session.moveTimer || (moveGoal && session.activeMoveGoal !== moveGoal)) return;
+            if (!session.moveTimer || !current()) return;
             const elapsed = Math.max(0, Date.now() - segmentStartedAt);
             const ratio = Math.min(1, elapsed / duration);
             if (ratio >= 1) {
-                actor.setLocXYZ(nextLoc);
+                if (!advancePosition(nextLoc)) return;
                 invoke('GameServer/Bot/AI/PartyCompanionService').updatePosition(session, actor);
                 session.moveTimer = null;
                 if (invoke('GameServer/Bot/Population/PopulationConfig').developerDiagnostics === true) recordMovementTrace(session, {
@@ -211,7 +224,7 @@ function startPathMovement({ session, actor, path, isClose, moveGoal }) {
                 const nextY = Math.round(currentLoc.locY + dy * ratio);
                 const nextZ = Math.round(currentLoc.locZ + dz * ratio);
                 const snappedZ = GeodataEngine.getHeight(nextX, nextY, nextZ);
-                actor.setLocXYZ({ locX: nextX, locY: nextY, locZ: snappedZ });
+                if (!advancePosition({ locX: nextX, locY: nextY, locZ: snappedZ })) return;
                 invoke('GameServer/Bot/AI/PartyCompanionService').updatePosition(session, actor);
                 if (moveGoal?.town) {
                     const point = locOf(actor);
@@ -286,6 +299,9 @@ function previewRouteSession(session) {
 
 function moveTo(session, actor, coords) {
     const previewOnly = coords.previewOnly === true;
+    const owner = coords.actionOwner;
+    if (!ActionOwner.current(session, actor, owner)) return;
+    const serverControlled = !!owner;
     if (!previewOnly && actor.isDead()) {
         return;
     }
@@ -313,7 +329,7 @@ function moveTo(session, actor, coords) {
     // repeated command to the active goal must not abort movement, rerun A*,
     // or broadcast StopMove + MoveToLocation again. Recovery callers can
     // explicitly replace a healthy-looking route with forceRepath.
-    if (!previewOnly && isBot && coords.forceRepath !== true) {
+    if (!previewOnly && (isBot || serverControlled) && coords.forceRepath !== true) {
         const activeGoal = activeMoveGoal(session, actor);
         if (activeGoal && sameMoveGoal(activeGoal.requestedTo, requestedTo)) {
             return session.lastPathfinding;
@@ -324,13 +340,14 @@ function moveTo(session, actor, coords) {
     if (!previewOnly) {
         // Abort scheduled movement, user redirected the actor
         actor.automation.abortAll(actor);
+        if (serverControlled) actor.automation.actionOwner = owner;
     }
 
-    if (!isBot) {
+    if (!isBot && !serverControlled) {
         // Normal player movement
         session.dataSendToMeAndOthers(ServerResponse.moveToLocation(actor.fetchId(), coords), actor);
     } else {
-        // Bot movement
+        // Authoritative waypoints for bots or explicitly owned player actions.
         const startX = coords.from.locX;
         const startY = coords.from.locY;
         const startZ = coords.from.locZ;
@@ -362,12 +379,12 @@ function moveTo(session, actor, coords) {
         // A* synchronously stalls the game loop when several hot bots navigate
         // a city at once, so share the bounded companion worker pool for those
         // expensive autonomous routes as well.
-        const useWorkerPathfinding = isCompanion || !!session.vassal || pathMaxNodes > COMPANION_PATH_MAX_NODES;
-        const useSegmentedTownRoute = pathMaxNodes > COMPANION_PATH_MAX_NODES;
+        const useWorkerPathfinding = serverControlled || isCompanion || !!session.vassal || pathMaxNodes > COMPANION_PATH_MAX_NODES;
+        const useSegmentedTownRoute = !serverControlled && pathMaxNodes > COMPANION_PATH_MAX_NODES;
         const townName = useSegmentedTownRoute && TownNavigation.enabled()
             ? TownTransitPolicy.routeTown({ locX: startX, locY: startY, locZ: startZ }, requestedTo) : null;
 
-        if (!session.vassal && !townName && shouldUseLowLodWarp({
+        if (!serverControlled && !session.vassal && !townName && shouldUseLowLodWarp({
             startDistance: distanceToPlayer,
             destinationDistance: destinationDistanceToPlayer,
             isCompanion,
@@ -395,11 +412,12 @@ function moveTo(session, actor, coords) {
             return session.lastPathfinding;
         }
 
-        const isClose = isCompanion || distanceToPlayer <= 500;
+        const isClose = serverControlled || isCompanion || distanceToPlayer <= 500;
 
         let pathTarget = { ...requestedTo };
         const pathStartedAt = invoke('GameServer/Bot/Population/PopulationConfig').developerDiagnostics === true ? Date.now() : null;
         const moveGoal = previewOnly ? null : beginMoveGoal(session, actor, requestedTo, coords.targetActor);
+        if (moveGoal && owner) moveGoal.actionOwner = owner;
         if (moveGoal && townName) {
             moveGoal.town = townName;
             moveGoal.observers = onlinePlayers;
@@ -467,7 +485,7 @@ function moveTo(session, actor, coords) {
                 coords.to.locY = pathTarget.locY;
                 coords.to.locZ = pathTarget.locZ;
             }
-            const requestKey = `${isCompanion ? 'companion' : 'bot'}:${actorId}`;
+            const requestKey = `${serverControlled ? 'player-auto-fight' : isCompanion ? 'companion' : 'bot'}:${actorId}`;
             const clearPending = ({ clearGoal = false } = {}) => {
                 const pending = session.pendingPathRequest;
                 if (pending?.key === requestKey && pending.generation === routeGeneration) {
@@ -477,6 +495,7 @@ function moveTo(session, actor, coords) {
                 if (clearGoal) clearMoveGoal(session, moveGoal);
             };
             const isCurrent = () => (
+                ActionOwner.current(session, actor, owner) &&
                 Number(session.moveRouteGeneration || 0) === routeGeneration &&
                 (!isCompanion || (
                     session.partyCompanion === true &&
@@ -555,6 +574,7 @@ function moveTo(session, actor, coords) {
                     clearPending({ clearGoal: true });
                     return null;
                 }
+                if (serverControlled) return finish(candidatePath, strategy);
                 if (Array.isArray(candidatePath) && candidatePath.length > 1) {
                     if (sameLoc(target, requestedTo)) session.townRoutePlan = null;
                     return finish(candidatePath, strategy);

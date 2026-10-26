@@ -31,6 +31,7 @@ class Actor extends ActorModel {
     }
 
     destructor() {
+        this.playerAutoFight?.dispose('actor_disposed');
         invoke('GameServer/Skills/ChargeLifecycle').dispose(this);
         // A player-owned summon retains follow/feed/lifetime timers. Dispose it
         // while the owner and session are still valid; otherwise a timer can

@@ -254,6 +254,36 @@ class Automation extends SelectedModel {
     }
 
     scheduleAction(session, src, dst, radius, callback, options = {}) {
+        const owner = options.actionOwner;
+        if (owner) {
+            if (!invoke('GameServer/Actor/PlayerActionOwner').current(session, src, owner)
+                || !owner.controller.legalTarget(dst)) return false;
+            const range = options.collisionAware
+                ? AttackRange.effectiveRange(src, dst, radius) : Math.max(0, Number(radius) || 0);
+            this.actionOwner = owner;
+            const execute = () => {
+                if (!invoke('GameServer/Actor/PlayerActionOwner').current(session, src, owner)
+                    || !owner.controller.legalTarget(dst)) return;
+                this.actionOwner = owner;
+                owner.run.dispatched = true;
+                const restrictions = invoke('GameServer/Effects/EffectRestrictions');
+                if (src.state.isBlocked() || !(options.action === 'attack'
+                    ? restrictions.canAttack(src) : restrictions.canCast(src))) {
+                    restrictions.reject(session);
+                    return;
+                }
+                callback();
+                owner.run.nativeStarted = src.state.fetchHits() || src.state.fetchCasts();
+            };
+            if (AttackRange.distance2d(src, dst) <= range
+                && Math.abs(src.fetchLocZ() - dst.fetchLocZ()) <= 64
+                && invoke('GameServer/Geodata/GeodataEngine').hasLineOfSight(
+                    src.fetchLocX(), src.fetchLocY(), src.fetchLocZ(), dst.fetchLocX(), dst.fetchLocY(), dst.fetchLocZ())) {
+                execute();
+                return true;
+            }
+            return owner.approach(dst, range, execute);
+        }
         // MoveToPawn interpolates a straight line. Bot actions must not use
         // it to cross a wall, even when the target is already in hit range.
         // The AI retries the action after the ordinary geodata route ends.
@@ -528,6 +558,7 @@ class Automation extends SelectedModel {
     }
 
     abortMovement(creature, { notifyClient = true } = {}) {
+        this.actionOwner = null;
         this.clearPlayerAttackApproach();
         this.stopMoveInterpolation();
         const wasMoving = !!creature?.state?.inMotion?.() && !creature?.session?.pendingPathRequest;

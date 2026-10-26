@@ -21,6 +21,7 @@ function attack(session, buffer) {
 }
 
 function consume(session, data) {
+    invoke('GameServer/Actor/PlayerActionOwner').takeover(session, session.actor);
     session.actor.select(data);
 }
 

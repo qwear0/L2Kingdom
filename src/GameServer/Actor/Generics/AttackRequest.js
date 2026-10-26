@@ -1,4 +1,5 @@
 const AttackRange = invoke('GameServer/Actor/AttackRange');
+const ActionOwner = invoke('GameServer/Actor/PlayerActionOwner');
 
 const fetchNormalAttackRange = AttackRange.fetchNormalAttackRange;
 
@@ -10,6 +11,8 @@ function withNormalAttackRange(actor, data) {
 }
 
 function attackRequest(session, actor, data) {
+    if (!ActionOwner.current(session, actor, data.actionOwner)) return;
+    if (!data.actionOwner) ActionOwner.takeover(session, actor);
     const Generics = invoke(path.actor);
     const EffectRestrictions = invoke('GameServer/Effects/EffectRestrictions');
 

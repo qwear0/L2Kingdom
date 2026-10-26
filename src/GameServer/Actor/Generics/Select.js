@@ -112,10 +112,16 @@ function openManufactureWindow(session, crafter) {
 }
 
 function select(session, actor, data) {
+    const ActionOwner = invoke('GameServer/Actor/PlayerActionOwner');
+    if (!ActionOwner.current(session, actor, data.actionOwner)) return;
+    const revision = actor.selectionRevision = Number(actor.selectionRevision || 0) + 1;
+    const current = () => session.actor === actor && actor.selectionRevision === revision
+        && ActionOwner.current(session, actor, data.actionOwner);
+    if (!data.selectionOnly && Number(actor.fetchDestId()) === Number(data.id)) ActionOwner.takeover(session, actor);
     const Generics = invoke(path.actor);
     // AI target refreshes are not client double-clicks. Combat planners
     // choose whether to cast, finish with a weapon, or hold their attack.
-    const selectionOnly = session?.constructor?.name === 'BotSession'
+    const selectionOnly = data.selectionOnly === true || session?.constructor?.name === 'BotSession'
         || String(session?.accountId || '').startsWith('bot_');
     if (selectionOnly && Number(actor.fetchDestId()) === Number(data.id)) return;
 
@@ -179,6 +185,7 @@ function select(session, actor, data) {
 
     // Fallback to World lookups for non-bot entities
     World.fetchNpc(data.id).then((npc) => {
+        if (!current()) return;
         // Another AI pass can select this target while the lookup is pending.
         if (selectionOnly && Number(actor.fetchDestId()) === Number(npc.fetchId())) return;
         if (npc.fetchId() !== actor.fetchDestId()) { // First click on a Creature
@@ -195,10 +202,14 @@ function select(session, actor, data) {
             Generics.attackRequest(session, actor, data);
         }
     }).catch(() => {
+        if (!current()) return;
         World.fetchItem(data.id).then(() => {
+            if (!current() || data.selectionOnly) return;
             Generics.pickupRequest(session, actor, data);
         }).catch(() => {
+            if (!current()) return;
             World.fetchUser(data.id).then((user) => {
+                if (!current()) return;
                 if (selectionOnly && Number(actor.fetchDestId()) === Number(user.fetchId())) return;
                 if (user.fetchId() !== actor.fetchDestId()) { // First click on a User
                     actor.setDestId(user.fetchId());

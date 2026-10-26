@@ -25,6 +25,7 @@ function validatePosition(session, buffer) {
 }
 
 function consume(session, data) {
+    data = session.actor.playerAutoFight?.reconcilePosition(data) || data;
     if (!EffectRestrictions.canMove(session.actor)) {
         EffectRestrictions.stopMovement(session, session.actor);
         EffectRestrictions.reject(session);

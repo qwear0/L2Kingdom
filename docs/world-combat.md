@@ -9,6 +9,7 @@ Read this before changing spatial publication, native actions or effect timing. 
 | `src/GameServer/World/World.js` | Session registration, actor/NPC/item presence and spatial queries. |
 | `src/GameServer/Model/Creature.js`, `Model/Actor.js` | Creature values/state and publication-aware actor setters. |
 | `src/GameServer/Actor/Actor.js` | Session-facing character, inventory, skills, attack and automation ownership. |
+| `src/GameServer/Actor/PlayerAutoFight.js`, `Actor/PlayerActionOwner.js` | Connected-player P1 single-action controller and explicit run ownership; not a bot or full hunting mode. |
 | `src/GameServer/Actor/Generics/` | Native character actions used by request handlers and bot adapters. |
 | `src/GameServer/Automation.js`, `Timer.js` | Continuing actions and shared timing helpers; not a single global simulation tick. |
 | `src/GameServer/Npc/Npc.js` | Native NPC state, behavior and combat timers. |
@@ -30,7 +31,7 @@ The [observer](world-observer.md) builds its own cross-world projections and can
 
 ## Movement and asynchronous paths
 
-- `Actor/Generics/MoveTo.js` distinguishes ordinary client-driven player movement from authoritative bot waypoint movement.
+- `Actor/Generics/MoveTo.js` distinguishes ordinary client-driven player movement from authoritative waypoint movement. Explicitly owned player auto-fight actions reuse the native worker/waypoint path without bot identity, low-detail warps or town-errand fallback.
 - `Actor/Generics/UpdatePosition.js` preserves reported Z and queues persistence. Spatial publication and SQLite durability are separate transitions.
 - Vassals/companions and expensive routes can use `Geodata/PathfindingWorkerPool.js`. Results must still match actor identity, route generation, target and current location before application.
 - Cancellation invalidates the route generation. A late result must not resurrect an old move after a new command or character switch.
@@ -49,6 +50,21 @@ The [observer](world-observer.md) builds its own cross-world projections and can
 5. Recipient-safe response paths publish animations/status. Request acceptance, launch animation and successful effect outcome are distinct events.
 
 NPCs have their own timer-driven behavior. `World/Generics/RemoveNpc.js` separates corpse decay from reward/respawn handling; respawn timing starts at death, not when the corpse becomes invisible. Do not assume a single tick determines every stage.
+
+## Connected-player auto-fight: P1 preview
+
+- Entrypoint: `.autofight` or the `.menu` preview entry → `World/Generics/NpcBypasses/PlayerAutoFight.js`. It uses stock HTML/HtmlKit, actor-bound epochs and consumed page revisions; no native-menu capability negotiation or client patch is required. Closing HTML does not stop a run; reopen it to reach Stop/status.
+- This is deliberately **one action per run**, not autonomous farming: selection-only, one basic swing, one explicitly allowed learned single-target damage/drain/blow skill, or movement to a point remembered while stopped. Choose a monster in the client, refresh the page, then act. For movement, remember the destination, move away manually, reopen the page and request Move to point.
+- P1 accepts only a living ordinary `Monster` within 600 horizontal units and 64 Z units, excluding summons and protected raid entities. Polearm swings and area/aura skills are unavailable. Full encounter/zone/engagement policy, recovery, companion/summon coordination, pickup and persisted preferences are not implemented. Do not treat this preview as the later hunting feature.
+- `PlayerActionOwner` carries an explicit source/controller/run through queued requests, asynchronous world lookups, native approaches and path callbacks. A stopped/replaced run cannot resume its route or dispatch an old action. Automatic selection uses `selectionOnly`; execution keeps its explicit target even if the player inspects another object.
+- Owned skills enter native execution immediately, without storing a spell for a future `ValidatePosition`. Native equipment, resources, reuse and effects still decide acceptance/results. Native action completion and rejection are reported separately.
+- Movement uses the existing bounded geodata worker and native waypoint timers. Arrival is checked against actual actor proximity/layer and line of sight for target actions, not merely elapsed time. An unusable route or finite deadline stops this P1 run with a visible reason; automatic retry/acquisition policy belongs to later phases. P1 conservatively blocks server progression that would change Z by more than 64 units in one update instead of snapping a connected player to another floor or through a fall; it does not implement automated jumps/drops. Existing missing-geodata limitations still apply.
+- During owned movement, server progression owns XY. Nearby passive reports may update heading/floor Z without rewinding the route; stale reports cannot complete it. Passive `StopMove` reports do not take control or stop the route. Ordinary movement/position handling remains client-driven outside the run. Explicit manual movement cancels the run first and starts from the latest authoritative position.
+- Explicit Start replaces older unlaunched stored/queued native requests after rejecting active/blocking states. Pending native lookups cannot take control back from that new run. Stop invalidates the run and removes only its queued/stored actions and owned movement. It does **not** blanket-clear `Attack` timers: an already started swing/cast retains native impact/interruption semantics, but an owned swing never automatically repeats. Native completion can release a subsequently queued manual command; old bow reload/cast callbacks must not clear a newer action's flags.
+- Explicit manual attack, skill, second-click action, pickup, sit/stand and summon commands take over before executing normally. First-click target inspection does not retarget the run. No special Esc behavior is promised.
+- Stop/manual takeover retains the in-memory point and allowed skill. Death/actor teardown, teleport, logout/restart and character replacement clear both; no run automatically resumes and no P1 state is saved in SQLite.
+
+Verification is source/syntax only until a separately authorized C4-client check confirms selection, cast initiation, obstacle routing, Stop/takeover and ordinary movement. Adding menu entry 12 makes the hard-coded 11-entry/unknown-12 assertions in `tests/test_native_menu.js` stale; that test is not updated or executed under the current no-test authorization.
 
 ## Effects and saved status
 

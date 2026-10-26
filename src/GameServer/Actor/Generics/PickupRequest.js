@@ -1,4 +1,5 @@
 function pickupRequest(session, actor, data) {
+    invoke('GameServer/Actor/PlayerActionOwner').takeover(session, actor);
     const Generics = invoke(path.actor);
 
     if (actor.isDead()) {

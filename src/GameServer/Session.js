@@ -176,6 +176,7 @@ class Session {
     }
 
     setActor(properties) {
+        this.actor?.playerAutoFight?.dispose('character_replaced');
         World.retireUserActor(this, this.actor);
         // The connection survives returning to character selection.
         invoke('GameServer/World/Generics/NativeUiSession').reset(this);

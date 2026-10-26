@@ -31,6 +31,9 @@ function moveToLocation(session, buffer) {
 }
 
 function consume(session, data) {
+    const takingOver = !!session.actor.playerAutoFight?.run;
+    invoke('GameServer/Actor/PlayerActionOwner').takeover(session, session.actor);
+    if (takingOver) data.from = { locX: session.actor.fetchLocX(), locY: session.actor.fetchLocY(), locZ: session.actor.fetchLocZ() };
     const recovery = invoke('GameServer/Geodata/PlayerTransitionRecovery');
     data.from = recovery.source(session, data.from);
     data.to = playerMoveDestination(session.actor, data.from, data.to);

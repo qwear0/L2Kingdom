@@ -351,6 +351,8 @@ party, which current startup does not create. See the [vassal contract](docs/vas
 and [bot execution boundary](docs/bot-runtime.md).
 
 - `.admin` - open the admin menu.
+- `.menu` - open the server command menu (stock HTML unless an optional native menu is negotiated).
+- `.autofight` - open the P1 connected-player preview: selection without attack, one basic attack, one allowed single-target learned skill, or movement to a remembered point. This is not autonomous hunting; no recovery, loot or saved preferences yet. Stop is in the same window; manual combat/movement takes over. See [native control and limitations](docs/world-combat.md#connected-player-auto-fight-p1-preview).
 - `.sell` - sell all unequipped non-Adena items for 50% item value.
 - `.afksell` - open the native private-sale window and leave a persistent AFK shop at the current peace-zone location.
 - `.afkbuy` - open the native private-purchase window and reserve its Adena budget in a persistent AFK shop.

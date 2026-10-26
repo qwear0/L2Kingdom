@@ -1,4 +1,8 @@
+const ActionOwner = invoke('GameServer/Actor/PlayerActionOwner');
+
 function skillRequest(session, actor, data) {
+    if (!ActionOwner.current(session, actor, data.actionOwner)) return;
+    if (!data.actionOwner) ActionOwner.takeover(session, actor);
     const Generics = invoke(path.actor);
     const EffectRestrictions = invoke('GameServer/Effects/EffectRestrictions');
     const ToggleSkills = invoke('GameServer/Skills/ToggleSkills');
@@ -8,7 +12,7 @@ function skillRequest(session, actor, data) {
         return;
     }
 
-    if (!skill) {
+    if (!skill || (data.actionOwner && !data.actionOwner.controller.allowsSkill(skill))) {
         return;
     }
 
@@ -45,7 +49,7 @@ function skillRequest(session, actor, data) {
         data.id = actor.fetchId();
     }
     else {
-        data.id = actor.fetchDestId();
+        data.id = data.actionOwner ? data.id : actor.fetchDestId();
         // Lisvus TARGET_ONE explicitly permits SEED on the caster. With no
         // selected target, preserve that native self-seeding route.
         if (data.id === undefined && skill.fetchSkillType?.() === 'seed') {
@@ -63,6 +67,13 @@ function skillRequest(session, actor, data) {
 
     if (actor.isBlocked()) {
         Generics.queueRequest(session, actor, 'skill', data);
+        return;
+    }
+
+    if (data.actionOwner) {
+        Generics.clearStoredActions(session, actor);
+        Generics.stopAutomation(session, actor);
+        Generics.skillExec(session, actor, data);
         return;
     }
 

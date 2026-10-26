@@ -22,6 +22,8 @@ class Attack {
         this.timers = new Set();
         this.bowReloading = false;
         this.bowRepeatTarget = null;
+        this.bowRepeatOwner = null;
+        this.activeSwing = null;
         this.resetQueuedEvent();
     }
 
@@ -43,6 +45,9 @@ class Attack {
 
         let actor = session.actor;
         let queue = this.queue;
+        this.resetQueuedEvent();
+        if (!actor || actor.attack !== this
+            || !invoke('GameServer/Actor/PlayerActionOwner').current(session, actor, queue.data?.actionOwner)) return;
         actor.state.setHits(false);
 
         switch (queue.name) {
@@ -52,7 +57,6 @@ class Attack {
             case 'pickup' : Generics.pickupRequest(session, actor, queue.data); break;
             case 'sit'    : Generics.basicAction  (session, actor, queue.data); break;
         }
-        this.resetQueuedEvent();
     }
 
     resetQueuedEvent() {
@@ -74,6 +78,8 @@ class Attack {
         this.timers.clear();
         this.bowReloading = false;
         this.bowRepeatTarget = null;
+        this.bowRepeatOwner = null;
+        this.activeSwing = null;
     }
 
     abortCast(session, actor) {
@@ -99,9 +105,12 @@ class Attack {
         return true;
     }
 
-    meleeHit(session, creature) {
+    meleeHit(session, creature, options = {}) {
         if (session?.pvpHandoffPending) return;
         const actor = session.actor;
+        const owner = options.actionOwner;
+        if (!invoke('GameServer/Actor/PlayerActionOwner').current(session, actor, owner)) return;
+        if (owner && (!owner.controller.legalTarget(creature) || AttackRange.weaponKind(actor) === 'Weapon.Pole')) return;
         const raidParty = invoke('GameServer/Clan/ClanRaidRoster').offensiveParty(session);
 
         if (this.blockedPvpDefense(session, actor, creature) || this.checkParticipants(actor, creature)) {
@@ -114,16 +123,19 @@ class Attack {
             // Movement and other actions are legal after the arrow is released,
             // but another arrow must still wait for the weapon reuse phase.
             this.bowRepeatTarget = creature;
+            this.bowRepeatOwner = owner;
             return;
         }
         if (!AttackRange.isWithinRange(actor, creature, attackRange)
-            || invoke('GameServer/Automation').needsGeodataApproach(session, actor, creature)) {
+            || invoke('GameServer/Automation').needsGeodataApproach(session, actor, creature)
+            || (owner && !invoke('GameServer/Geodata/GeodataEngine').hasLineOfSight(
+                actor.fetchLocX(), actor.fetchLocY(), actor.fetchLocZ(), creature.fetchLocX(), creature.fetchLocY(), creature.fetchLocZ()))) {
             actor.state.setHits(false);
             // Auto-attacks and chase arrivals both return here. The target
             // may have moved since the initial attack request or last swing.
             if (invoke('GameServer/Effects/EffectRestrictions').canMove(actor)) {
                 actor.automation.scheduleAction(session, actor, creature, attackRange,
-                    () => this.meleeHit(session, creature), { collisionAware: true, action: 'attack' });
+                    () => this.meleeHit(session, creature, options), { collisionAware: true, action: 'attack', actionOwner: owner });
             }
             return;
         }
@@ -192,15 +204,18 @@ class Attack {
             }))
         }), actor);
         actor.state.setHits(true);
+        const swing = this.activeSwing = {};
 
         this.queueTimer(() => {
+            if (session.actor !== actor) return;
             const releaseBowMovement = () => {
-                if (!rangedAttack) return;
+                if (!rangedAttack || (owner && this.activeSwing !== swing)) return;
                 actor.state.setHits(false);
                 if (this.queue.name) this.dequeueEvent(session);
             };
 
-            if (this.blockedPvpDefense(session, actor, creature) || this.checkParticipants(actor, creature)) {
+            if (owner ? (actor.state.fetchDead() || creature.state.fetchDead())
+                : (this.blockedPvpDefense(session, actor, creature) || this.checkParticipants(actor, creature))) {
                 releaseBowMovement();
                 return;
             }
@@ -245,11 +260,27 @@ class Attack {
         }, timing.drawMs); // Until hit point
 
         this.queueTimer(() => {
+            if (session.actor !== actor) return;
             const repeatTarget = rangedAttack ? this.bowRepeatTarget : null;
+            const repeatOwner = rangedAttack ? this.bowRepeatOwner : null;
             const nextTarget = repeatTarget || creature;
             if (rangedAttack) {
                 this.bowReloading = false;
                 this.bowRepeatTarget = null;
+                this.bowRepeatOwner = null;
+            }
+            // Owned P1 swings yield at the native boundary, even after Stop.
+            // A bow's movement was released at impact, so its later reload must
+            // not clear flags belonging to a newer manual swing or cast.
+            if (owner) {
+                if (this.activeSwing === swing) {
+                    this.activeSwing = null;
+                    if (!rangedAttack) actor.state.setHits(false);
+                }
+                if (actor.state.fetchHits() || actor.state.fetchCasts()) return;
+                if (this.queue.name) this.dequeueEvent(session);
+                else if (repeatTarget) this.meleeHit(session, repeatTarget, { actionOwner: repeatOwner });
+                return;
             }
             if (this.blockedPvpDefense(session, actor, nextTarget) || this.checkParticipants(actor, nextTarget)) {
                 return;
@@ -266,7 +297,7 @@ class Attack {
             }
 
             if (rangedAttack && repeatTarget) {
-                this.meleeHit(session, nextTarget);
+                this.meleeHit(session, nextTarget, { actionOwner: repeatOwner });
                 return;
             }
 
@@ -281,9 +312,12 @@ class Attack {
         }, timing.cycleMs); // Until end of combat move or bow reload
     }
 
-    remoteHit(session, creature, skill) {
+    remoteHit(session, creature, skill, options = {}) {
         if (session?.pvpHandoffPending) return;
         const actor = session.actor;
+        const owner = options.actionOwner;
+        if (!invoke('GameServer/Actor/PlayerActionOwner').current(session, actor, owner)) return;
+        if (owner && (!owner.controller.legalTarget(creature) || !owner.controller.allowsSkill(skill))) return;
         const raidParty = invoke('GameServer/Clan/ClanRaidRoster').offensiveParty(session);
         const corpseTarget = ['corpse_mob', 'corpse_player', 'corpse_pet', 'corpse_ally']
             .includes(skill.fetchTargetKind?.());
@@ -329,11 +363,16 @@ class Attack {
         // casts longer than its 420 ms gauge threshold. Keep short/static
         // casts at their existing duration, without negative timer delays.
         const launchLead = magicSkill && castTime > 420 ? 400 : 0;
-        const cast = { raidParty, corpseTarget, mpCost, magicSkill, launchLead, castWeapon };
-        const land = () => this.landRemoteCast(session, actor, creature, skill, cast);
+        const cast = { raidParty, corpseTarget, mpCost, magicSkill, launchLead, castWeapon,
+            actionOwner: owner, castState: this.activeCast };
+        const land = () => {
+            if (owner && (session.actor !== actor || this.activeCast !== cast.castState)) return;
+            this.landRemoteCast(session, actor, creature, skill, cast);
+            if (owner && !actor.state.fetchCasts() && this.queue.name) this.dequeueEvent(session);
+        };
 
         if (launchLead) {
-            this.queueTimer(() => this.launchRemoteCast(session, actor, creature, skill, corpseTarget),
+            this.queueTimer(() => this.launchRemoteCast(session, actor, creature, skill, corpseTarget, cast),
                 castTime - launchLead);
         }
         // Schedule from the same start time: a delayed launch callback must
@@ -366,13 +405,19 @@ class Attack {
         return magicSkill;
     }
 
-    launchRemoteCast(session, actor, creature, skill, corpseTarget) {
-        if (this.blockedPvpDefense(session, actor, creature, skill)
-            || this.checkParticipants(actor, creature, { allowDeadTarget: corpseTarget })) {
+    launchRemoteCast(session, actor, creature, skill, corpseTarget, cast = {}) {
+        if (cast.actionOwner && (session.actor !== actor || this.activeCast !== cast.castState)) return;
+        if (cast.actionOwner ? (actor.state.fetchDead() || creature.state.fetchDead())
+            : (this.blockedPvpDefense(session, actor, creature, skill)
+                || this.checkParticipants(actor, creature, { allowDeadTarget: corpseTarget }))) {
             this.clearTimers();
             HotPartyCastTracker.clear(actor);
             invoke('GameServer/Bot/AI/BotSupportPlanner').cancelSupportCast(session, actor);
             invoke('GameServer/Bot/AI/BotPartyChat').cancelExpectedSkillResult(session, actor, creature, skill);
+            if (cast.actionOwner) {
+                actor.state.setCasts(false);
+                if (this.queue.name) this.dequeueEvent(session);
+            }
             return;
         }
         const targets = this.resolveSkillTargets(session, actor, creature, skill);
@@ -384,13 +429,16 @@ class Attack {
         }
     }
 
-    landRemoteCast(session, actor, creature, skill, { raidParty, corpseTarget, mpCost, magicSkill, launchLead, castWeapon }) {
+    landRemoteCast(session, actor, creature, skill, { raidParty, corpseTarget, mpCost, magicSkill, launchLead, castWeapon, actionOwner, castState }) {
+        if (actionOwner && (session.actor !== actor || this.activeCast !== castState)) return;
         this.activeCast = null;
         // Once the landing callback owns the turn, no other damage event
         // can interleave before MP and effects resolve. Stop watching the
         // target before the authoritative cast work begins.
         HotPartyCastTracker.clear(actor);
-        if (this.blockedPvpDefense(session, actor, creature, skill) || this.checkParticipants(actor, creature, { allowDeadTarget: corpseTarget })) {
+        if (actionOwner ? (actor.state.fetchDead() || creature.state.fetchDead())
+            : (this.blockedPvpDefense(session, actor, creature, skill) || this.checkParticipants(actor, creature, { allowDeadTarget: corpseTarget }))) {
+            if (actionOwner) actor.state.setCasts(false);
             invoke('GameServer/Bot/AI/BotSupportPlanner').cancelSupportCast(session, actor);
             invoke('GameServer/Bot/AI/BotPartyChat').cancelExpectedSkillResult(session, actor, creature, skill);
             return;

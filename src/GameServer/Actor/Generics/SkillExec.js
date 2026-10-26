@@ -1,5 +1,6 @@
 const World = invoke('GameServer/World/World');
 const ArenaCombatRules = invoke('GameServer/World/ArenaCombatRules');
+const ActionOwner = invoke('GameServer/Actor/PlayerActionOwner');
 
 function canTargetEnemyNpc(npc, data = {}) {
     return npc?.fetchAttackable?.() === true || npc?.fetchIsSummon?.() === true || data.ctrl === true;
@@ -13,8 +14,13 @@ function cancelFailedSupportTarget(session, actor, data, skill) {
 }
 
 function skillExec(session, actor, data) {
+    const owner = data.actionOwner;
+    const generation = Number(actor.playerAutoFight?.generation || 0);
+    const current = () => session.actor === actor && ActionOwner.current(session, actor, owner)
+        && (!!owner || Number(actor.playerAutoFight?.generation || 0) === generation);
+    if (!current()) return;
     const skill = actor.skillset.fetchSkill(data.selfId);
-    if (!skill) return;
+    if (!skill || (owner && !owner.controller.allowsSkill(skill))) return;
     const SpoilSweep = invoke('GameServer/Npc/SpoilSweep');
 
     if (skill.fetchTargetKind() === 'self') {
@@ -50,8 +56,12 @@ function skillExec(session, actor, data) {
         return;
     }
 
+    if (owner) owner.run.lookupPending = true;
     World.fetchNpc(data.id).then((npc) => {
+        if (!current()) return;
+        if (owner) owner.run.lookupPending = false;
         actor.automation.scheduleAction(session, actor, npc, skill.fetchDistance(), () => {
+            if (!current()) return;
             if (SpoilSweep.isSpoilSkill(data.selfId)) {
                 SpoilSweep.castSpoil(session, actor, npc, skill);
                 return;
@@ -75,13 +85,21 @@ function skillExec(session, actor, data) {
                 actor.attack.remoteHit(session, npc, skill);
             }
             else if (skill.fetchTargetKind() === 'enemy' && canTargetEnemyNpc(npc, data)) {
-                actor.attack.remoteHit(session, npc, skill);
+                actor.attack.remoteHit(session, npc, skill, { actionOwner: owner });
             }
-        }, { allowDeadTarget: SpoilSweep.isSweepSkill(data.selfId)
+        }, { action: 'skill', actionOwner: owner, allowDeadTarget: SpoilSweep.isSweepSkill(data.selfId)
             && String(session?.accountId || '').startsWith('bot_') });
-    }).catch(() => {
+    }).catch((error) => {
+        if (!current()) return;
+        if (owner) {
+            owner.controller.stop('skill_failed');
+            utils.infoWarn('PlayerAutoFight', 'skill failed: %s', error.message || String(error));
+            return;
+        }
         World.fetchUser(data.id).then((user) => {
+            if (!current()) return;
             actor.automation.scheduleAction(session, actor, user, skill.fetchDistance(), () => {
+                if (!current()) return;
                 if (skill.fetchTargetKind() !== 'enemy') {
                     actor.attack.remoteHit(session, user, skill);
                 }
