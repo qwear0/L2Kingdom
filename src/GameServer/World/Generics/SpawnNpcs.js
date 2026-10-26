@@ -7,6 +7,7 @@ const NpcAggro = invoke('GameServer/Npc/NpcAggro');
 const RaidBossState = invoke('GameServer/World/RaidBossState');
 const MinionManager = invoke('GameServer/World/RaidBossMinionManager');
 const GeodataEngine = invoke('GameServer/Geodata/GeodataEngine');
+const SpawnPlacement = invoke('GameServer/Geodata/SpawnPlacement');
 
 const { CLIENT_VISIBILITY_RADIUS } = invoke('GameServer/World/WorldConstants');
 
@@ -66,7 +67,7 @@ function isPeriodActive(spawn, mode = 'day') {
 }
 
 function randomCoords(definition) {
-    const { spawn, bounds } = definition;
+    const { spawn } = definition;
     if (utils.size(spawn.coords) > 0) {
         const info = spawn.coords[Math.floor(Math.random() * spawn.coords.length)];
         return {
@@ -77,12 +78,8 @@ function randomCoords(definition) {
         };
     }
 
-    const polygon = bounds.map((bound) => [bound.locX, bound.locY]);
-    const pos = require('random-point-in-shape')(polygon);
-    // A territory's maxZ is a layer hint, not the surface at every XY.
-    // Keep explicit datapack coordinates above unchanged (towns/dungeon floors).
-    const locZ = GeodataEngine.getHeight(pos[0], pos[1], bounds[0].maxZ);
-    return { locX: pos[0], locY: pos[1], locZ, head: utils.randomNumber(65536) };
+    const coords = SpawnPlacement.randomCoords(definition);
+    return coords ? { ...coords, head: utils.randomNumber(65536) } : null;
 }
 
 function isRaidBossDefinition(definition) {
@@ -129,7 +126,9 @@ function scheduleRaidBossRespawn(world, definition, respawnAt) {
 
         // A transient spawn failure must not permanently lose a persisted
         // raid boss. Retry shortly while keeping the DB respawn deadline.
-        scheduleRaidBossRespawn(world, definition, Date.now() + 1000);
+        if (!world.npc.deferredPlacements?.has(definition)) {
+            scheduleRaidBossRespawn(world, definition, Date.now() + 1000);
+        }
     }, delay);
     timer.unref?.();
     timers.set(id, { timer, respawnAt: at });
@@ -155,9 +154,53 @@ function spawnDefinition(world, definition, coords, { ignoreRaidBossState = fals
     return npc;
 }
 
+function schedulePlacementRetry(world, state) {
+    if (state.placementRetryTimer || !state.deferredPlacements?.size) return;
+    state.placementRetryTimer = setTimeout(() => {
+        state.placementRetryTimer = null;
+        if (world.npc !== state) return;
+        const revision = Number(GeodataEngine.navigationRevision || 0);
+        // Geometry failures are cached. Only a new navigation revision can
+        // justify repeating preparation; retain slots without a timer per mob.
+        const ready = [...state.deferredPlacements].filter(([, entry]) => entry.revision !== revision).slice(0, 16);
+        for (const [definition, entry] of ready) {
+            state.deferredPlacements.delete(definition);
+            if (isPeriodic(definition.spawn) && (entry.periodRevision !== Number(state.periodRevision || 0)
+                || !isPeriodActive(definition.spawn, state.periodMode))) continue;
+            try {
+                spawnNpc(world, definition, entry.options);
+            } catch (error) {
+                utils.infoWarn('SpawnPlacement', 'Deferred spawn failed for %d: %s', definition.spawn.selfId, error.message);
+                // Publication/minion attachment can throw after construction.
+                // Do not replay that slot while its already-created NPC lives.
+                const created = state.spawns.some(npc => npc.spawnDefinition === definition
+                    && npc.state?.fetchDead?.() !== true);
+                if (!created) state.deferredPlacements.set(definition, entry);
+            }
+        }
+        schedulePlacementRetry(world, state);
+    }, 60000);
+    state.placementRetryTimer.unref?.();
+}
+
+function deferPlacement(world, definition, options) {
+    const state = world.npc;
+    state.deferredPlacements ||= new Map();
+    state.deferredPlacements.set(definition, {
+        options, revision: Number(GeodataEngine.navigationRevision || 0),
+        periodRevision: Number(state.periodRevision || 0)
+    });
+    schedulePlacementRetry(world, state);
+}
+
 function spawnNpc(world, definition, options = {}) {
     if (!isPeriodActive(definition?.spawn, world?.npc?.periodMode)) return null;
     const coords = randomCoords(definition);
+    if (!coords) {
+        deferPlacement(world, definition, options);
+        return null;
+    }
+    world.npc.deferredPlacements?.delete(definition);
     const npc = spawnDefinition(world, definition, coords, options);
     if (!npc) return null;
     if (world.addNpcToGrid) world.addNpcToGrid(npc);
@@ -237,7 +280,11 @@ function despawnQuestNpc(world, npc, sourceSession = null) {
 }
 
 function spawnNpcs() {
+    clearTimeout(this.npc.placementRetryTimer);
+    this.npc.placementRetryTimer = null;
+    this.npc.deferredPlacements = new Map();
     this.npc.periodDefinitions = [];
+    SpawnPlacement.init(DataCache.npcSpawns);
     // These templates are created only by the quest encounter handler. Keeping
     // C4's old shared duel spawns would duplicate a player's personal opponent.
     const exclusive = new Set(invoke('GameServer/Quest/QuestService').quests()
@@ -248,7 +295,10 @@ function spawnNpcs() {
         item.spawns.forEach((spawn) => {
             if (exclusive.has(Number(spawn.selfId))) return;
             DataCache.fetchNpcFromSelfId(spawn.selfId, (npc) => {
-                const definition = { npc, spawn: structuredClone(spawn), bounds: structuredClone(bounds) };
+                const definition = {
+                    npc, spawn: structuredClone(spawn), bounds: structuredClone(bounds),
+                    territoryId: item.selfId, spawnAnchors: item.spawnAnchors
+                };
 
                 for (let i = 0; i < spawn.total; i++) {
                     if (utils.size(spawn.coords) > 0) { // Explicit location

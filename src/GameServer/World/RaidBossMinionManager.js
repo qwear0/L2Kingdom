@@ -3,6 +3,7 @@ const ItemTemplateIndex = require('../Item/ItemTemplateIndex');
 const DataCache = invoke('GameServer/DataCache');
 const NpcVisibility = invoke('GameServer/World/NpcVisibility');
 const RaidEntityIndex = invoke('GameServer/World/RaidEntityIndex');
+const SpawnPlacement = invoke('GameServer/Geodata/SpawnPlacement');
 
 // One manager for every Lisvus minion group: raid bosses and ordinary group
 // leaders (data/Npcs/Minions). Lisvus keeps the raid rules apart: only raid
@@ -64,14 +65,8 @@ function aliveMinions(world, group) {
 }
 
 function minionCoords(boss) {
-    const angle = Math.random() * Math.PI * 2;
-    const radius = 80 + Math.random() * 220;
-    return {
-        locX: Math.round(Number(boss.fetchLocX?.() || 0) + Math.cos(angle) * radius),
-        locY: Math.round(Number(boss.fetchLocY?.() || 0) + Math.sin(angle) * radius),
-        locZ: Number(boss.fetchLocZ?.() || 0),
-        head: Math.floor(Math.random() * 65536)
-    };
+    const coords = SpawnPlacement.nearLeader(boss);
+    return coords ? { ...coords, head: Math.floor(Math.random() * 65536) } : null;
 }
 
 function spawnMinion(world, boss, group) {
@@ -86,14 +81,60 @@ function spawnMinion(world, boss, group) {
         minionBossObjectId: Number(boss.fetchId?.() || 0),
         minionGroup: group
     } : { minionLeader: boss, minionGroup: group };
-    const minion = SpawnNpcs.spawnChildNpc(world, template, minionCoords(boss), link);
+    const coords = minionCoords(boss);
+    if (!coords) {
+        if (!group.placementWarning) utils.infoWarn('SpawnPlacement',
+            'Minions of NPC %d deferred: leader has no supported geodata surface', boss.fetchSelfId());
+        group.placementWarning = true;
+        return null;
+    }
+    group.placementWarning = false;
+    const minion = SpawnNpcs.spawnChildNpc(world, template, coords, link);
     if (minion) group.members.push(minion);
     return minion;
 }
 
+function scheduleDeferredMinions(world, state) {
+    if (state.minionPlacementTimer || !state.deferredMinionGroups?.size) return;
+    state.minionPlacementTimer = setTimeout(() => {
+        state.minionPlacementTimer = null;
+        if (world.npc !== state) return;
+        for (const [group, entry] of state.deferredMinionGroups) {
+            const { boss } = entry;
+            if (!liveNpc(world, boss) || boss.state?.fetchDead?.() === true || boss.isDead?.() === true
+                || !boss.minionState?.groups.includes(group)) {
+                state.deferredMinionGroups.delete(group);
+                continue;
+            }
+            // Only uncreated members are retried. Dead ordinary minions must
+            // not be resurrected by the placement-recovery mechanism.
+            try {
+                while (entry.remaining > 0 && spawnMinion(world, boss, group)) entry.remaining--;
+            } catch (error) {
+                // Unlike a null placement result, an exception may follow a
+                // published child. Replaying the remaining count could duplicate it.
+                state.deferredMinionGroups.delete(group);
+                utils.infoWarn('SpawnPlacement', 'Deferred minion creation failed for NPC %d; automatic retry stopped after possible partial creation: %s',
+                    boss.fetchSelfId(), error.message);
+            }
+            if (!entry.remaining) state.deferredMinionGroups.delete(group);
+        }
+        scheduleDeferredMinions(world, state);
+    }, 60000);
+    state.minionPlacementTimer.unref?.();
+}
+
 function fillGroup(world, boss, group, count = group.desired) {
     const live = aliveMinions(world, group).length;
-    for (let index = live; index < count; index++) spawnMinion(world, boss, group);
+    for (let index = live; index < count; index++) {
+        if (spawnMinion(world, boss, group)) continue;
+        if (!isRaidBoss(boss)) {
+            world.npc.deferredMinionGroups ||= new Map();
+            world.npc.deferredMinionGroups.set(group, { boss, remaining: count - index });
+            scheduleDeferredMinions(world, world.npc);
+        }
+        break;
+    }
 }
 
 function attachBoss(world, boss) {
@@ -220,6 +261,7 @@ function removeMinions(world, boss, sourceSession) {
     if (!state) return 0;
     let removed = 0;
     state.groups.forEach((group) => {
+        world.npc.deferredMinionGroups?.delete(group);
         group.members.forEach((minion) => {
             if (cleanupMinion(world, minion, sourceSession)) removed++;
         });
@@ -263,13 +305,16 @@ function start(world) {
     if (!world?.npc) return null;
     world.npc.raidBossMinionTicker = setInterval(() => maintain(world), MINION_MAINTENANCE_INTERVAL_MS);
     world.npc.raidBossMinionTicker.unref?.();
+    scheduleDeferredMinions(world, world.npc);
     return world.npc.raidBossMinionTicker;
 }
 
 function stop(world) {
-    if (!world?.npc?.raidBossMinionTicker) return;
+    if (!world?.npc) return;
     clearInterval(world.npc.raidBossMinionTicker);
     world.npc.raidBossMinionTicker = undefined;
+    clearTimeout(world.npc.minionPlacementTimer);
+    world.npc.minionPlacementTimer = null;
 }
 
 module.exports = {

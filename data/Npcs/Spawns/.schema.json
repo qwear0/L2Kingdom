@@ -33,6 +33,19 @@
                     ]
                 }
             },
+            "spawnAnchors": {
+                "description": "Authored player-accessible entry points for random spawn connectivity; never inferred from monster coordinates.",
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "locX": { "type": "integer" },
+                        "locY": { "type": "integer" },
+                        "locZ": { "type": "integer" }
+                    },
+                    "required": ["locX", "locY", "locZ"]
+                }
+            },
             "spawns": {
                 "type": "array",
                 "items": {
