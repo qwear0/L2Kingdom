@@ -3,7 +3,9 @@
 // stay in these zones; menu eligibility alone is not a combat-safety decision.
 const AREAS = Object.freeze([
     { id: 'ruins_of_agony', name: 'Ruins of Agony', spawnIds: ['gludio_t18_21_015', 't18_21_028', 'gludio_t18_21_030'] },
-    { id: 'ruins_of_despair', name: 'Ruins of Despair', spawnIds: ['gludio_t19_22_062', 'gludio_t19_22_063', 'gludio_t19_22_064'] },
+    { id: 'ruins_of_despair', name: 'Ruins of Despair', spawnIds: ['gludio_t19_22_060', 'gludio_t19_22_061',
+        'gludio_t19_22_062', 'gludio_t19_22_063', 'gludio_t19_22_064', 'gludio_t19_22_065',
+        'gludio_t19_22_066', 'gludio_t19_22_067', 'gludio_t19_22_068'] },
     { id: 'abandoned_camp', name: 'Abandoned Camp', spawnIds: ['gludio_t18_22_019', 'gludio_t18_22_020', 'gludio_t18_22_030', 'gludio_t18_22_031', 'gludio_t18_22_032'] },
     { id: 'langk_lizardmen', name: 'Langk Lizardmen (Gludin)', spawnIds: ['gludio_t18_24_004', 'gludio_t18_24_005', 'gludio_t18_24_006', 'gludio_t18_24_007', 'gludio_t18_24_008'] },
     { id: 'wasteland', name: 'Wasteland', spawnIds: ['w19_23_018', 'w19_23_019', 'w19_23_028', 'w19_23_035', 'w19_23_043'] }

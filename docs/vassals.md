@@ -38,8 +38,12 @@ A vassal belongs to one **character**, with an original `boundClanId`. Another c
 
 `VassalOrders` owns duties; `src/GameServer/Lord/GatherAreas.js` supplies five authored gathering polygon sets. Failure to find a safe target does not authorize hunting outside the assigned area.
 
-Gathering route recovery stays within that assignment:
+Ruins of Despair includes all nine authored ruin spawn polygons, `gludio_t19_22_060` through `gludio_t19_22_068`; their existing XY and height bounds remain authoritative.
 
+Gathering distribution and route recovery stay within that assignment:
+
+- New routes prefer less occupied polygons, counting both live solo gatherers in place and their pinned travel destinations. Party companions, pending post-party rest and town/service phases do not reserve gathering space. Equal occupancy uses actor-specific cyclic ordering rather than always starting at the first polygon.
+- No-target relocation prefers another polygon before retrying the current one. Failed travel similarly deprioritizes its polygon while retaining the failed-point cooldown. Other polygons without safe destination candidates are skipped; the current polygon remains a fallback. Useful fights and pinned routes are not periodically interrupted to rebalance occupancy.
 - Routes pin an interior destination with room for the arrival radius and geodata-cell rounding. Stopping just outside the polygon, within an NPC's arrival radius, does not count as entering it.
 - Navigation reuses bounded waypoint retries. Exhausted routes or 30 seconds without physical progress select another point/polygon and exclude the failed point's 128-unit bucket for five minutes. A gap of more than five seconds between gathering travel ticks resets the stall clock, so time spent in combat, recovery or service work is not credited as continuous travel failure.
 - If no safe candidate is available, the duty waits and retries rather than teleporting or changing its assigned area.

@@ -331,14 +331,33 @@ function gatherPointInside(zone, point) {
         return Math.hypot(point.locX - a.locX - along * dx, point.locY - a.locY - along * dy) > margin;
     });
 }
+function gatherZoneOrder(session, area, run) {
+    const counts = area.zones.map(() => 0);
+    for (const other of invoke('GameServer/Bot/BotManager').sessions) {
+        if (other === session || !other.actor || other.actor.isDead() || other.partyCompanion) continue;
+        const row = rowFor(other), otherRun = other.vassalRun;
+        if (row?.order !== 'gather' || row.areaId !== area.id || row.gatherResumePending
+            || otherRun && (otherRun.revision !== row.orderRevision || otherRun.phase !== 'gather')) continue;
+        // Reserve a pinned destination before arrival, otherwise successive
+        // departures all see the same empty polygon and converge there.
+        const destination = otherRun?.gatherTravel?.destination;
+        const zoneIndex = destination ? destination.zoneIndex
+            : area.zones.findIndex(zone => Areas.containsZone(zone, other.actor));
+        if (zoneIndex >= 0) counts[zoneIndex]++;
+    }
+    const first = Number(run.zoneIndex ?? session.actor.fetchId()) % area.zones.length;
+    const avoided = run.gatherTravel?.avoidZoneIndex;
+    return area.zones.map((zone, zoneIndex) => ({ zone, zoneIndex,
+        load: counts[zoneIndex], step: (zoneIndex - first + area.zones.length) % area.zones.length }))
+        .sort((a, b) => Number(a.zoneIndex === avoided) - Number(b.zoneIndex === avoided)
+            || a.load - b.load || a.step - b.step);
+}
 function gatherDestination(session, area, run) {
     const now = Date.now(), botPoint = Areas.pointOf(session.actor);
     run.blockedGatherPoints = Object.fromEntries(Object.entries(run.blockedGatherPoints || {})
         .filter(([, until]) => until > now));
     const npcs = invoke('GameServer/World/World').npc.spawns.filter(npc => npc.fetchAttackable?.());
-    for (let step = 0; step < area.zones.length; step++) {
-        const zoneIndex = (Number(run.zoneIndex || 0) + step) % area.zones.length;
-        const zone = area.zones[zoneIndex];
+    for (const { zone, zoneIndex } of gatherZoneOrder(session, area, run)) {
         const center = {
             locX: Math.round(zone.bounds.reduce((n, p) => n + p.locX, 0) / zone.bounds.length),
             locY: Math.round(zone.bounds.reduce((n, p) => n + p.locY, 0) / zone.bounds.length),
@@ -401,7 +420,7 @@ function travelToGatherPoint(session, area, run) {
     bot.automation.abortAll(bot);
     Navigation.clear(session);
     session.townRoutePlan = null;
-    run.gatherTravel = {};
+    run.gatherTravel = { avoidZoneIndex: destination.zoneIndex };
     status(session, 'physical_route_blocked');
 }
 function gatherTick(session, row, run, Generics, BotAI) {
@@ -439,10 +458,14 @@ function targetAllowed(session, target) {
 function noTarget(session) {
     status(session, 'no_safe_targets_in_assigned_area');
     // Try only another authored polygon of the same assignment, never a global spot.
-    const run = session.vassalRun, area = Areas.find(rowFor(session)?.areaId);
-    if (!run || !area || Date.now() < Number(run.nextZoneAt || 0)) return;
+    const row = rowFor(session), run = session.vassalRun, area = Areas.find(row?.areaId);
+    if (!run || !area || session.partyCompanion || row.gatherResumePending || run.phase !== 'gather'
+        || run.gatherTravel || Date.now() < Number(run.nextZoneAt || 0)) return;
     run.nextZoneAt = Date.now() + 30000;
-    run.zoneIndex = (Number(run.zoneIndex || 0) + 1) % area.zones.length;
+    const currentZoneIndex = area.zones.findIndex(zone => Areas.containsZone(zone, session.actor));
+    run.zoneIndex = ((currentZoneIndex >= 0 ? currentZoneIndex : Number(run.zoneIndex ?? session.actor.fetchId()))
+        + 1) % area.zones.length;
+    run.gatherTravel = { avoidZoneIndex: currentZoneIndex };
     travelToGatherPoint(session, area, run);
 }
 function died(session) {
