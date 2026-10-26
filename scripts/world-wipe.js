@@ -132,8 +132,8 @@ function wipeWithConnection(db, scope, onWiped = null) {
     return preview;
 }
 
-function withConnection(work) {
-    const { databasePath } = readDatabaseConfig();
+function withConnection(work, resolved = readDatabaseConfig()) {
+    const { databasePath } = resolved;
     if (!fs.existsSync(databasePath)) throw new Error('No game database found.');
     const db = new DatabaseSync(databasePath, { timeout: 5000 });
     db.exec('PRAGMA foreign_keys = ON');
@@ -145,8 +145,8 @@ function withConnection(work) {
 }
 
 function preview(scope) { return withConnection((db) => previewWithConnection(db, scope)); }
-function wipeHistory(db, wiped) {
-    const { historyPath } = readDatabaseConfig();
+function wipeHistory(db, wiped, resolved = readDatabaseConfig()) {
+    const { historyPath } = resolved;
     if (!fs.existsSync(historyPath)) return;
     const history = HistoryStore.open(historyPath);
     try {
@@ -163,7 +163,11 @@ function wipeHistory(db, wiped) {
         }
     } finally { history.close(); }
 }
-async function wipe(scope) { return withConnection((db) => wipeWithConnection(db, scope, (wiped) => wipeHistory(db, wiped))); }
+// Management passes the exact world/history pair protected by its access lock.
+// Re-reading INI after world commit could redirect history cleanup to another pair.
+async function wipe(scope, resolved = readDatabaseConfig()) {
+    return withConnection((db) => wipeWithConnection(db, scope, (wiped) => wipeHistory(db, wiped, resolved)), resolved);
+}
 
 module.exports = { validateScope, targetClause, previewWithConnection, wipeWithConnection,
     wipeHistoryWithConnection: HistoryStore.wipeWorldHistory, preview, wipe };

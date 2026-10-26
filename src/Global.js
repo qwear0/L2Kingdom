@@ -133,42 +133,7 @@ global.utils = {
     }
 };
 
-function mergeConfig(base, override) {
-    Object.keys(override || {}).forEach((key) => {
-        const baseValue = base[key];
-        const overrideValue = override[key];
-
-        if (
-            baseValue &&
-            overrideValue &&
-            typeof baseValue === 'object' &&
-            typeof overrideValue === 'object' &&
-            !Array.isArray(baseValue) &&
-            !Array.isArray(overrideValue)
-        ) {
-            mergeConfig(baseValue, overrideValue);
-        } else {
-            base[key] = overrideValue;
-        }
-    });
-
-    return base;
-}
-
-const ini = require('js-ini');
-const defaultConfig = ini.parse(utils.parseRawFile('./config/default.ini'));
-const configOverridePath = process.env.L2NODE_CONFIG_FILE;
-const sharedConfigPath = process.env.L2NODE_SHARED_CONFIG_FILE;
-const localConfigPath = configOverridePath ? null : './config/local.ini';
-const configLayers = [sharedConfigPath, localConfigPath, configOverridePath]
-    .filter(Boolean)
-    .map((configPath) => (utils.fileExists(configPath)
-        ? ini.parse(utils.parseRawFile(configPath))
-        : {}));
-
-global.options = {
-    default: configLayers.reduce((config, layer) => mergeConfig(config, layer), defaultConfig)
-};
+global.options = { default: require('./ConfigLoader').load().effective };
 
 require(__dirname + '/GameServer/Progression/ProgressionCap').validate(global.options.default);
 

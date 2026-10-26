@@ -13,6 +13,16 @@ Read this before changing chat routing, external requests or social facts. Rule-
 
 Keys belong in private configuration/environment, not source documentation. External requests can include supplied dialogue and game context; choosing a remote provider crosses the application boundary.
 
+## Live Settings and queued dispatch
+
+The management parent's Bot settings exposes enabled, the active section's dialogue/router model and bounded request concurrency. Environment-owned models are locked with their actual variable/source. Provider/key/URL editing and expert inference tuning are not exposed; only provider identity and credential configured/not-configured state leave that settings boundary. Parent persistence precedes narrow runtime IPC apply; failed application uses the explicit Stop → Start recovery in [runtime](runtime.md).
+
+`OpenRouterGateway.requestUntraced` re-reads the current enabled setting and applicable dialogue or party/clan router model at the shared outbound boundary, **after** callers' budget/admission waits. Captured `spec.config` cannot restore stale enabled/model values. Each schema/truncation repair crosses the same gate again. There is no await between this gate and fetch; already dispatched requests may finish, but disabled unsent requests return through the existing disabled/fallback path. `BotBrain` retains its existing reservation settlement/finally path, releasing admitted slots even when dispatch is disabled. Direct gateway callers use the same boundary; there is no replacement queue/cancellation system.
+
+`BotInferenceBudget.globalConfig` reads current concurrency for admissions. Lowering does not abort in-flight requests, and raising is observed at the next existing admission/pump opportunity, not an immediate background drain in a setter.
+
+The separate Server management inference test works without gameplay and sends one explicit bounded synthetic turn. Loading Settings, editing drafts and saving fields never initiate provider requests. Its origin-only endpoint/latency/status are connectivity evidence, not game dialogue, queue-suppression or tool acceptance. Live/provider checks require separate authorization.
+
 ## Player speech → response → validated action
 
 Relevant owners under `src/GameServer/`:
@@ -63,4 +73,4 @@ Optional gateway metrics/raw-output diagnostics and observer social diagnostics 
 
 ## Update together
 
-Provider changes require checking gateway configuration, request schema, budgets, routing, fallback and launcher inference controls. Tool changes require checking ownership and native action guards as well as audit/turn storage. Memory changes require event producers, replay, transaction attribution, hydration and the source-adjacent docs. Live provider compatibility, delivery, restart durability and clan refresh remain separate checks; source research is not acceptance.
+Provider changes require checking gateway configuration, dispatch-time policy, request schema, budgets, routing, fallback and parent Server management inference controls. Tool changes require checking ownership and native action guards as well as audit/turn storage. Memory changes require event producers, replay, transaction attribution, hydration and the source-adjacent docs. Live provider compatibility, delivery, restart durability and clan refresh remain separate checks; source research is not acceptance.

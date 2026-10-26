@@ -16,6 +16,12 @@ Read this to distinguish active vassal execution from retained population machin
 
 `ClanSimulationConfig.js` additionally forces autonomous clan simulation off. `src/NodeL2.js` skips its planner and gates the legacy hot-load hook. Old INI overrides, historical rows or the presence of a module do not reactivate those services.
 
+## Settings boundary
+
+WorldObserver Bot settings describes **player-owned vassal behavior and optional AI dialogue**. Owned-only is read-only. `pvpAggression` (0..1) and `knowledgeErrorsEnabled` remain restart settings because `PopulationConfig` snapshots file/environment overrides; knowledge is not erased. PvP is initiation/risk/retreat behavior, not a probability of attacking every encounter, and self-defense remains at zero. Population environment ownership locks the relevant controls.
+
+Inactive ambient counts/seeders, cold travel, background services, autonomous clans and static-shot restrictions are not offered as functional controls. Diagnostics remain restart settings under Server management with master/detail dependency. AI enabled/model/router/concurrency have a separate live dispatch contract; see [AI](ai-social.md) and [Settings](world-observer.md). Saving a configuration never starts workers or restarts gameplay.
+
 ## Live bot lifecycle
 
 - `src/GameServer/Bot/BotManager.js::init` initializes vassal/lifecycle services and restores `fetchOwnedVassalCharacters()` rather than an ambient roster.

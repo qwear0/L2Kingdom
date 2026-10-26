@@ -29,9 +29,17 @@ class Server {
     constructor(name, optn, callback) {
         const parameters = { name: name, callback: callback };
 
-        // Create a new listening `Server`
-        require('net').createServer(this.onSocket.bind(parameters)).listen(optn.port, optn.hostname, () => {
-            utils.infoSuccess(name, 'successful init for %s:%d', optn.hostname, optn.port);
+        this.listener = require('net').createServer(this.onSocket.bind(parameters));
+        this.ready = new Promise((resolve, reject) => {
+            this.listener.once('error', reject);
+            this.listener.listen(optn.port, optn.hostname, () => {
+                utils.infoSuccess(name, 'successful init for %s:%d', optn.hostname, optn.port);
+                resolve(this.listener.address());
+            });
+        });
+        this.listener.on('error', (error) => {
+            utils.infoWarn(name, 'listener failed: %s', error.message);
+            this.onListenError?.(error);
         });
     }
 

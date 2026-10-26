@@ -245,13 +245,15 @@ npm install
 npm start
 ```
 
-That command starts the local launcher. Cloning this private fork requires repository access; cloning upstream L2Solo does not provide the current fork's implementation.
+That command starts the persistent WorldObserver management UI, not gameplay. Open **Settings → Server management** at `http://127.0.0.1:8088/observer/settings/server` (or the configured `[WorldObserver] hostname/port`) and press **Start**. **Stop** stops only the game; the same Settings URL, logs and saves remain available. Cloning this private fork requires repository access; cloning upstream L2Solo does not provide this fork's implementation.
 
-Press `Start` in the launcher to run the server. 
+World/Bot/Server configuration uses explicit per-tab **Save changes** and **Discard draft**. Fields show saved versus actually active values and live/game-restart/management-restart scope. A successfully saved live value that could not be confirmed active requires **Stop → Start**, not an automatic retry or restart. The separate x1/x10/x50 preset form changes only the next managed start; it never changes a running child or saves unrelated drafts. See [Settings and management](docs/world-observer.md) and [configuration precedence/native limits](docs/runtime.md).
+
+There is one public management origin, no old launcher page/8090 listener or legacy `/api/*` management routes. `npm run NodeL2` remains a standalone runtime wrapper, not an alternative persistent management UI. `WorldObserver.enabled=false` disables the game observer API only; management still runs under `npm start`. Existing private configuration, service ownership and trusted LAN/firewall binding must be checked before a separately authorized cutover. No login system is added, and these controls must not be exposed to the Internet.
 
 Use **Saved Games** while the server is stopped to save a full copy of your world database. Enter a name or leave it blank for a generated one. Saves are stored in `tmp/saves` (or `saves` inside a custom runtime directory), with no limit on their number beyond available disk space. The list shows each save's name, date, time, and size in GB.
 
-**Load** replaces the current database with the selected save and leaves the server stopped. **Delete** permanently removes that save. Both actions ask for confirmation. All saves are manual: loading never creates an automatic backup. Configuration files and launcher settings are not part of a save.
+**Load** replaces the current database with the selected save and leaves the server stopped. **Delete** permanently removes that save. Both actions ask for confirmation. All saves are manual: loading never creates an automatic backup. Configuration files and the retained `launcher-settings.json` preset store are not part of a save.
 
 On the first server start, L2Solo checks `data/Geodata`. If the region files are missing, it downloads the verified C4 geodata pack from `https://l2solo.com/files/geodata.zip` and installs it before opening the game server. The archive is about 209 MiB and expands to about 900 MiB. You can prepare it without starting the server with:
 
@@ -275,7 +277,7 @@ equipment enchantments and pet data. Bots retain their character warehouses.
 Deleting a character leaves the account warehouse intact. The shared capacity is
 300 item stacks or individual equipment rows for every player character, regardless
 of race or Expand Storage skill. Override `[GameServer] playerWarehouseSlots`
-(1..1000) to change it; restart to apply. Existing stock above a reduced limit
+(1..1000) to change it; Settings applies this live for subsequent deposits after Save. Existing stock above a reduced limit
 remains withdrawable, and deposits into existing stacks remain available.
 
 Example:

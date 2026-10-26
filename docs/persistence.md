@@ -41,6 +41,14 @@ Owned vassals have an additional lifecycle snapshot path: `PopulationService.per
 
 Migration application, save/relogin behavior and malformed-data recovery still require separately authorized runtime verification. Static implementation does not assert that migration 69 has run on the live world. See [controls and execution](world-combat.md#connected-player-auto-fight).
 
+## Management settings and stopped-data operations
+
+`src/WorldObserver/SettingsService.js` is the sole managed local INI writer; `ManagementPresetStore.js` owns the retained `launcher-settings.json` separately. These files are configuration, **not** new DB tables or part of saved worlds. Shared `ConfigLoader` preserves layering/parser semantics; curated writes validate/reparse, preserve unrelated content/mode, stage/fsync and atomically replace in the same directory after revision recheck. INI and preset JSON are not one transaction, and external editor coordination is limited to detected revisions.
+
+Persisted configuration and runtime IPC are also not atomic. Only confirmed observed values count as applied. A successful save with failed/uncertain live apply remains saved and pending **Stop → Start**, without hidden retries or an Apply saved endpoint. Existing save/data formats and configured paths are unchanged; see [runtime](runtime.md).
+
+The persistent management parent reserves lifecycle/save/load/delete/wipe operations before awaits, requires confirmed game-descendant exit for data operations and preserves the existing save-worker/access-lock protocol. Stop leaves metadata/logs/Settings available at the same origin; HTTP disconnect does not cancel or roll back a reserved operation. Load still makes no automatic backup and does not start the game. World-wipe history failure can follow committed deletion, not rollback. Cleanup outcome (clean/failed/timed_out/unknown) is separate from process exit code, and unknown descendant termination blocks conflicting operations.
+
 ## Retained cold ownership protocol
 
 The cold worker architecture remains in source but is not started by the enforced owned-only policy. When tracing retained code, follow:
@@ -75,7 +83,7 @@ World/history use WAL with `synchronous=NORMAL`; neither in-memory buffering nor
 - Passive checkpoint maintenance defaults to a five-second interval and a 4-MiB minimum WAL size. A passive checkpoint need not reset/shrink WAL, and busy results matter.
 - `PopulationService.runAdaptiveWalReset` gates a truncate reset on player protection, an idle database queue, checkpoint completion and growth/cooldown thresholds. It is not permission to truncate WAL externally.
 - Checkpointing is not backup. Copying only an active SQLite main file can omit WAL state.
-- Shutdown attempts service drains and character flushes before closing the database, but has a forced-exit deadline; see [runtime](runtime.md).
+- Shutdown attempts service drains and character flushes before closing the database, but has a forced-exit deadline. Database/history cleanup reports recoverable journal/outbox/history-stop and final-checkpoint-result failures to the lifecycle owner while preserving cleanup/SQL ordering and existing return values; these failures cannot become clean merely because the process exits code 0. See [runtime](runtime.md).
 - Paired save loading uses validated copies, fsynced markers and rollback files to recover interrupted replacement. It is recoverable replacement, not an atomic world+history filesystem transaction.
 - Preserve `.access.sqlite`, restore markers and pending files for their owner. Never unlink the shared lock file to clear a busy error.
 
@@ -83,4 +91,4 @@ Authored SQL/resources, generated catalogue exports and live SQLite/WAL/SHM/hist
 
 ## Update together
 
-Changes to buffered fields or transactional operations require checking producers, flush barriers, restore/status readers and economic commit guards. Changes to outbox events require checking `HistoryStore`, transfer cursors, pairing, retention and observer consumers. Save-format changes also affect [operations](operations.md) and launcher UI. Recovery, crash replay and restart durability require separately authorized runtime checks; source research alone does not certify them.
+Changes to buffered fields or transactional operations require checking producers, flush barriers, restore/status readers and economic commit guards. Changes to outbox events require checking `HistoryStore`, transfer cursors, pairing, retention and observer consumers. Save-format changes also affect [operations](operations.md) and Server management UI. Recovery, crash replay and restart durability require separately authorized runtime checks; source research alone does not certify them.

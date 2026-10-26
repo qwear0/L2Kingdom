@@ -6590,24 +6590,33 @@ const Database = {
 
     isReady() { return !!connection; },
 
-    close() {
+    close({ onCleanupFailure = () => {} } = {}) {
         if (closePromise) return closePromise;
         clearInterval(economyJournalTimer);
         economyJournalTimer = null;
+        // Continue cleanup on recoverable failures, but let the lifecycle owner
+        // distinguish a closed process from a fully successful final drain.
+        const stopCheckpoint = async () => {
+            const result = await CheckpointCoordinator.stop({ final: true });
+            if (result.final && result.final.ok !== true) onCleanupFailure(new Error('Final checkpoint did not confirm success.'));
+        };
         if (connection) {
-            flushJournals().catch((error) => utils.infoWarn('DB', 'journal flush failed: %s', error.message));
+            flushJournals().catch((error) => {
+                utils.infoWarn('DB', 'journal flush failed: %s', error.message);
+                onCleanupFailure(error);
+            });
         }
         shuttingDown = true;
         const pending = queryTail;
         closePromise = pending.then(async () => {
             if (!connection) {
-                await History.stop();
-                await CheckpointCoordinator.stop({ final: true });
+                await History.stop({ onCleanupFailure });
+                await stopCheckpoint();
                 return false;
             }
             // The history thread moves what is left in the outbox; the moved
             // rows leave the world before it closes.
-            const movedUpTo = await History.stop();
+            const movedUpTo = await History.stop({ onCleanupFailure });
             const openConnection = connection;
             connection = null;
             if (movedUpTo > 0) {
@@ -6615,12 +6624,13 @@ const Database = {
                     openConnection.prepare('DELETE FROM history_outbox WHERE id <= ?').run(movedUpTo);
                 } catch (error) {
                     utils.infoWarn('DB', 'history outbox cleanup failed: %s', error.message);
+                    onCleanupFailure(error);
                 }
             }
             EconomyCommit.clear();
             openConnection.close();
             queryTail = Promise.resolve();
-            await CheckpointCoordinator.stop({ final: true });
+            await stopCheckpoint();
             return true;
         });
         return closePromise;

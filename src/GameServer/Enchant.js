@@ -122,7 +122,9 @@ async function enchant(session, objectId, options = {}) {
     const category = EnchantRules.categoryOf(target);
     const oldLevel = EnchantRules.enchantLevelOf(target);
     const max = EnchantRules.maxFor(category, config);
-    if (max > 0 && oldLevel >= max) {
+    // Item lists/trades serialize enchant with signed writeH. A configured
+    // maximum of 0 removes only the gameplay cap, not this transport ceiling.
+    if (!Number.isInteger(oldLevel) || oldLevel >= 32767 || (max > 0 && oldLevel >= max)) {
         finish();
         sendFailure(session);
         return { ok: false, result: 'invalid' };

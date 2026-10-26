@@ -195,7 +195,7 @@ function flush() {
 
 // Moves what is left in the outbox, then stops the thread. Returns the last
 // moved outbox id (the caller deletes the outbox rows up to it).
-async function stop() {
+async function stop({ onCleanupFailure = () => {} } = {}) {
     if (!config) return 0;
     clearTimeout(restartTimer);
     restartTimer = null;
@@ -205,7 +205,10 @@ async function stop() {
         while ((Diagnostics.stats().queued || Diagnostics.stats().inFlight) && Date.now() < deadline)
             await new Promise(resolve => setTimeout(resolve, 10));
         const left = Diagnostics.stats(); Diagnostics.stop();
-        if (left.queued || left.inFlight) utils.infoWarn('DB', 'economy diagnostics stop dropped %d pending records', left.queued + left.inFlight);
+        if (left.queued || left.inFlight) {
+            utils.infoWarn('DB', 'economy diagnostics stop dropped %d pending records', left.queued + left.inFlight);
+            onCleanupFailure(new Error('Economy diagnostics drain incomplete.'));
+        }
     }
     let upTo = counters.upTo;
     if (worker) {
@@ -214,12 +217,13 @@ async function stop() {
         } catch (error) {
             // The outbox keeps what was not moved; the next start moves it.
             utils.infoWarn('DB', 'history thread stop: %s', error.message);
+            onCleanupFailure(error);
         }
     }
     const instance = worker;
     worker = null;
     rejectPending(new Error('history_worker_stopped'));
-    if (instance) await instance.terminate().catch(() => {});
+    if (instance) await instance.terminate().catch(onCleanupFailure);
     reader?.close();
     reader = null;
     config = null;

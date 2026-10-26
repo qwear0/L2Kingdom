@@ -502,9 +502,17 @@ function validateContent(data, responseSchema) {
 }
 
 async function requestUntraced(spec = {}) {
+    // Admission waits and schema repairs are not outbound requests. A caller's
+    // captured config must never restore enabled/model values after a Save.
+    // There is no await between this gate and fetch, including repair dispatches.
+    const current = config();
+    const router = /^(?:party|clan)_router$/.test(String(spec.source || ''));
     const cfg = config({
         ...(spec.config || {}),
-        ...(spec.timeoutMs !== undefined ? { timeoutMs: spec.timeoutMs } : {})
+        ...(spec.timeoutMs !== undefined ? { timeoutMs: spec.timeoutMs } : {}),
+        enabled: current.enabled,
+        model: router ? current.partyRouterModel : current.model,
+        partyRouterModel: current.partyRouterModel
     });
     const requestData = {
         ...spec,

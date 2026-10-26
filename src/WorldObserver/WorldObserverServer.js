@@ -3031,21 +3031,26 @@ const WorldObserverServer = {
         };
     },
 
-    init() {
-        if (!isEnabled() || this.server) return;
-
-        const config = options.default.WorldObserver || {};
+    init(binding) {
+        if (!isEnabled()) return Promise.resolve(null);
+        if (this.server) return this.ready;
+        const config = binding || options.default.WorldObserver || {};
         const hostname = config.hostname || '127.0.0.1';
-        const port = Number(config.port || 8088);
-
+        const port = Number(config.port ?? 8088);
         this.server = http.createServer(route);
-        this.server.listen(port, hostname, () => {
-            utils.infoSuccess('Observer', 'world observer ready at http://%s:%d/observer/', hostname, port);
+        this.ready = new Promise((resolve, reject) => {
+            this.server.once('error', reject);
+            this.server.listen(port, hostname, () => {
+                const address = this.server.address();
+                utils.infoSuccess('Observer', 'world observer ready at http://%s:%d/observer/', hostname, address.port);
+                resolve({ hostname, port: address.port });
+            });
         });
-
-        this.server.on('error', (err) => {
+        this.server.on('error', err => {
             utils.infoWarn('Observer', 'world observer failed: %s', err.message);
+            this.onListenError?.(err);
         });
+        return this.ready;
     }
 };
 

@@ -254,7 +254,7 @@ class BoundedPathfindingWorkerPool {
         };
     }
 
-    shutdown() {
+    shutdown({ onCleanupFailure = () => {} } = {}) {
         if (this.shuttingDown) return Promise.resolve();
         this.shuttingDown = true;
         clearTimeout(this.budgetTimer);
@@ -266,7 +266,7 @@ class BoundedPathfindingWorkerPool {
                 this.finishTask(slot.task, null, taskError('path worker pool shut down', 'POOL_SHUTDOWN'));
             }
         });
-        const terminations = this.workers.map((slot) => Promise.resolve(slot?.worker?.terminate?.()).catch(() => null));
+        const terminations = this.workers.map((slot) => Promise.resolve(slot?.worker?.terminate?.()).catch(onCleanupFailure));
         this.workers = [];
         return Promise.allSettled(terminations).then(() => undefined);
     }

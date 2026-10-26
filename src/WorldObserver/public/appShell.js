@@ -11,7 +11,8 @@
         ['market', 'Market', 'coins', '/observer/market'],
         ['database', 'Database', 'search', '/observer/database/items'],
         ['raid-bosses', 'Raid bosses', 'skull', '/observer/raid-bosses'],
-        ['rankings', 'Rankings', 'trophy', '/observer/rankings']
+        ['rankings', 'Rankings', 'trophy', '/observer/rankings'],
+        ['settings', 'Settings', 'settings', '/observer/settings']
     ];
     const navigation = document.createElement('aside');
     navigation.className = 'app-navigation';
@@ -172,9 +173,9 @@
     root.WorldObserverShell = {
         update,
         getActors: null,
-        connection(connected) {
+        connection(connected, label) {
             header.querySelector('.app-connection').classList.toggle('is-disconnected', !connected);
-            header.querySelector('.app-connection span').textContent = connected ? 'Live world' : 'Reconnecting…';
+            header.querySelector('.app-connection span').textContent = label || (connected ? 'Live world' : 'Reconnecting…');
         }
     };
     update();

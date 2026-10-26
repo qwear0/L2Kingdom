@@ -21,7 +21,7 @@ Read `README.md`, `package.json`, and the relevant source and configuration befo
 
 Key entry points and areas:
 
-- `scripts/start.js`, `scripts/run-server.js`, `src/NodeL2.js`: launch and runtime entry points; inspect them without automatically starting the server.
+- `scripts/start.js` (`npm start`): persistent WorldObserver management parent and sole Settings/preset writer; launches the game only on an explicit Start action. `scripts/run-server.js` / `src/NodeL2.js`: wrapper/runtime entrypoints, not a second management frontend. Inspect without automatically starting the server.
 - `src/AuthenticationServer/`: authentication server.
 - `src/GameServer/`: game server and simulation.
 - `src/Packet/`: packet handling.

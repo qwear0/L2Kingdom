@@ -3478,13 +3478,29 @@ function applyWorldChanges(data) {
     };
 }
 
+function worldRequestError(response) {
+    return Object.assign(new Error(`HTTP ${response.status}`), { unavailable: response.status === 503 });
+}
+function showWorldUnavailable(error) {
+    if (!error.unavailable) {
+        els.serverLine.textContent = 'The world could not refresh. Reconnecting…';
+        window.WorldObserverShell?.connection(false);
+        return;
+    }
+    els.serverLine.innerHTML = 'Game observer unavailable. <a href="/observer/settings/server">Open Server management</a>.';
+    window.WorldObserverShell?.connection(false, 'World unavailable');
+    els.botsTotal.textContent = '—'; els.playersTotal.textContent = '—';
+    els.lastRefresh.textContent = state.snapshot ? 'Last observation is stale; not a live world.' : 'Game observer unavailable.';
+    if (!state.snapshot) els.actorList.textContent = 'Live characters are unavailable while the game observer is stopped or disabled.';
+}
+
 async function loadWorldStatus(force = false) {
     if (!state.snapshot || state.worldStatusLoading) return;
     if (!force && Date.now() - state.worldStatusAt < 30000) return;
     state.worldStatusLoading = true;
     try {
         const response = await fetch('/observer/api/world/status', { cache: 'no-store' });
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        if (!response.ok) throw worldRequestError(response);
         const status = await response.json();
         if (worldEpochChanged(status.epoch)) {
             restartWorldBootstrap(status.epoch);
@@ -3507,8 +3523,7 @@ async function loadWorldStatus(force = false) {
             renderSelected();
         }
     } catch (error) {
-        els.serverLine.textContent = 'The world could not refresh. Reconnecting…';
-        window.WorldObserverShell?.connection(false);
+        showWorldUnavailable(error);
     } finally {
         state.worldStatusLoading = false;
     }
@@ -3522,7 +3537,7 @@ async function refresh() {
     try {
         if (!state.snapshot) {
             const response = await fetch('/observer/api/world/bootstrap', { cache: 'no-store' });
-            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            if (!response.ok) throw worldRequestError(response);
             const bootstrap = WorldState.decodeBootstrap(await response.json());
             state.worldEpoch = bootstrap.epoch || null;
             state.worldRevision = Number(bootstrap.revision || 0);
@@ -3547,7 +3562,7 @@ async function refresh() {
             loadWorldStatus();
             return;
         }
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        if (!response.ok) throw worldRequestError(response);
         window.WorldObserverShell?.connection(true);
         const changes = await response.json();
         if (worldEpochChanged(changes.epoch)) {
@@ -3565,8 +3580,7 @@ async function refresh() {
         loadClanDirectory();
         loadWorldStatus();
     } catch (error) {
-        els.serverLine.textContent = 'The world could not refresh. Reconnecting…';
-        window.WorldObserverShell?.connection(false);
+        showWorldUnavailable(error);
     } finally {
         state.refreshing = false;
     }
@@ -4129,7 +4143,7 @@ mapControls = window.WorldObserverMapControls.create({ state, getMeta: mapMeta, 
     applyViewport, renderViewport: scheduleMapViewportRender, renderLabels, renderRaids: renderRaidBossPoints,
     getActors: actors, getSelected: selectedActor, navigate: (route) => { commitRoute(route); if (route.name !== 'world') applyRoute(route); } });
 window.addEventListener('observer:navigate', (event) => {
-    if (event.detail.name === 'not-found' || event.detail.name === 'market' || event.detail.name.startsWith('knowledge-')) return;
+    if (event.detail.name === 'not-found' || event.detail.name === 'settings' || event.detail.name === 'market' || event.detail.name.startsWith('knowledge-')) return;
     event.preventDefault(); commitRoute(event.detail); applyRoute(event.detail);
 });
 window.addEventListener('popstate', () => applyRoute());

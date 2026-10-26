@@ -1,91 +1,114 @@
 # Runtime, configuration and lifecycle
 
-Read this when changing startup, effective configuration or shutdown behavior. See the [project map](README.md) for subsystem ownership and [operations](operations.md) for command side effects.
+Read this when changing startup, effective configuration or shutdown behavior. See the [project map](README.md), [operations](operations.md) and [Settings/API guide](world-observer.md).
 
 ## Entrypoints and process boundaries
 
 | Entrypoint | Responsibility |
 | --- | --- |
-| `package.json` → `scripts/start.js` (`npm start`) | Starts the local HTTP launcher, not the game immediately. The launcher starts/stops a child server and exposes configuration, logs, saves and wipe controls. |
-| `scripts/run-server.js` (`npm run NodeL2`) | Prepares geodata, then spawns the actual runtime with `--openssl-legacy-provider` and repository working directory. |
-| `src/NodeL2.js` | Initializes shared globals, database, world, TCP servers, bots and observer. Direct invocation bypasses wrapper geodata preparation. |
-| `src/Global.js` | Defines `invoke`, shared utilities, constants and parsed configuration. `invoke('GameServer/...')` resolves a module under `src/`, not a separate service. |
-| `src/Server.js` | Owns a TCP listener and constructs a session for each connection. Listening is asynchronous. |
+| `package.json` → `scripts/start.js` (`npm start`) | Persistent WorldObserver management parent. Serves the frontend/Settings, owns configuration/preset writes and lifecycle/data operations. Does not start gameplay on launch. |
+| `scripts/run-server.js` (`npm run NodeL2`) | Geodata/runtime wrapper. Spawns `src/NodeL2.js` with `--openssl-legacy-provider`, repository working directory and shutdown IPC; not another management frontend. |
+| `src/NodeL2.js` | Owns SQLite, world, TCP listeners, bots and optional game observer API. Direct invocation bypasses geodata preparation. |
+| `src/ConfigLoader.js`, `src/Global.js` | Shared INI loading; only the runtime installs `invoke`, utilities and global options. The parent does not import game singletons or open the world DB to serve assets/settings. |
+| `src/Server.js` | TCP listener/session owner, with a `ready` promise and listener-error callback. |
 
-The launcher defaults to `127.0.0.1:8090` and opens a browser unless `L2NODE_NO_BROWSER=1`. The game runtime is one application process with worker threads and an integrated observer; authentication, game and observer directories are not independently deployed services.
+`npm start` listens at `[WorldObserver] hostname/port` (committed default `127.0.0.1:8088`) and normally opens `/observer/settings/server`; `L2NODE_NO_BROWSER=1` suppresses the browser. There is no launcher page/listener on 8090 and no legacy `/api/*` management namespace or launcher host/port/name flags.
 
-## Configuration precedence
+```text
+trusted LAN browser -> management parent /observer/*
+                       |-- static pages, Settings and all management actions
+                       |-- sole local INI and preset JSON writer
+                       `-- bounded known-route proxy -> private 127.0.0.1:<OS-assigned port>
+                                                        wrapper -> NodeL2
+                               generation-bound readiness/settings/shutdown IPC
+```
 
-`src/Global.js` merges nested INI sections in this order:
+In managed mode the game observer binds loopback port **0**, reports the actual port through the wrapper, and never reuses the public listener. Direct `npm run NodeL2` retains the standalone observer binding/disabled behavior, but has no persistent Settings management API; use `npm start` for the unified UI, not a second supervisor.
+
+### WorldObserver.enabled
+
+Under `npm start`, this controls the **game observer API only**, not the persistent management UI. When false there is no private observer listener or proxy readiness requirement; game readiness still requires authentication/game listeners and initialization. Settings, logs, saved-game management and explicit inference remain available. Live world/search/count routes return unavailable, not an empty world. Hostname/port still select the public management listener, and are read-only in Settings because their restart owner is external.
+
+This is a migration in entrypoint ownership, not evidence that an existing service command, firewall or LAN binding has been changed. Confirm the real service owner/command and private binding before separately authorized stop-and-replace deployment.
+
+## Configuration precedence and ownership
+
+The parent and runtime use `ConfigLoader` with the existing `js-ini` parser and nested merge semantics:
 
 1. `config/default.ini`.
-2. The optional file named by `L2NODE_SHARED_CONFIG_FILE`.
-3. `config/local.ini`, or the file named by `L2NODE_CONFIG_FILE` **instead of** `local.ini`.
+2. Optional `L2NODE_SHARED_CONFIG_FILE`.
+3. `L2NODE_CONFIG_FILE`, or `config/local.ini` when that variable is absent.
 
-Missing optional files contribute no overrides. `config/local.example.ini` is an example, not an automatically loaded layer. Private keys and machine-specific values belong in ignored local configuration, never in maintained documentation.
+Optional missing files contribute no overrides. Paths resolve against the repository; wrappers use that working directory. Empty INI values use the parser's native undefined typing. `config/local.example.ini` is not automatically loaded. Private keys and machine-specific values belong in ignored overrides, never documentation.
 
-Environment overrides are implemented by individual consumers; they are not a universal last merge layer. Examples:
+Environment overrides are consumer-specific, **not** a universal final INI layer:
 
-- `src/GameServer/ProgressionRates.js` reads `L2NODE_PROGRESSION_RATE`. The launcher passes its selected `x1`, `x10` or `x50` profile to the child.
-- Geodata preparation and runtime consume `L2NODE_GEODATA_DIR`; mirror/checksum controls belong to preparation, not INI parsing.
-- AI provider and tracing overrides have their own consumers; see [AI and social behavior](ai-social.md).
-- `PopulationConfig` applies the owned-only policy **after** ordinary configuration/environment handling. Old overrides cannot reactivate ambient population or autonomous clans; see [bot runtime](bot-runtime.md).
+- `ProgressionRates` uses `L2NODE_PROGRESSION_RATE`; the managed parent passes the authoritative next-start preset to each child.
+- `PopulationConfig` snapshots its environment/file values, then enforces owned-only policy. PvP, knowledge errors and diagnostics are restart fields. `BOT_PVP_AGGRESSION`, `BOT_KNOWLEDGE_ERRORS_ENABLED` and `BOT_DEVELOPER_DIAGNOSTICS` lock their controls, including explicitly supplied empty population overrides.
+- Existing `[AI]` wins over `[OpenRouter]`. Model/router environment variables lock only the fields their gateway consumer actually owns. Provider URL/keys are never editable here; see [AI](ai-social.md).
+- Geodata uses `L2NODE_GEODATA_DIR`; mirror/checksum controls belong to preparation, not the INI editor.
 
-Paths used by the runtime are working-directory-sensitive. The supported wrapper sets the repository working directory; the launcher has its own root-relative configuration reader. Keep those readers synchronized when changing launch settings.
+### Settings persistence and reconciliation
 
-### Committed defaults, not deployment claims
+The curated parent API edits only permitted local scalar keys in `L2NODE_CONFIG_FILE`/`config/local.ini`, never shared/default layers or browser-selected paths. It validates the full submitted patch, preserves unrelated text/comments/keys and file mode, rejects ambiguous duplicate targeted sections/keys, reparses the result, stages/fsyncs in the same directory, rechecks layer revision and atomically replaces the local file. Ordinary single-link files are required for managed reads/writes; symlink/hardlink ambiguity is rejected. Revision checks detect edits but cannot coordinate arbitrary external editors in the final check/rename interval. Storage failures are explicit, not reported as successful saves.
 
-| Setting | Default | Owner |
-| --- | --- | --- |
-| `[Database] path` | `tmp/nodel2.sqlite` | `src/Database.js` and database helpers |
-| `[AuthServer] hostname/port` | `0.0.0.0:2106` | `src/Server.js`, authentication sessions |
-| `[AuthServer] autoCreate` | `true` | Authentication login flow |
-| `[GameServer] hostname/port` | `0.0.0.0:7777` | Game sessions |
-| `[GameServer] advertisedHostname` | Unset | Address sent during server selection; distinct from listener binding |
-| `[GameServer] playerWarehouseSlots` | `300` | Shared account warehouse capacity |
-| `[General] protocol/maxLevel` | `656` / `78` | C4 protocol and progression |
-| `[General] progressionPreset` | `x1` | `src/GameServer/ProgressionRates.js` |
-| `[OpenRouter] enabled` | `false` | External inference client |
-| `[Langfuse] enabled` | `false` | Optional tracing |
-| `[WorldObserver] enabled/hostname/port` | `true`, `127.0.0.1:8088` | Integrated observer |
+`null` removes only a descriptor-permitted local override. Resolution then follows remaining layers before native sibling fallback: removing local SP may expose a shared SP value rather than inherit EXP. Runtime apply mutates only explicitly saved **live** keys on existing section objects, after persistence; restart fields are not applied. Rate/native-knowledge caches already track profile inputs and need no generic invalidation.
 
-A committed default does not establish effective private configuration, network reachability or a running deployment.
+Disk persistence and IPC are not one transaction. Only an authoritative runtime read counts as active. Failed/uncertain live application or an externally changed saved live value remains **Saved, not applied; Stop → Start required**. There is no background retry, Apply saved endpoint/button or implicit restart. Another explicit save may apply its own fields, not unrelated pending values. When stopped, values are **Saved for next start**. Restart/service pending state is derived from actual observed values, not a browser acknowledgement.
 
-## Startup flow
+### Separate preset store
 
-`src/NodeL2.js` is the ordering authority:
+`launcher-settings.json` retains its name/location under `L2NODE_RUNTIME_DIR` (default `tmp`) and `L2NODE_LAUNCHER_SETTINGS_FILE` override. It is not part of an INI tab save or a world snapshot.
 
-1. Load globals, acquire the database-access lock and initialize optional tracing.
-2. Initialize the database and data cache; run stackable-inventory compaction and possible space reclamation.
-3. Initialize clans, geodata and the world, then clan-hall and persistent AFK-trade runtimes.
-4. Load bot personas and warm recipe/native knowledge catalogues.
-5. Construct authentication and game TCP servers.
-6. Await bot-manager initialization, then initialize WorldObserver and the developer console.
+- A non-empty parent `L2NODE_PROGRESSION_RATE` is forced/read-only; otherwise the stored `progressionRate` wins, or x1 if genuinely absent.
+- Only exact x1/x10/x50 are accepted. Malformed JSON or invalid explicit environment/stored values leave the UI available with an actionable error; they are not replaced by x1.
+- The dedicated revisioned mutation preserves unrelated JSON fields/mode and atomically replaces a same-directory staged file. Failed writes cannot change the saved selection.
+- Saved next-start and child-captured active presets are distinct. Start rereads and validates the authoritative selection/rate combinations without rewriting an unchanged preset or saving drafts. Changing the selection never mutates a running child environment.
+- `General.progressionPreset` remains a standalone-runtime input, not a second managed selector. INI and JSON writes are separate transactions.
 
-Startup can migrate and write persistent state; it is not a read-only health check. Owned-only startup skips autonomous clan planning and the legacy hot-load hook.
+## Curated numeric bounds and native limitations
 
-TCP listener construction is not an awaited all-subsystem readiness barrier. The launcher's game-server log marker can appear before bots and observer finish initialization. Do not interpret a launcher “running” indication as proof that every subsystem is ready.
+`SettingsDescriptors.js` owns strict bounds for **new edits**. Reads do not clamp/rewrite existing overrides. Start validates rate combinations for every supported preset, including the selected next launch.
+
+| Controls | Descriptor bound / source contract |
+| --- | --- |
+| Individual reward modifiers | 0..10; each preset product finite and ≤500. This is a conservative curated operational envelope, not a new native storage type or a global reward-safety proof. |
+| Normal/blessed/crystal chances | 0..100 percent. |
+| Enchant safe/max integers | 0..32767: `ItemsList`/trade/warehouse enchant fields reach signed `Packet/Send.writeH`. `Enchant.enchant` refuses further increments at 32767 even when configured max=0; existing items are not downgraded. |
+| PK continuation / PvP aggression | 0..1; PK UI uses percent. Native policy semantics are unchanged. |
+| Player warehouse slots | 1..1000, matching `PersonalWarehouseLimits`; contents and withdrawals survive reduction, bot capacity unchanged. |
+| Request concurrency | 1..128, curated operational admission limit; existing in-flight work is not aborted. |
+| Auth/game ports / advertised address | 1..65535 / IPv4 or permitted inheritance; bind hostname is read-only context. |
+
+Why the rate bounds are not a universal guarantee:
+
+- `Packet/Send.writeD` represents unsigned C4 D values through `0xffffffff`; console reward messages, SP and some warehouse paths do not all use a display saturation helper. Inventory list display saturation does not make arbitrary rewards safe.
+- Static source inspection found NPC base SP up to 1,356,048 and normal reward quantities up to 400,000 with group overall up to 149.3019. At modifier 10/preset x50, the unmodified base SP award is 678,024,000 and an envelope for one base drop amount is 298,800,000 (ceil of 746.5095 repeats × 400,000), within D. These figures are **not** exhaustive effective reward maxima.
+- NPC EXP is `level² × authored modifier`; NPC max-HP effects can multiply EXP/SP further (`Npc.fetchRewardMaxHpMultiplier`). `ExperienceReward`/`ProgressionCap` cap accepted character EXP at the C4 table boundary (level-78 upper boundary 2,099,275,834), but **cumulative SP has no corresponding native transport guard**, in both `ExperienceReward` and `Database.applyQuestStep`. Any positive reward can eventually exceed D. This pre-existing defect is not silently clamped or repaired by Settings.
+- Quest specific modifiers use the shared profile in `QuestStep`, `QuestService` and authored handlers. Fixed rewards and variable-size hand-ins differ: `Q327_ReclaimTheLand` multiplies held counts for EXP/Adena. There is no finite positive modifier that proves all arbitrary legacy holdings or cumulative balances fit D. Objectives and held stock are not scanned/rebalanced here.
+
+Exceptional legacy stock/effects/cumulative-SP behavior therefore remains a separately scoped native gameplay/protocol repair and acceptance risk. Do not describe bounded descriptor/product checks as proof of global numeric safety, or use a personal live world to probe these limits.
+
+## Startup/readiness
+
+NodeL2 initializes DB/data maintenance, clans/geodata/world, clan halls/AFK trades, personas/catalogues, TCP listeners and bots before optional observer and developer console readiness. Startup can migrate/write persistence; it is not a read-only check.
+
+Managed **running** requires completed necessary initialization, awaited AuthServer and GameServer listening, and awaited private observer listening when enabled. The parent uses v1 generation-bound `ready` IPC, not a log marker. Required listener/startup failures initiate shutdown; an old generation cannot mark a new child ready. A 120-second readiness deadline requests the same graceful shutdown chain, not a second process.
+
+Settings IPC is independently available without observer HTTP: `settings.read`, `settings.apply`, `settings.reply`, current generation and bounded request IDs. Parent correlation is capped at 32 outstanding requests with a four-second reply bound; stale replies are ignored. Proxy requests have a 15-second deadline and endpoint/generation checks.
+
+## Shutdown truthfulness
+
+`shutdown-result` reports **clean / failed / timed_out** separately from process phase; missing evidence remains **unknown**. Code 0 alone is not clean-save evidence. NodeL2 waits for its bounded bootstrap step, stops new listeners, drains population/character writes, workers/tracing/social events and closes SQLite, carrying step failures into the outcome. Narrow optional failure callbacks also report previously swallowed journal/outbox/history-stop, final-checkpoint-result, tracing and pathfinding-termination failures without interrupting subsequent cleanup or changing existing callers' return shapes. The 15-second deadline exits nonzero with timed_out; the wrapper may force its runtime after 18 seconds but still waits for OS-confirmed child exit.
+
+The wrapper emits generation-bound `tree-exited` only after its runtime closes; the parent retains stopping/exclusion until wrapper close. It never kills the wrapper as a substitute for reaping the descendant. If descendant termination cannot be confirmed, status remains error/unknown and conflicting data/start operations stay blocked; investigate through the actual external service owner, not by adopting/killing unrelated processes or removing DB locks. A confirmed crash may be stopped at the OS level while cleanup is failed/unknown; that distinction is visible.
+
+The wrapper reacts to loss of owning management IPC; a runtime with wrapper IPC reacts to disconnect as well. Direct execution with no parent IPC does not acquire this rule. Parent service shutdown awaits/reaps the existing chain and any reserved data operation. This is not a full native-client TCP drain or power-loss durability guarantee.
 
 ## Geodata preparation
 
-- owner: `scripts/geodata-bootstrap.js`; CLI: `scripts/ensure-geodata.js`.
-- consumer: `src/GameServer/Geodata/GeodataEngine.js`.
-- local resource: ignored `data/Geodata/`, unless `L2NODE_GEODATA_DIR` selects another directory.
-- Missing/empty resources trigger download of the pinned archive, checksum verification and staged installation.
-- An existing directory is accepted using region-count and required-file-size checks, not a checksum of every installed region.
-- A nonempty incomplete directory is rejected rather than replaced automatically.
-- `L2NODE_GEODATA_URL` and `L2NODE_GEODATA_SHA256` select an explicit alternate source/trust value. Changing a URL alone is not authorization to trust different bytes.
-
-`npm run geodata` prepares files without starting gameplay, but may perform a large network download and disk writes.
-
-## Shutdown and failure clues
-
-`src/NodeL2.js::shutdown` handles signals and the wrapper's IPC shutdown request. It stops population work, flushes buffered characters, shuts down pathfinding/planning workers and tracing, drains interaction-memory events, then closes SQLite. Individual step failures are logged and later cleanup steps still run.
-
-The runtime has a 15-second forced-exit deadline; the wrapper and launcher have longer termination deadlines. A timeout or logged flush failure means graceful durability is not proven. This flow does not provide an explicit full TCP connection-drain guarantee.
-
-For failures, inspect the layer that owns the transition: geodata bootstrap before child startup; database access/recovery before world initialization; the specific initialization promise before observer startup; buffered-write and worker-drain messages during shutdown. Avoid deleting lock or recovery files to make startup proceed.
+`scripts/geodata-bootstrap.js` (CLI `scripts/ensure-geodata.js`) downloads the pinned archive only for missing/empty resources, verifies its checksum and stages installation. Region count/required sizes validate an existing directory, not a checksum of every region. Nonempty incomplete geodata is rejected, not overwritten. `npm run geodata` may download/write substantial data without starting gameplay; explicit authorization remains necessary for operations.
 
 ## Update together
 
-Update this document when entrypoints, readiness, configuration precedence, environment consumers or shutdown ordering change. Also check `README.md`, [operations](operations.md), [persistence](persistence.md), `config/local.example.ini` and the launcher's configuration reader. Syntax checking alone cannot validate lifecycle behavior.
+Keep entrypoints, Settings descriptors/runtime adapter, lifecycle IPC, README, [operations](operations.md), [persistence](persistence.md), configuration examples and agent entrypoint guidance synchronized. Syntax/source checks do not establish live readiness, queue suppression, failure recovery, browser behavior or deployment.

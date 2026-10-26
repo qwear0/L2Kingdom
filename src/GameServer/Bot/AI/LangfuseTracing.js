@@ -299,9 +299,10 @@ function activeTraceId() {
     try { return tracing?.getActiveTraceId?.() || null; } catch (_) { return null; }
 }
 
-async function shutdown() {
+async function shutdown({ onCleanupFailure = () => {} } = {}) {
     if (!sdk) return;
     try { await sdk.shutdown(); } catch (error) {
+        onCleanupFailure(error);
         if (config().debug) utils.infoWarn('Langfuse', 'shutdown failed: %s', error.message);
     } finally {
         sdk = null;
