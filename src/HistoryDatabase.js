@@ -211,14 +211,13 @@ async function stop({ onCleanupFailure = () => {} } = {}) {
         }
     }
     let upTo = counters.upTo;
-    if (worker) {
-        try {
-            upTo = await request('stop', STOP_TIMEOUT_MS);
-        } catch (error) {
-            // The outbox keeps what was not moved; the next start moves it.
-            utils.infoWarn('DB', 'history thread stop: %s', error.message);
-            onCleanupFailure(error);
-        }
+    try {
+        upTo = await request('stop', STOP_TIMEOUT_MS);
+    } catch (error) {
+        // A configured but unavailable worker cannot confirm the final drain.
+        // The outbox keeps what was not moved; the next start moves it.
+        utils.infoWarn('DB', 'history thread stop: %s', error.message);
+        onCleanupFailure(error);
     }
     const instance = worker;
     worker = null;

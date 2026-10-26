@@ -43,7 +43,7 @@
         return { items: items.slice(offset, offset + size), page: current, pages, total: items.length, from: items.length ? offset + 1 : 0, to: Math.min(items.length, offset + size) };
     }
     function create(options) {
-        const { getSnapshot, getActors, getClans, navigate, rememberRoute, activityLabel, roleLabel } = options;
+        const { getSnapshot, getWorldUnavailable, getActors, getClans, navigate, rememberRoute, activityLabel, roleLabel } = options;
         const Router = window.WorldObserverSpaRouter;
         const escape = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
         const number = (value) => Number(value || 0).toLocaleString('en');
@@ -114,6 +114,7 @@
             return `<div class="directory-pagination"><span>${number(result.from)}–${number(result.to)} of ${number(result.total)} characters</span><div><button class="app-button" type="button" data-directory-page="${result.page - 1}" ${result.page <= 1 ? 'disabled' : ''}>← Previous</button><span class="app-button">${result.page} / ${result.pages}</span><button class="app-button" type="button" data-directory-page="${result.page + 1}" ${result.page >= result.pages ? 'disabled' : ''}>Next →</button></div></div>`;
         }
         function directory() {
+            if (!getSnapshot()) return heading('People of Aden', 'Characters', 'Find the people in your world.') + '<div class="directory-empty">Loading characters…</div>';
             const result = paginate(filterCharacters(getActors(), filters), page); page = result.page;
             return heading('People of Aden', 'Characters', 'Find an adventurer, meet a player, or explore the traders and crafters in your world.') + controls() + `<div id="directoryResults">${table(result.items)}${pagination(result)}</div>`;
         }
@@ -137,27 +138,35 @@
         }
         function render(force = false) {
             if (!route || !['overview', 'characters', 'parties', 'dungeon'].includes(route.name)) return;
-            const signature = JSON.stringify([route, getSnapshot()?.revision, getSnapshot()?.generatedAt, getClans().length, marketAt]);
+            const snapshot = getSnapshot(), unavailable = getWorldUnavailable();
+            const signature = JSON.stringify([route, snapshot?.revision, snapshot?.generatedAt, getClans().length, marketAt, unavailable]);
             if (!force && signature === lastSignature) return;
             lastSignature = signature;
-            if (route.name === 'overview') loadMarket();
+            const notice = unavailable ? `<section class="overview-card world-unavailable" data-world-availability role="status"><h2>World unavailable${snapshot ? ' · stale observation' : ''}</h2><p>${escape(unavailable)} ${snapshot ? 'All retained observations below are stale, not a live world.' : 'No world observation is available; population and search results are unknown.'}</p><a class="app-button" href="/observer/settings/server">Open Server management →</a></section>` : '';
+            if (!snapshot) {
+                host.innerHTML = notice || (route.name === 'overview' ? overview() : route.name === 'characters' ? directory() : route.name === 'parties' ? parties() : dungeon());
+                return;
+            }
+            if (route.name === 'overview' && !unavailable) loadMarket();
             if (route.name === 'characters' && host.querySelector('#directoryResults')) {
                 const select = host.querySelector('#directoryClass');
-                const html = '<option value="">All classes</option>' + (getSnapshot()?.classes || []).map(entry => `<option value="${Number(entry.classId)}">${escape(entry.className || entry.name)}</option>`).join('');
+                const html = '<option value="">All classes</option>' + (snapshot.classes || []).map(entry => `<option value="${Number(entry.classId)}">${escape(entry.className || entry.name)}</option>`).join('');
                 if (select.innerHTML !== html) { select.innerHTML = html; select.value = filters.classId || ''; }
                 const result = paginate(filterCharacters(getActors(), filters), page); page = result.page;
-                host.querySelector('#directoryResults').innerHTML = table(result.items) + pagination(result); return;
-            }
-            if (route.name === 'parties' && host.querySelector('#partyResults')) {
+                host.querySelector('#directoryResults').innerHTML = table(result.items) + pagination(result);
+            } else if (route.name === 'parties' && host.querySelector('#partyResults')) {
                 const groups = groupParties(getActors()).filter((party) => [party.name, party.location, ...party.members.map((member) => [member.name, member.area?.name, member.region].filter(Boolean).join(' '))].join(' ').toLowerCase().includes(String(filters.query || '').toLowerCase()));
-                host.querySelector('#partyResults').innerHTML = partyCards(groups); host.querySelector('#partyCount').textContent = `${number(groups.length)} parties`; return;
+                host.querySelector('#partyResults').innerHTML = partyCards(groups); host.querySelector('#partyCount').textContent = `${number(groups.length)} parties`;
+            } else {
+                host.innerHTML = route.name === 'overview' ? overview() : route.name === 'characters' ? directory() : route.name === 'parties' ? parties() : dungeon();
+                if (route.name === 'characters') {
+                    document.getElementById('directoryKind').value = filters.kind || 'all';
+                    document.getElementById('directoryClass').value = filters.classId || '';
+                    document.getElementById('directorySort').value = filters.sort || 'level';
+                }
             }
-            host.innerHTML = route.name === 'overview' ? overview() : route.name === 'characters' ? directory() : route.name === 'parties' ? parties() : dungeon();
-            if (route.name === 'characters') {
-                document.getElementById('directoryKind').value = filters.kind || 'all';
-                document.getElementById('directoryClass').value = filters.classId || '';
-                document.getElementById('directorySort').value = filters.sort || 'level';
-            }
+            host.querySelector('[data-world-availability]')?.remove();
+            if (notice) host.insertAdjacentHTML('afterbegin', notice);
         }
         function show(next) {
             const changed = JSON.stringify(route) !== JSON.stringify(next);
@@ -167,7 +176,6 @@
             }
             host.hidden = !['overview', 'characters', 'parties', 'dungeon'].includes(next.name);
             render(true);
-            if (next.name === 'overview') loadMarket();
         }
         function remember() {
             route = { name: route.name, ...filters, page };
@@ -179,7 +187,7 @@
             const link = event.target.closest('a');
             if (!link || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
             const next = Router.parse(link.getAttribute('href'));
-            if (next.name === 'not-found' || next.name === 'market' || next.name.startsWith('knowledge-')) return;
+            if (next.name === 'not-found' || next.name === 'settings' || next.name === 'market' || next.name.startsWith('knowledge-')) return;
             event.preventDefault(); navigate(next);
         });
         host.addEventListener('input', (event) => {

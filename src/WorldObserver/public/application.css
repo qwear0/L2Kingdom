@@ -250,6 +250,7 @@ button { cursor: pointer; }
 .overview-metric > small { display: block; color: var(--faint); font-size: 11px; line-height: 1.5; }
 .overview-grid { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(280px, 1fr); gap: 20px; }
 .overview-card { min-width: 0; padding: 22px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.world-unavailable { margin-bottom: 24px; border-color: var(--gold); }
 .overview-card h2 { font-size: 17px; font-weight: 600; margin: 0; }
 .overview-card > p { margin: 8px 0 18px; color: var(--muted); font-size: 12px; line-height: 1.6; }
 .overview-card header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 20px; }

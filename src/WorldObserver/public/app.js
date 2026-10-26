@@ -23,6 +23,7 @@ const scheduleMapViewportRender = MapViewport.frameRenderer(() => {
 
 const state = {
     snapshot: null,
+    worldUnavailable: null,
     refreshing: false,
     worldRevision: 0,
     worldEpoch: null,
@@ -241,6 +242,7 @@ function restartWorldBootstrap(epoch = null) {
     state.worldRevision = 0;
     state.worldEpoch = epoch || null;
     state.worldStatusAt = 0;
+    playerPages?.render(true);
     setTimeout(refresh, 0);
 }
 
@@ -3482,26 +3484,24 @@ function worldRequestError(response) {
     return Object.assign(new Error(`HTTP ${response.status}`), { unavailable: response.status === 503 });
 }
 function showWorldUnavailable(error) {
-    if (!error.unavailable) {
-        els.serverLine.textContent = 'The world could not refresh. Reconnecting…';
-        window.WorldObserverShell?.connection(false);
-        return;
-    }
-    els.serverLine.innerHTML = 'Game observer unavailable. <a href="/observer/settings/server">Open Server management</a>.';
+    state.worldUnavailable = error.unavailable ? 'The game observer is stopped, not ready or disabled.' : 'The world could not refresh. Reconnecting…';
+    els.serverLine.innerHTML = `${state.worldUnavailable} <a href="/observer/settings/server">Open Server management</a>.`;
     window.WorldObserverShell?.connection(false, 'World unavailable');
     els.botsTotal.textContent = '—'; els.playersTotal.textContent = '—';
-    els.lastRefresh.textContent = state.snapshot ? 'Last observation is stale; not a live world.' : 'Game observer unavailable.';
-    if (!state.snapshot) els.actorList.textContent = 'Live characters are unavailable while the game observer is stopped or disabled.';
+    els.lastRefresh.textContent = state.snapshot ? 'Last observation is stale; not a live world.' : 'No world observation is available.';
+    if (!state.snapshot) els.actorList.textContent = 'Live characters are unavailable until the game observer reconnects.';
+    playerPages?.render();
 }
 
 async function loadWorldStatus(force = false) {
-    if (!state.snapshot || state.worldStatusLoading) return;
+    if (!state.snapshot || state.worldUnavailable || state.worldStatusLoading) return;
     if (!force && Date.now() - state.worldStatusAt < 30000) return;
     state.worldStatusLoading = true;
     try {
         const response = await fetch('/observer/api/world/status', { cache: 'no-store' });
         if (!response.ok) throw worldRequestError(response);
         const status = await response.json();
+        if (state.worldUnavailable) return;
         if (worldEpochChanged(status.epoch)) {
             restartWorldBootstrap(status.epoch);
             return;
@@ -3535,7 +3535,9 @@ async function refresh() {
     loadProfileCollection();
     state.refreshing = true;
     try {
-        if (!state.snapshot) {
+        // Keep the last observation visibly stale until a full bootstrap succeeds;
+        // a status-only reply cannot establish fresh actors after an outage.
+        if (!state.snapshot || state.worldUnavailable) {
             const response = await fetch('/observer/api/world/bootstrap', { cache: 'no-store' });
             if (!response.ok) throw worldRequestError(response);
             const bootstrap = WorldState.decodeBootstrap(await response.json());
@@ -3543,6 +3545,7 @@ async function refresh() {
             state.worldRevision = Number(bootstrap.revision || 0);
             state.worldStatusAt = Date.now();
             state.snapshot = bootstrap;
+            state.worldUnavailable = null;
             reconcileSelectedActor();
             renderSnapshot();
             loadClanDirectory();
@@ -3552,24 +3555,26 @@ async function refresh() {
         }
         const response = await fetch(`/observer/api/world/changes?since=${encodeURIComponent(state.worldRevision)}`, { cache: 'no-store' });
         if (response.status === 204) {
-            window.WorldObserverShell?.connection(true);
+            if (state.worldUnavailable) return;
             const epoch = response.headers.get('X-Observer-Epoch');
             if (worldEpochChanged(epoch)) {
                 restartWorldBootstrap(epoch);
                 return;
             }
             state.worldEpoch = epoch || state.worldEpoch;
+            window.WorldObserverShell?.connection(true);
             loadWorldStatus();
             return;
         }
         if (!response.ok) throw worldRequestError(response);
-        window.WorldObserverShell?.connection(true);
         const changes = await response.json();
+        if (state.worldUnavailable) return;
         if (worldEpochChanged(changes.epoch)) {
             restartWorldBootstrap(changes.epoch);
             return;
         }
         state.worldEpoch = changes.epoch || state.worldEpoch;
+        window.WorldObserverShell?.connection(true);
         const changed = applyWorldChanges(changes);
         reconcileSelectedActor();
         renderActorUpdates({ mapChanged: changed.mapChanged });
@@ -4137,7 +4142,7 @@ document.addEventListener('keydown', (event) => {
 });
 
 window.WorldObserverShell.getActors = actors;
-playerPages = window.WorldObserverPlayerPages.create({ getSnapshot: () => state.snapshot, getActors: actors, getClans: clanItems, rememberRoute: (route) => commitRoute(route, { replace: true }),
+playerPages = window.WorldObserverPlayerPages.create({ getSnapshot: () => state.snapshot, getWorldUnavailable: () => state.worldUnavailable, getActors: actors, getClans: clanItems, rememberRoute: (route) => commitRoute(route, { replace: true }),
     navigate: (route) => { commitRoute(route); applyRoute(route); }, activityLabel, roleLabel });
 mapControls = window.WorldObserverMapControls.create({ state, getMeta: mapMeta, getMetrics: () => activeMapMetrics || mapViewportMetrics(), project: worldToMap,
     applyViewport, renderViewport: scheduleMapViewportRender, renderLabels, renderRaids: renderRaidBossPoints,

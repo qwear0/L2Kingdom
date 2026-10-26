@@ -148,6 +148,9 @@
     $('settingsForm').addEventListener('submit', async event => {
         event.preventDefault(); if (saving || uncertain || $('saveSettings').disabled) return;
         const saveTab = tab, targeted = fields().filter(changed);
+        // Native whole-form constraints would reject unchanged legacy values.
+        // Validate only the targeted draft, without clamping or rewriting others.
+        if (!targeted.length || targeted.some(validateField)) { updateDirty(); return; }
         const changes = Object.fromEntries(targeted.map(field => [field.id, parsed(field, drafts[saveTab][field.id])]));
         saving = true; render();
         try {
