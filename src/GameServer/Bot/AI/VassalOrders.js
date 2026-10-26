@@ -9,12 +9,16 @@ const Catalog = invoke('GameServer/Bot/Economy/TownServiceCatalog');
 const Rest = invoke('GameServer/Bot/AI/RestPolicy');
 const Travel = invoke('GameServer/Bot/AI/BotTownTravel');
 const Navigation = invoke('GameServer/Bot/AI/CompanionNavigationRecovery');
-const Geodata = invoke('GameServer/Geodata/GeodataEngine');
+const TargetMatchup = invoke('GameServer/Bot/AI/BotTargetMatchup');
+const HuntingTargetPolicy = invoke('GameServer/Bot/AI/BotHuntingTargetPolicy');
+const TargetScorer = require('./BotTargetScorer');
+const { NPC_GRID_SIZE } = require('../../World/WorldConstants');
 const SAFE_REST_MS = 10 * 60 * 1000;
 const TOWN_RETRY_MS = 5 * 60 * 1000;
 const GATHER_ARRIVAL_RADIUS = 16;
 const GATHER_STALL_MS = 30000;
 const GATHER_ROUTE_RETRY_MS = 5 * 60 * 1000;
+const GATHER_LOCAL_TOLERANCE = 512;
 const FARM_STALL_MS = 5 * 60 * 1000;
 const MAX_FARM_RECOVERIES = 3;
 
@@ -333,50 +337,149 @@ function gatherPointInside(zone, point) {
         return Math.hypot(point.locX - a.locX - along * dx, point.locY - a.locY - along * dy) > margin;
     });
 }
-function gatherZoneOrder(session, area, run) {
-    const counts = area.zones.map(() => 0);
+function gatherPointKey(zone, point) {
+    return `${zone.selfId}:${Math.round(point.locX / 128)}:${Math.round(point.locY / 128)}`;
+}
+function blockGatherPoint(run, area, point, until) {
+    run.blockedGatherPoints ||= {};
+    // Aliases must share a failure, but only when this XYZ point belongs to
+    // the polygon. Do not create an XY-global block across separate floors.
+    for (const zone of area?.zones || []) {
+        if (!Areas.containsZone(zone, point)) continue;
+        const key = gatherPointKey(zone, point);
+        run.blockedGatherPoints[key] = Math.max(run.blockedGatherPoints[key] || 0, until);
+    }
+}
+function gatherZoneBounds(area) {
+    return area.zones.map(zone => {
+        let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity, minZ = Infinity, maxZ = -Infinity;
+        for (const p of zone.bounds) {
+            minX = Math.min(minX, p.locX); maxX = Math.max(maxX, p.locX);
+            minY = Math.min(minY, p.locY); maxY = Math.max(maxY, p.locY);
+            minZ = Math.min(minZ, p.minZ); maxZ = Math.max(maxZ, p.maxZ);
+        }
+        return { zone, minX, maxX, minY, maxY, minZ, maxZ };
+    });
+}
+function gatherZoneCells(zones) {
+    const cells = new Map();
+    zones.forEach((b, i) => {
+        for (let gx = Math.floor(b.minX / NPC_GRID_SIZE); gx <= Math.floor(b.maxX / NPC_GRID_SIZE); gx++) {
+            for (let gy = Math.floor(b.minY / NPC_GRID_SIZE); gy <= Math.floor(b.maxY / NPC_GRID_SIZE); gy++) {
+                const key = `${gx}_${gy}`;
+                if (!cells.has(key)) cells.set(key, []);
+                cells.get(key).push(i);
+            }
+        }
+    });
+    return cells;
+}
+function gatherMemberships(zones, cells, point) {
+    const indices = [];
+    const key = `${Math.floor(point.locX / NPC_GRID_SIZE)}_${Math.floor(point.locY / NPC_GRID_SIZE)}`;
+    for (const i of cells.get(key) || []) {
+        const b = zones[i];
+        if (point.locX < b.minX || point.locX > b.maxX || point.locY < b.minY || point.locY > b.maxY
+            || point.locZ < b.minZ || point.locZ > b.maxZ) continue;
+        if (Areas.containsZone(b.zone, point)) indices.push(i);
+    }
+    return indices;
+}
+function gatherOccupants(session, area, zones, cells) {
+    const occupants = [];
     for (const other of invoke('GameServer/Bot/BotManager').sessions) {
         if (other === session || !other.actor || other.actor.isDead() || other.partyCompanion) continue;
         const row = rowFor(other), otherRun = other.vassalRun;
         if (row?.order !== 'gather' || row.areaId !== area.id || row.gatherResumePending
             || otherRun && (otherRun.revision !== row.orderRevision || otherRun.phase !== 'gather')) continue;
-        // Reserve a pinned destination before arrival, otherwise successive
-        // departures all see the same empty polygon and converge there.
-        const destination = otherRun?.gatherTravel?.destination;
-        const zoneIndex = destination ? destination.zoneIndex
-            : area.zones.findIndex(zone => Areas.containsZone(zone, other.actor));
-        if (zoneIndex >= 0) counts[zoneIndex]++;
+        const point = otherRun?.gatherTravel?.destination?.point || Areas.pointOf(other.actor);
+        const memberships = gatherMemberships(zones, cells, point);
+        if (memberships.length) occupants.push(new Set(memberships));
     }
-    const first = Number(run.zoneIndex ?? session.actor.fetchId()) % area.zones.length;
-    const avoided = run.gatherTravel?.avoidZoneIndex;
-    return area.zones.map((zone, zoneIndex) => ({ zone, zoneIndex,
-        load: counts[zoneIndex], step: (zoneIndex - first + area.zones.length) % area.zones.length }))
-        .sort((a, b) => Number(a.zoneIndex === avoided) - Number(b.zoneIndex === avoided)
-            || a.load - b.load || a.step - b.step);
+    return occupants;
 }
 function gatherDestination(session, area, run) {
-    const now = Date.now(), botPoint = Areas.pointOf(session.actor);
+    const now = Date.now(), bot = session.actor, botPoint = Areas.pointOf(bot);
     run.blockedGatherPoints = Object.fromEntries(Object.entries(run.blockedGatherPoints || {})
         .filter(([, until]) => until > now));
-    const npcs = invoke('GameServer/World/World').npc.spawns.filter(npc => npc.fetchAttackable?.());
-    for (const { zone, zoneIndex } of gatherZoneOrder(session, area, run)) {
-        const center = {
-            locX: Math.round(zone.bounds.reduce((n, p) => n + p.locX, 0) / zone.bounds.length),
-            locY: Math.round(zone.bounds.reduce((n, p) => n + p.locY, 0) / zone.bounds.length),
-            locZ: Math.round((zone.bounds[0].minZ + zone.bounds[0].maxZ) / 2)
-        };
-        center.locZ = Geodata.getHeight(center.locX, center.locY, center.locZ);
-        const candidates = [...npcs.filter(npc => Areas.containsZone(zone, npc)).map(Areas.pointOf), center]
-            .filter(point => gatherPointInside(zone, point))
-            .map(point => ({ point, zoneIndex,
-                key: `${zone.selfId}:${Math.round(point.locX / 128)}:${Math.round(point.locY / 128)}` }))
-            .filter(candidate => !run.blockedGatherPoints[candidate.key]
-                && Math.hypot(candidate.point.locX - botPoint.locX, candidate.point.locY - botPoint.locY) > 128)
-            .sort((a, b) => Math.hypot(a.point.locX - botPoint.locX, a.point.locY - botPoint.locY)
-                - Math.hypot(b.point.locX - botPoint.locX, b.point.locY - botPoint.locY));
-        if (candidates.length) return candidates[0];
+    const zones = gatherZoneBounds(area), cells = gatherZoneCells(zones);
+    const grid = invoke('GameServer/World/World').npc.grid, sectors = new Set();
+    // The radius helper only visits 3x3 cells. Cover this whole area once,
+    // retaining neighbor cells for NPCs moving away from their indexed bucket.
+    // The cell-to-polygon table is selection-local and bounds exact geometry
+    // work; it is not another retained world/actor index.
+    for (const key of cells.keys()) {
+        const [gx, gy] = key.split('_').map(Number);
+        for (let dx = -1; dx <= 1; dx++) {
+            for (let dy = -1; dy <= 1; dy++) sectors.add(`${gx + dx}_${gy + dy}`);
+        }
     }
-    return null;
+    const npcs = new Set();
+    for (const key of sectors) {
+        for (const npc of grid[key] || []) npcs.add(npc);
+    }
+    const first = Number(run.zoneIndex ?? bot.fetchId()) % area.zones.length;
+    const avoided = run.gatherTravel?.avoidZoneIndex, points = new Map();
+    for (const npc of npcs) {
+        if (!npc.fetchAttackable?.() || npc.isDead()) continue;
+        const point = Areas.pointOf(npc), identity = `${point.locX}:${point.locY}:${point.locZ}`;
+        if (points.has(identity)) { points.get(identity).npcs.push(npc); continue; }
+        const zoneIndices = gatherMemberships(zones, cells, point);
+        if (!zoneIndices.length || zoneIndices.some(i => run.blockedGatherPoints[gatherPointKey(area.zones[i], point)])) continue;
+        const distance = Math.hypot(point.locX - botPoint.locX, point.locY - botPoint.locY);
+        if (distance <= 128) continue;
+        let zoneIndex = -1, step = Infinity;
+        for (const i of zoneIndices) {
+            const offset = (i - first + area.zones.length) % area.zones.length;
+            if (offset < step && gatherPointInside(area.zones[i], point)) { zoneIndex = i; step = offset; }
+        }
+        if (zoneIndex < 0) continue;
+        points.set(identity, { point, zoneIndices, zoneIndex, step, distance,
+            avoided: zoneIndices.includes(avoided), npcs: [npc] });
+    }
+    const byPoint = (a, b) => a.point.locX - b.point.locX || a.point.locY - b.point.locY || a.point.locZ - b.point.locZ;
+    const candidates = [...points.values()].sort((a, b) => Number(a.avoided) - Number(b.avoided)
+        || a.distance - b.distance || byPoint(a, b));
+    if (!candidates.length) return null;
+    const profiles = TargetMatchup.actorProfiles([bot]), stats = TargetMatchup.profileStats(profiles);
+    const botStats = { solo: true, botLevel: bot.fetchLevel(), botRole: profiles[0].role,
+        minLevelGap: invoke('GameServer/Bot/Economy/EquipmentIncomeRoute').economicHunt(session.coldLifeState || {}) ? -15 : undefined,
+        botPAtk: bot.fetchCollectivePAtk?.(), botMAtk: bot.fetchCollectiveMAtk?.(),
+        botPDef: bot.fetchCollectivePDef?.(), botMaxHp: bot.fetchMaxHp?.() };
+    const eligible = npc => {
+        if (!HuntingTargetPolicy.canHunt(npc)) return false;
+        const target = TargetMatchup.targetView(npc, stats);
+        return TargetScorer.intrinsicEligibility({ ...botStats,
+            npcLevel: npc.fetchLevel?.() || botStats.botLevel,
+            targetMatchup: TargetMatchup.soloCanHunt(profiles, target),
+            botOffenseRatio: profiles.length > 1 ? profiles.reduce((sum, profile) => sum
+                + (profile.role === 'mage' ? Number(profile.mAtk || 0) / Math.max(1, target.mDef || 1)
+                    : Number(profile.pAtk || 0) / Math.max(1, target.pDef || 1)), 0) : undefined,
+            npcPAtk: npc.fetchPAtk?.() ?? npc.fetchCollectivePAtk?.(),
+            npcPDef: target.pDef, npcMDef: target.mDef, npcMaxHp: target.maxHp
+        }).eligible;
+    };
+    const local = [];
+    let dMin = Infinity, tier;
+    // Establish one fixed distance band before applying occupancy. A fuzzy
+    // pairwise distance comparator would be non-transitive and admit far wins.
+    for (const candidate of candidates) {
+        if (local.length && (candidate.avoided !== tier || candidate.distance > dMin + GATHER_LOCAL_TOLERANCE)) break;
+        if (!candidate.npcs.some(eligible)) continue;
+        if (!local.length) { dMin = candidate.distance; tier = candidate.avoided; }
+        local.push(candidate);
+    }
+    if (!local.length) return null;
+    const occupants = gatherOccupants(session, area, zones, cells), loads = new Map();
+    for (const candidate of local) {
+        const membershipKey = candidate.zoneIndices.join(',');
+        if (!loads.has(membershipKey)) loads.set(membershipKey,
+            occupants.reduce((count, member) => count + Number(candidate.zoneIndices.some(i => member.has(i))), 0));
+        candidate.load = loads.get(membershipKey);
+    }
+    local.sort((a, b) => a.load - b.load || a.distance - b.distance || a.step - b.step || byPoint(a, b));
+    const { point, zoneIndex } = local[0];
+    return { point, zoneIndex, key: gatherPointKey(area.zones[zoneIndex], point) };
 }
 function travelToGatherPoint(session, area, run) {
     const bot = session.actor, now = Date.now(), point = Areas.pointOf(bot);
@@ -417,7 +520,7 @@ function travelToGatherPoint(session, area, run) {
         targetActor: null, arrivalRadius: GATHER_ARRIVAL_RADIUS
     });
     if (navigation.status !== 'exhausted' && now - travel.progressAt < GATHER_STALL_MS) return;
-    run.blockedGatherPoints[destination.key] = now + GATHER_ROUTE_RETRY_MS;
+    blockGatherPoint(run, area, destination.point, now + GATHER_ROUTE_RETRY_MS);
     run.zoneIndex = (destination.zoneIndex + 1) % area.zones.length;
     bot.automation.abortAll(bot);
     Navigation.clear(session);
@@ -557,13 +660,7 @@ function farmWatchdog(session, row, run, paused) {
     watch.from = point;
     watch.castToken = session.townEscape.token;
     const area = Areas.find(row.areaId);
-    run.blockedGatherPoints ||= {};
-    for (const zone of area?.zones || []) {
-        if (Areas.containsZone(zone, bot)) {
-            run.blockedGatherPoints[`${zone.selfId}:${Math.round(point.locX / 128)}:${Math.round(point.locY / 128)}`]
-                = now + 30 * 60 * 1000;
-        }
-    }
+    blockGatherPoint(run, area, point, now + 30 * 60 * 1000);
     run.zoneIndex = (Number(run.zoneIndex || 0) + 1) % Math.max(1, area?.zones.length || 0);
     run.gatherTravel = null;
     status(session, `farm_recovery_${method}`);

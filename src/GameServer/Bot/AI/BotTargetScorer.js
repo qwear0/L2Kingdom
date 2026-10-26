@@ -34,23 +34,12 @@ function powerRatio(context = {}) {
     return Math.cbrt(Math.max(0.001, offense * resilience * health));
 }
 
-function score(context = {}) {
+// Journey selection shares intrinsic fight gates, not the current encounter's
+// range, visibility, cooldown or ranking. Callers still check liveness/protection.
+function intrinsicEligibility(context = {}) {
     const botLevel = Math.max(1, number(context.botLevel, 1));
     const npcLevel = Math.max(1, number(context.npcLevel, botLevel));
     const levelGap = npcLevel - botLevel;
-    const distance = Math.max(0, number(context.distance));
-    const verticalGap = Math.max(0, number(context.verticalGap));
-    const reasons = [];
-
-    if (context.dead || !context.attackable) {
-        return { eligible: false, score: -Infinity, reason: 'not_attackable', reasons: ['not_attackable'] };
-    }
-    if (context.raidEntity) {
-        return { eligible: false, score: -Infinity, reason: 'raid_entity_protected', reasons: ['raid_entity_protected'] };
-    }
-    if (context.retryCooldown) {
-        return { eligible: false, score: -Infinity, reason: 'retry_cooldown', reasons: ['retry_cooldown'] };
-    }
     if (!context.incomingThreat && context.targetMatchup?.eligible === false) {
         const reason = context.targetMatchup.reason || 'target_resistance';
         return { eligible: false, score: -Infinity, reason, reasons: [reason] };
@@ -61,10 +50,6 @@ function score(context = {}) {
     if (!context.incomingThreat && levelGap < Math.max(-15, number(context.minLevelGap, MIN_LEVEL_GAP))) {
         return { eligible: false, score: -Infinity, reason: 'level_too_low', reasons: ['level_too_low'] };
     }
-    if (verticalGap > MAX_VERTICAL_GAP) {
-        return { eligible: false, score: -Infinity, reason: 'vertical_gap', reasons: ['vertical_gap'] };
-    }
-
     const matchup = context.solo === true ? powerRatio(context) : null;
     if (!context.incomingThreat && matchup !== null && matchup < MIN_SOLO_POWER_RATIO) {
         return {
@@ -73,12 +58,34 @@ function score(context = {}) {
             reason: 'overmatched_stats',
             reasons: ['overmatched_stats', `power_ratio:${matchup.toFixed(2)}`],
             powerRatio: matchup,
-            levelGap,
-            distance: Math.round(distance),
-            verticalGap: Math.round(verticalGap)
+            levelGap
         };
     }
+    return { eligible: true, levelGap, powerRatio: matchup };
+}
 
+function score(context = {}) {
+    const distance = Math.max(0, number(context.distance));
+    const verticalGap = Math.max(0, number(context.verticalGap));
+    const reasons = [];
+    if (context.dead || !context.attackable) {
+        return { eligible: false, score: -Infinity, reason: 'not_attackable', reasons: ['not_attackable'] };
+    }
+    if (context.raidEntity) {
+        return { eligible: false, score: -Infinity, reason: 'raid_entity_protected', reasons: ['raid_entity_protected'] };
+    }
+    if (context.retryCooldown) {
+        return { eligible: false, score: -Infinity, reason: 'retry_cooldown', reasons: ['retry_cooldown'] };
+    }
+    const intrinsic = intrinsicEligibility(context);
+    if (!intrinsic.eligible && intrinsic.powerRatio === undefined) return intrinsic;
+    // Preserve ordinary hunting's diagnostic priority: level/matchup first,
+    // then encounter height, then stat mismatch.
+    if (verticalGap > MAX_VERTICAL_GAP) {
+        return { eligible: false, score: -Infinity, reason: 'vertical_gap', reasons: ['vertical_gap'] };
+    }
+    if (!intrinsic.eligible) return { ...intrinsic, distance: Math.round(distance), verticalGap: Math.round(verticalGap) };
+    const { levelGap, powerRatio: matchup } = intrinsic;
     let value = 1000;
     if (!context.incomingThreat && context.targetMatchup) {
         value -= context.targetMatchup.penalty;
@@ -164,6 +171,7 @@ module.exports = {
     MAX_VERTICAL_GAP,
     MIN_SOLO_POWER_RATIO,
     powerRatio,
+    intrinsicEligibility,
     rank,
     score
 };
