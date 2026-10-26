@@ -1,6 +1,6 @@
 const Response = invoke('GameServer/Network/Response');
 const { GROUND_ITEM_ID_START } = require('./WorldConstants');
-const viewers = new WeakMap();
+const viewersByItem = new WeakMap();
 
 function isViewer(session) {
     return session?.actor?.fetchIsOnline?.() === true && !session.botSession
@@ -8,26 +8,18 @@ function isViewer(session) {
         && typeof session.dataSendToMe === 'function';
 }
 
-function knownItems(session, create = false) {
-    let known = viewers.get(session);
-    // A connection can return to character selection and acquire another actor.
-    // Its previous character's item knowledge must not cross that boundary.
-    if (known?.actor !== session.actor) {
-        if (!create) return null;
-        known = { actor: session.actor, ids: new Set() };
-        viewers.set(session, known);
-    }
-    return known?.ids;
-}
-
 function publish(world, sourceSession, item) {
     if (sourceSession?.populationStaging) return;
     const id = item.fetchId();
     const packet = Response.spawnItem(item);
     const recipients = new Set([sourceSession, ...world.fetchVisibleRealPlayers(sourceSession, item)]);
+    let viewers = viewersByItem.get(item);
     for (const session of recipients) {
         if (!isViewer(session)) continue;
-        knownItems(session, true).add(id);
+        if (!viewers) viewersByItem.set(item, viewers = []);
+        // An uncollected drop must not keep a disconnected character/session
+        // alive. Actor identity also fences a connection's next character.
+        viewers.push(new WeakRef(session.actor));
         try {
             session.dataSendToMe(packet);
         } catch (error) {
@@ -40,7 +32,6 @@ function publish(world, sourceSession, item) {
 function hide(session, id, rejectAction = false) {
     try {
         session.dataSendToMe(Response.deleteOb(id));
-        knownItems(session)?.delete(id);
         if (rejectAction) session.dataSendToMe(Response.actionFailed());
     } catch (error) {
         utils.infoWarn('GroundItemVisibility', 'failed to hide item=%s actor=%s error=%s',
@@ -48,12 +39,18 @@ function hide(session, id, rejectAction = false) {
     }
 }
 
-function remove(world, sourceSession, item) {
+function remove(sourceSession, item) {
     const id = item.fetchId();
-    // Current proximity cannot find a client that saw the drop before moving
-    // away. Delete at claim time, before asynchronous inventory awards yield.
-    for (const session of new Set([sourceSession, ...(world.user?.sessions || [])])) {
-        if (isViewer(session) && (session === sourceSession || knownItems(session)?.has(id))) {
+    const viewers = viewersByItem.get(item);
+    viewersByItem.delete(item);
+    if (isViewer(sourceSession)) hide(sourceSession, id);
+    if (!viewers) return;
+    // Only actual observers matter, even after moving away. Do not scan world
+    // sessions: unobserved bot drops should have constant removal overhead.
+    for (const reference of viewers) {
+        const actor = reference.deref();
+        const session = actor?.session;
+        if (session !== sourceSession && session?.actor === actor && isViewer(session)) {
             hide(session, id);
         }
     }

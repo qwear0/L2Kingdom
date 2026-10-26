@@ -44,7 +44,7 @@ async function claim(session, actor, item, canContinue) {
             if (admission.status !== 'admitted') return { ...admission, recipientId: entry.actor.fetchId() };
         }
         this.items.spawns.splice(index, 1);
-        GroundItemVisibility.remove(this, session, canonical);
+        GroundItemVisibility.remove(session, canonical);
         reservation.commit?.();
         const results = [];
         // This is not a multi-recipient database transaction. Keep partial
