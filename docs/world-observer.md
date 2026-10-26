@@ -91,7 +91,7 @@ Some game read handlers do not enforce GET-only; parent management methods are s
 ## Incremental world flow and offline behavior
 
 1. `ensureWorldProjection` collects live actors and bounded lifecycle-cache entries.
-2. `WorldObserverProjection.js` keys by kind/id and retains bounded revision history.
+2. Dynamic refresh builds a local first-session-by-numeric-ID map once to join the existing available hot-status list. It does not keep a permanent BotManager index or change status/detail collection, PK/lifecycle fallbacks, actor order or removal detection. `WorldObserverProjection.js` keys by kind/id and retains bounded revision history.
 3. Bootstrap supplies row schema, process epoch and revision. `public/worldState.js` decodes the supplied contract.
 4. Changes coalesce removals/upserts; expired/invalid cursors reset. Unchanged replies are HTTP 204 with epoch/revision headers. New process epochs invalidate old state.
 5. `public/app.js` polls approximately every two seconds while visible/live, plus slower status polling. Settings is a separate entrypoint, excluded from this router interception and loop.

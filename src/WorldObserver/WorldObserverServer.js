@@ -2039,12 +2039,18 @@ async function refreshDynamicProjection() {
     const pkHotIds = new Set(BotManager.sessions
         .filter((session) => isPkActor(session.actor))
         .map((session) => Number(session.actor.fetchId())));
+    const sessionsById = new Map();
+    for (const session of BotManager.sessions) {
+        const id = session.actor?.fetchId();
+        // Match findSessionById's first strict numeric match, including duplicates.
+        if (Number.isFinite(id) && !sessionsById.has(id)) sessionsById.set(id, session);
+    }
     const hot = BotManager.getAllBotStatuses()
         .filter((status) => status && status.available)
         .map((status) => projectionActor(compactHotBot(
             status,
             pkHotIds,
-            BotManager.findSessionById(Number(status.id))
+            sessionsById.get(Number(status.id))
         ), 'bot'));
     const players = realPlayerSessions().map((session) => projectionActor(compactPlayer(session), 'player'));
     const nextDynamicKeys = new Set([

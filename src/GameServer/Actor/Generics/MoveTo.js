@@ -6,6 +6,7 @@ const PathfindingWorkerPool = invoke('GameServer/Geodata/PathfindingWorkerPool')
 const TownNavigation = invoke('GameServer/Bot/AI/TownNavigation');
 const TownTransitPolicy = invoke('GameServer/Bot/AI/TownTransitPolicy');
 const TownTraffic = invoke('GameServer/Bot/AI/TownTraffic');
+const ActorSpatialQueries = invoke('GameServer/World/ActorSpatialQueries');
 const ActionOwner = invoke('GameServer/Actor/PlayerActionOwner');
 
 // World.fetchVisibleUsers broadcasts movement to observers inside this same
@@ -362,13 +363,11 @@ function moveTo(session, actor, coords) {
         // visibility radius, so a bot could be visibly running and then have
         // its server position silently overwritten.
         const World = invoke('GameServer/World/World');
-        const onlinePlayerSessions = World.user.sessions
-            .filter(s =>
-                s.actor &&
-                s.actor.fetchIsOnline() &&
-                s.accountId &&
-                !s.accountId.startsWith('bot_')
-            );
+        const onlinePlayerSessions = ActorSpatialQueries.humans(World, s =>
+            s.actor &&
+            s.actor.fetchIsOnline() &&
+            s.accountId &&
+            !s.accountId.startsWith('bot_'), true);
         const onlinePlayers = onlinePlayerSessions.map((playerSession) => playerSession.actor);
         const distanceToPlayer = distanceToClosestPlayer(onlinePlayers, {
             locX: startX,
