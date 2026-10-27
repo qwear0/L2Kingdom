@@ -74,7 +74,7 @@ function spendSkillMp(session, actor, skill) {
     return true;
 }
 
-function castUtilitySkill(session, actor, target, skill, effect, offensiveTargets = null, actionOwner = null) {
+function castUtilitySkill(session, actor, target, skill, effect, offensiveTargets = null, actionOwner = null, resumeAttack = null) {
     if (!invoke('GameServer/Actor/PlayerActionOwner').current(session, actor, actionOwner)) return;
     const autoFight = offensiveTargets && invoke('GameServer/Actor/PlayerAutoFightPolicy').forAction(session, actor, actionOwner);
     if (autoFight && !autoFight.canInitiate(offensiveTargets, actor)) return;
@@ -97,6 +97,7 @@ function castUtilitySkill(session, actor, target, skill, effect, offensiveTarget
     session.dataSendToMeAndOthers(ServerResponse.skillStarted(actor, target.fetchId(), skill), actor);
     session.dataSendToMe(ServerResponse.skillDurationBar(skill.fetchCalculatedHitTime()));
     actor.state.setCasts(true);
+    if (!actor.attack.queue.name || actor.attack.queue.name === 'skill') actor.attack.queue.resumeAttack = resumeAttack;
     HotPartyCastTracker.begin(session, actor, target, skill);
     if (cast) actor.attack.activeCast = cast;
 
@@ -112,6 +113,9 @@ function castUtilitySkill(session, actor, target, skill, effect, offensiveTarget
             return;
         }
         effect();
+        if (resumeAttack && (actor.attack.queue.name || actor.attack.queue.resumeAttack)) {
+            actor.attack.dequeueEvent(session);
+        }
     }, skill.fetchCalculatedHitTime());
 }
 
@@ -199,11 +203,11 @@ const SpoilSweep = {
         return this.isSweepable(npc) ? Math.max(corpseTime, SPOILED_CORPSE_TIME) : corpseTime;
     },
 
-    castSpoil(session, actor, npc, skill, actionOwner = null) {
-        this.castSpoilTargets(session, actor, [npc], skill, actionOwner);
+    castSpoil(session, actor, npc, skill, actionOwner = null, resumeAttack = null) {
+        this.castSpoilTargets(session, actor, [npc], skill, actionOwner, resumeAttack);
     },
 
-    castSpoilTargets(session, actor, targets, skill, actionOwner = null) {
+    castSpoilTargets(session, actor, targets, skill, actionOwner = null, resumeAttack = null) {
         const eligible = [...new Map((targets || []).filter(Boolean)
             .map((npc) => [npc.fetchId?.(), npc]))].map(([, npc]) => npc)
             .filter((npc) => npc.fetchAttackable?.() && !npc.isDead?.() && hasSpoils(npc) && !npc.model?.spoil?.spoiled);
@@ -233,10 +237,10 @@ const SpoilSweep = {
                 .catch(error => utils.infoWarn('Quest', 'skill callback failed: %s', error.message));
             if (invoke('GameServer/Bot/Population/PopulationConfig').developerDiagnostics === true) console.info('SpoilSweep :: %s spoiled %d of %d targets with %s', actor.fetchName(), landed, spoiled.length, skill.fetchName());
             if (landed > 0) ConsoleText.transmit(session, ConsoleText.caption.spoilActivated);
-        }, eligible, actionOwner);
+        }, eligible, actionOwner, resumeAttack);
     },
 
-    castSweep(session, actor, npc, skill, actionOwner = null) {
+    castSweep(session, actor, npc, skill, actionOwner = null, resumeAttack = null) {
         // A hot bot may finish its queued approach after the corpse decayed.
         const expiredBotCorpse = () => String(session?.accountId || '').startsWith('bot_')
             && (npc.corpseDecayState === 'removed'
@@ -285,7 +289,7 @@ const SpoilSweep = {
             const World = invoke('GameServer/World/World');
             NpcObjectIndex.remove(World, npc);
             World.npc.spawns = World.npc.spawns.filter((ob) => ob.fetchId() !== npc.fetchId());
-        }, null, actionOwner);
+        }, null, actionOwner, resumeAttack);
     }
 };
 

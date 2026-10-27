@@ -380,7 +380,7 @@ class Automation extends SelectedModel {
         // Players report position intermittently. Keep the fallback arrival,
         // but allow an accepted position update to shorten its stale estimate.
         const approach = movingSelf && !movingBot && weaponAttack ? {
-            session, src, dst, movementRadius, actionRange, dueAt: Date.now() + ticks,
+            session, src, dst, movementRadius, actionRange, ctrl: options.ctrl, dueAt: Date.now() + ticks,
             stopCoords, finish: null, timerRevision: 0
         } : null;
         this.playerAttackApproach = approach;

@@ -65,6 +65,20 @@ function skillRequest(session, actor, data) {
         return;
     }
 
+    if (!data.actionOwner && !session.botSession && !session.accountId?.startsWith('bot_') && !data.resumeAttack) {
+        const swing = (actor.state.fetchHits() || actor.attack.bowReloading) && actor.attack.activeSwing;
+        const approach = actor.automation.playerAttackApproach;
+        if (actor.attack.bowRepeatTarget && !actor.attack.bowRepeatOwner) {
+            data.resumeAttack = { id: actor.attack.bowRepeatTarget.fetchId(), ctrl: actor.attack.bowRepeatCtrl };
+        }
+        else if (swing && !swing.actionOwner) {
+            data.resumeAttack = { id: swing.targets[0].fetchId(), ctrl: swing.ctrl };
+        }
+        else if (approach && actor.state.fetchTowards() === 'melee') {
+            data.resumeAttack = { id: approach.dst.fetchId(), ctrl: approach.ctrl };
+        }
+    }
+
     if (actor.isBlocked()) {
         Generics.queueRequest(session, actor, 'skill', data);
         return;

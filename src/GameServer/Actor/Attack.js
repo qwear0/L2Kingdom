@@ -23,6 +23,7 @@ class Attack {
         this.bowReloading = false;
         this.bowRepeatTarget = null;
         this.bowRepeatOwner = null;
+        this.bowRepeatCtrl = undefined;
         this.activeSwing = null;
         this.resetQueuedEvent();
     }
@@ -36,8 +37,11 @@ class Attack {
     // Queue mechanism
 
     queueEvent(name, data) {
+        // Only another skill inherits the interrupted auto-attack. Explicit
+        // movement, attacks or other commands replace that continuation.
         this.queue.name = name;
         this.queue.data = data;
+        if (name !== 'skill') this.queue.resumeAttack = undefined;
     }
 
     dequeueEvent(session) {
@@ -45,6 +49,12 @@ class Attack {
 
         let actor = session.actor;
         let queue = this.queue;
+        if (queue.name === 'skill' && queue.resumeAttack) {
+            queue.data = { ...queue.data, resumeAttack: queue.data.resumeAttack || queue.resumeAttack };
+        }
+        else if (!queue.name && queue.resumeAttack) {
+            queue = { name: 'attack', data: queue.resumeAttack };
+        }
         this.resetQueuedEvent();
         if (!actor || actor.attack !== this
             || !invoke('GameServer/Actor/PlayerActionOwner').current(session, actor, queue.data?.actionOwner)) return;
@@ -60,7 +70,7 @@ class Attack {
     }
 
     resetQueuedEvent() {
-        this.queue = { name: undefined, data: undefined };
+        this.queue = { name: undefined, data: undefined, resumeAttack: undefined };
     }
 
     queueTimer(callback, delay) {
@@ -74,11 +84,13 @@ class Attack {
 
     clearTimers() {
         this.activeCast = null;
+        this.queue.resumeAttack = undefined;
         this.timers.forEach((timer) => clearTimeout(timer));
         this.timers.clear();
         this.bowReloading = false;
         this.bowRepeatTarget = null;
         this.bowRepeatOwner = null;
+        this.bowRepeatCtrl = undefined;
         this.activeSwing = null;
     }
 
@@ -126,6 +138,7 @@ class Attack {
             // but another arrow must still wait for the weapon reuse phase.
             this.bowRepeatTarget = creature;
             this.bowRepeatOwner = owner;
+            this.bowRepeatCtrl = options.ctrl;
             return;
         }
         if (!AttackRange.isWithinRange(actor, creature, attackRange)
@@ -137,7 +150,7 @@ class Attack {
             // may have moved since the initial attack request or last swing.
             if (invoke('GameServer/Effects/EffectRestrictions').canMove(actor)) {
                 actor.automation.scheduleAction(session, actor, creature, attackRange,
-                    () => this.meleeHit(session, creature, options), { collisionAware: true, action: 'attack', actionOwner: owner });
+                    () => this.meleeHit(session, creature, options), { collisionAware: true, action: 'attack', actionOwner: owner, ctrl: options.ctrl });
             }
             return;
         }
@@ -209,7 +222,7 @@ class Attack {
             }))
         }), actor);
         actor.state.setHits(true);
-        const swing = this.activeSwing = { targets: meleeTargets };
+        const swing = this.activeSwing = { targets: meleeTargets, actionOwner: owner, ctrl: options.ctrl };
 
         this.queueTimer(() => {
             if (session.actor !== actor) return;
@@ -268,11 +281,13 @@ class Attack {
             if (session.actor !== actor) return;
             const repeatTarget = rangedAttack ? this.bowRepeatTarget : null;
             const repeatOwner = rangedAttack ? this.bowRepeatOwner : null;
+            const repeatCtrl = rangedAttack ? this.bowRepeatCtrl : undefined;
             const nextTarget = repeatTarget || creature;
             if (rangedAttack) {
                 this.bowReloading = false;
                 this.bowRepeatTarget = null;
                 this.bowRepeatOwner = null;
+                this.bowRepeatCtrl = undefined;
             }
             // Owned swings yield at the native boundary, even after Stop.
             // A bow's movement was released at impact, so its later reload must
@@ -284,7 +299,7 @@ class Attack {
                 }
                 if (actor.state.fetchHits() || actor.state.fetchCasts()) return;
                 if (this.queue.name) this.dequeueEvent(session);
-                else if (repeatTarget) this.meleeHit(session, repeatTarget, { actionOwner: repeatOwner });
+                else if (repeatTarget) this.meleeHit(session, repeatTarget, { actionOwner: repeatOwner, ctrl: repeatCtrl });
                 return;
             }
             if (this.blockedPvpDefense(session, actor, nextTarget) || this.checkParticipants(actor, nextTarget)) {
@@ -302,7 +317,7 @@ class Attack {
             }
 
             if (rangedAttack && repeatTarget) {
-                this.meleeHit(session, nextTarget, { actionOwner: repeatOwner });
+                this.meleeHit(session, nextTarget, { actionOwner: repeatOwner, ctrl: repeatCtrl });
                 return;
             }
 
@@ -312,7 +327,7 @@ class Attack {
                 || actor.isBlocked?.()
             )) return;
 
-            this.meleeHit(session, creature);
+            this.meleeHit(session, creature, options);
 
         }, timing.cycleMs); // Until end of combat move or bow reload
     }
@@ -372,6 +387,7 @@ class Attack {
                 || (skill.fetchSkillType?.() === 'manaRecharge'
                     && !invoke('GameServer/Bot/AI/PartyAwareness').underDirectNpcAttack(creature.session)))) return;
         const magicSkill = this.beginRemoteCast(session, actor, creature, skill);
+        if (!this.queue.name || this.queue.name === 'skill') this.queue.resumeAttack = options.resumeAttack;
         if (acceptedTargets) {
             this.activeCast.autoFightTargets = acceptedTargets;
             AutoFightPolicy.accepted(session, actor, acceptedTargets, owner);
@@ -626,7 +642,7 @@ class Attack {
             return;
         }
 
-        if (this.queue.name) {
+        if (this.queue.name || this.queue.resumeAttack) {
             this.dequeueEvent(session);
             return;
         }

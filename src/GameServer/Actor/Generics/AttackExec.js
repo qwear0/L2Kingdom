@@ -22,12 +22,12 @@ function attackExec(session, actor, data) {
         actor.automation.scheduleAction(session, actor, npc, attackRange, () => {
             if (!current()) return;
             if (canAttackNpc(npc, data)) {
-                actor.attack.meleeHit(session, npc, { actionOwner: owner });
+                actor.attack.meleeHit(session, npc, { actionOwner: owner, ctrl: data.ctrl });
             }
             else {
                 World.npcTalk(session, npc);
             }
-        }, { collisionAware: true, action: 'attack', actionOwner: owner });
+        }, { collisionAware: true, action: 'attack', actionOwner: owner, ctrl: data.ctrl });
     }).catch((error) => {
         if (!current()) return;
         if (owner) {
@@ -46,7 +46,7 @@ function attackExec(session, actor, data) {
                         session.dataSendToMe(ServerResponse.speak(actor, { kind: 0, text: "You cannot attack players in a peace zone." }));
                         return;
                     }
-                    actor.attack.meleeHit(session, user);
+                    actor.attack.meleeHit(session, user, { ctrl: data.ctrl });
                 }
                 else {
                     const BotManager = invoke('GameServer/Bot/BotManager');
@@ -56,7 +56,7 @@ function attackExec(session, actor, data) {
                         BotMerchant.talk(session, user);
                     }
                 }
-            }, { collisionAware: true, action: 'attack' });
+            }, { collisionAware: true, action: 'attack', ctrl: data.ctrl });
         }).catch((err) => {
             utils.infoWarn('GameServer', 'Attack -> ' + err);
         })
