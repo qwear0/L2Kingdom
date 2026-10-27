@@ -118,6 +118,16 @@ Runtime acceptance remains separate: management assets without a DB; stopped rel
 - Do not add/modify automated tests/test infrastructure or run suites by default. `tests/test_launcher_progression_memory.js` still assumes `/api/*`, `L2NODE_LAUNCHER_PORT`, old inline HTML and status shape. `tests/test_multi_launcher_isolation.js` still assumes separate launcher/observer ports and old URL/status fields. `tests/test_saved_games.js` and `tests/test_world_wipe.js` also contain old launcher API/HTML assumptions. These tests were not migrated or run; those assumptions are obsolete, not a reason to retain compatibility. Other legacy gateway tests may explicitly override enabled/model snapshots, now subordinate to the dispatch-time policy gate.
 - No build/start/stop/restart is an incidental documentation, Git or syntax-check side effect. Independent review, runtime acceptance and deployment are distinct activities.
 
+## One-commit upstream updates
+
+Use the canonical [upstream-integrator skill](../skills/l2siege-upstream-integrator/SKILL.md) for incremental L2Solo or Mobius C4 updates. It explains one exact commit's purpose, local compatibility, expected behavior, dependencies, performance impact and verification limits, then waits for user approval. L2Solo changes may be integrated as native patches; Mobius changes require native adaptations, not a Java subtree merge or rebase.
+
+Invoke `/skill:l2siege-upstream-integrator next l2solo` or `next mobius-c4`; use `status` to resume and `refresh <source>` to discover new source tips. Each approval applies only to its saved proposal. After applying, skipping or deferring the commit, the agent records the result and stops rather than applying the next one automatically.
+
+Progress lives in ignored `tmp/upstream-integration/state.md` and per-commit receipts. It persists between local sessions, but is not pushed with Git and is lost if those files are deleted. Integration commit trailers retain source provenance, not skipped decisions. Read the skill's [record contract](../skills/l2siege-upstream-integrator/references/records.md) for recovery. Root restrictions on tests, runtime operations, backups and scoped commits still apply; a pushed code change is not evidence of live activation.
+
+Local discovery follows the existing skill convention: `~/.agents/skills/l2siege-upstream-integrator` links to `skills/l2siege-upstream-integrator/`. Run `/reload` in Pi after installation. The skill is an instruction workflow, not an executable approval guard or background updater.
+
 ## Update together
 
 Keep command effects, source/preset ownership, simulation consumers, operation locks, save/wipe failure semantics, README, [runtime](runtime.md), [persistence](persistence.md) and `AGENTS.md` synchronized. Do not turn historical tests or a successful parser check into evidence of runtime acceptance.

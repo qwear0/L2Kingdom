@@ -43,6 +43,13 @@ At the end of a task, check whether `README.md`, these instructions, or other af
 - Keep documentation changes proportionate. Update affected maps, links, and feature docs in the same task when their claims change; installing the skill alone does not require creating a documentation tree.
 - Validate changed claims, paths, and links and inspect `git diff --check`. There is no bundled documentation auditor; do not import QSD-specific commands or create test infrastructure merely to mirror its workflow.
 
+## Incremental Upstream Integration
+
+- Use `skills/l2siege-upstream-integrator/SKILL.md` for one-at-a-time L2Solo or Mobius C4 updates. Analyze one exact upstream commit, explain its local effects in Russian, and wait for the user's approval before implementation. Approval does not extend to the next commit or unreviewed prerequisites.
+- L2Solo is the Git upstream; Mobius C4 is a source for native behavior/content adaptations, not a rebase target. Preserve local ownership, runtime, persistence and performance contracts.
+- Keep resumable decisions under ignored `tmp/upstream-integration/`; record source provenance in integration commits. Do not silently mark skipped/deferred commits as applied. See the skill for approval, recovery and publication boundaries.
+- Local skill discovery uses `~/.agents/skills/l2siege-upstream-integrator` as a symlink to the canonical repository directory. Installing the skill does not authorize any upstream integration.
+
 ## Code Intelligence Retrieval
 
 Use CodeGraph or an equivalent semantic/code graph for bounded cross-file discovery.
