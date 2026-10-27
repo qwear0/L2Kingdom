@@ -10,6 +10,7 @@ const Rest = invoke('GameServer/Bot/AI/RestPolicy');
 const Travel = invoke('GameServer/Bot/AI/BotTownTravel');
 const Transit = invoke('GameServer/Bot/AI/TownTransitPolicy');
 const Navigation = invoke('GameServer/Bot/AI/CompanionNavigationRecovery');
+const Surface = invoke('GameServer/Geodata/SpawnSurface');
 const Journey = require('../Travel/JourneyExecutor');
 const TargetMatchup = invoke('GameServer/Bot/AI/BotTargetMatchup');
 const HuntingTargetPolicy = invoke('GameServer/Bot/AI/BotHuntingTargetPolicy');
@@ -23,6 +24,10 @@ const GATHER_ROUTE_RETRY_MS = 5 * 60 * 1000;
 const GATHER_LOCAL_TOLERANCE = 512;
 const FARM_STALL_MS = 5 * 60 * 1000;
 const MAX_FARM_RECOVERIES = 3;
+const WAIT_MIN_RADIUS = 180;
+const WAIT_MAX_RADIUS = 640;
+const WAIT_ARRIVAL_RADIUS = 24;
+const WAIT_RETRY_MS = 30000;
 
 function rowFor(session) { return Registry.find(session.actor?.fetchId()); }
 function snapshot(session) {
@@ -177,7 +182,70 @@ function journeyTo(session, row, run, kind, destination, arrival, label) {
     if (result.status === 'blocked' || result.status === 'waiting') status(session, `journey_${result.reason || result.status}`);
     return result;
 }
-function serviceReturn(session, row, run, kind = 'service') {
+function waitingPosition(point) {
+    const distance = Math.hypot(point.locX - Access.loc.locX, point.locY - Access.loc.locY);
+    return distance >= WAIT_MIN_RADIUS - WAIT_ARRIVAL_RADIUS
+        && distance <= WAIT_MAX_RADIUS + WAIT_ARRIVAL_RADIUS
+        && Math.abs(point.locZ - Access.loc.locZ) <= 100;
+}
+function settleAtCastellan(session, run) {
+    const bot = session.actor, from = Areas.pointOf(bot), now = Date.now();
+    const wait = run.castellanWait ||= { target: null, retryAt: 0 };
+    if (now < wait.retryAt) return false;
+    if (!wait.target) {
+        // Sample real surfaces only; reachability is established by normal
+        // movement, not by accepting a random XY point or teleporting to it.
+        for (let attempt = 0; attempt < 8 && !wait.target; attempt++) {
+            const angle = Math.random() * Math.PI * 2;
+            const radius = Math.sqrt(WAIT_MIN_RADIUS ** 2
+                + Math.random() * (WAIT_MAX_RADIUS ** 2 - WAIT_MIN_RADIUS ** 2));
+            wait.target = Surface.supported({
+                locX: Math.round(Access.loc.locX + Math.cos(angle) * radius),
+                locY: Math.round(Access.loc.locY + Math.sin(angle) * radius),
+                locZ: Access.loc.locZ
+            });
+        }
+        wait.progressPoint = from;
+        wait.progressAt = now;
+        if (!wait.target) {
+            wait.retryAt = now + WAIT_RETRY_MS + Math.random() * 5000;
+            return false;
+        }
+    }
+    if (Math.hypot(from.locX - wait.target.locX, from.locY - wait.target.locY) <= WAIT_ARRIVAL_RADIUS
+        && Math.abs(from.locZ - wait.target.locZ) <= 32) {
+        seated(session, true);
+        Navigation.clear(session);
+        return true;
+    }
+    seated(session, false);
+    if (Math.hypot(from.locX - wait.progressPoint.locX, from.locY - wait.progressPoint.locY) >= 48) {
+        wait.progressPoint = from;
+        wait.progressAt = now;
+    }
+    const result = Navigation.move(session, bot, wait.target, 'castellan_wait', {
+        arrivalRadius: WAIT_ARRIVAL_RADIUS, targetActor: null
+    });
+    if (result.status === 'exhausted'
+        || (!session.pendingPathRequest && now - wait.progressAt >= WAIT_RETRY_MS)) {
+        bot.automation.abortAll(bot);
+        Navigation.clear(session);
+        wait.target = null;
+        wait.retryAt = now + WAIT_RETRY_MS + Math.random() * 5000;
+    }
+    return false;
+}
+function serviceReturn(session, row, run, kind = 'service', wait = row.order === 'service') {
+    // Completed waiting must not restart the arrival journey: it stands the
+    // actor up. Legacy centre positions are redistributed on their next tick.
+    if (wait && run.phase === 'waiting') {
+        if (waitingPosition(Areas.pointOf(session.actor))) {
+            seated(session, true);
+            return true;
+        }
+        run.phase = 'service';
+        delete run.castellanWait;
+    }
     const goal = run.journeyGoal;
     if (!goal || goal.kind !== kind || goal.actor !== session.actor || goal.clanEligible !== eligible(session, row)
         || !goal.completed || Math.hypot(session.actor.fetchLocX() - Access.loc.locX,
@@ -185,7 +253,7 @@ function serviceReturn(session, row, run, kind = 'service') {
         || Math.abs(session.actor.fetchLocZ() - Access.loc.locZ) > 100) {
         if (journeyTo(session, row, run, kind, Access.loc, { xy: 1200, z: 100 }, 'Castellan (Gludio)').status !== 'arrived') return false;
     }
-    return move(session, Access.loc, 100);
+    return wait ? settleAtCastellan(session, run) : move(session, Access.loc, 100);
 }
 function routeBlocked(session, destination) {
     const path = session.lastPathfinding;
@@ -866,7 +934,9 @@ function tick(session, Generics, BotAI) {
     if (Date.now() < Number(session.vassalBlockedUntil || 0)) { pauseJourney(session, 'duty_backoff'); return; }
     if (enforceClan(session)) {
         if (session.vassalOperation || session.vassalRun !== run) return;
-        try { serviceReturn(session, row, run, 'clan_return'); }
+        try {
+            if (serviceReturn(session, row, run, 'clan_return', true)) run.phase = 'waiting';
+        }
         catch (error) { dutyError(session, bot, error); }
         return;
     }
@@ -908,10 +978,6 @@ function tick(session, Generics, BotAI) {
             }
             status(session, 'required_supplies_unaffordable');
             serviceReturn(session, row, run, 'shortage');
-        } else if (run.phase === 'waiting') {
-            // Re-running the arrival journey would stand a restored idle actor
-            // and collapse its saved waiting position back onto the Castellan.
-            status(session, 'waiting_at_castellan');
         } else {
             status(session, 'returning_to_castellan');
             if (serviceReturn(session, row, run)) {

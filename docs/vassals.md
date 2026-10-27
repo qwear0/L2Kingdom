@@ -87,6 +87,10 @@ Gathering distribution and route recovery stay within that assignment:
 
 Known wording mismatch: `CastellanDialog.js` currently says “one minute” in its home text, while `VassalOrders.SAFE_REST_MS` is ten minutes. The implementation value above is the documented contract; the UI wording has not been repaired by this documentation-only change.
 
+## Idle waiting near Castellan
+
+Service-duty vassals choose a random supported surface 180–640 units around Castellan, walk there through normal navigation and sit on arrival. The chosen destination stays fixed during the approach; failed routes or 30 seconds without local progress discard it and retry after a staggered 30–35-second delay. Surface sampling is bounded, routing uses the existing navigation recovery/worker budgets, and seated waiting performs no repeated destination searches or world-wide occupancy scans. Combat, recovery, owner trade and new orders retain their existing priority. Clan-ineligible vassals use the same seated waiting behavior while retaining cargo and the clan-ineligibility reason.
+
 ## Physical supplies and cargo
 
 Duties execute on live actors and native movement; they do not earn rewards from elapsed offline time.
@@ -102,7 +106,7 @@ Personal-storage diversion and autonomous redistribution of Lord-led clan stock 
 
 `Lord/Repository.js` owns `lord_characters`, `vassals` and grant receipts: ownership, clan binding, loadout, duty, area, pending resumption and revision are durable state. Economic commits additionally check current duty and synchronize inventory snapshots.
 
-`BotManager` restores only registered owned vassals at their saved character coordinates. Lifecycle JSON also retains sitting/standing posture, heading, recovery mode and completed service-duty waiting, fenced by the current order revision. Restoration happens before world publication. Completed waiting does not repeat the arrival journey, so an idle vassal keeps its position and posture until recovery, combat or a newer order requires a change. Missing legacy posture metadata uses the normal duty initialization; it cannot reconstruct a previously unsaved pose. Post-party gather interruptions still repeat their full safe-rest interval after restart.
+`BotManager` restores only registered owned vassals at their saved character coordinates. Lifecycle JSON also retains sitting/standing posture, heading, recovery mode and completed service-duty waiting, fenced by the current order revision. Restoration happens before world publication. Completed waiting within the waiting ring does not repeat the arrival journey: the vassal keeps its saved position and heading and waits seated. Legacy centre positions or positions outside that ring go through normal waiting-place selection. Missing legacy posture metadata uses the normal duty initialization; it cannot reconstruct a previously unsaved pose. Post-party gather interruptions still repeat their full safe-rest interval after restart.
 
 `PopulationService` persists owned actors every 30 seconds and makes a fresh final pass during graceful shutdown after any admitted periodic pass settles. Forced termination can only recover committed state. `Cooldown` refuses their ordinary cold handoff and `HotActorLodPolicy` keeps owned context active even when the Lord is offline. This is server-running activity, not offline-time simulation. See [persistence](persistence.md).
 
