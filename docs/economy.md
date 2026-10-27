@@ -31,6 +31,8 @@ This is not one atomic ground/SQLite/multi-recipient transaction. A persistence/
 
 `Crafting/ManufactureShop.js` adds customer/crafter authority, quote and 150-unit XY contact checks. `Database.craftForCustomer` handles customer materials/fee and crafter MP. Retained static-station exemptions do not prove such stations spawn under current owned-only startup.
 
+Retained clan crafting planners pool personal inventory with available clan warehouse materials, recipes and blades listed as inputs in `Items/C4DualSwordCombinations.js`. `Clan/ClanCraftingPolicy.js` subtracts reserved warehouse quantities; other weapons remain outside this planning pool. Counting stock does not transfer it or grant warehouse access: physical handoff still uses the native custody/revision checks. This does not enable autonomous clan scheduling under owned-only startup.
+
 Recipes, skills, item definitions and catalogue descriptions must agree; see [content](content.md).
 
 ## Native private stores and direct bot trade
