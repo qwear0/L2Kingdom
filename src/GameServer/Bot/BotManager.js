@@ -702,6 +702,8 @@ const BotManager = {
                             this.prepareBotForSpawn(session, botData);
                         }
                         session.actor.state.setSeated(session.plan === 'resting');
+                        if (session.vassal) invoke('GameServer/Bot/AI/VassalOrders').restore(session,
+                            invoke('GameServer/Bot/Population/BotLifeState').snapshot(character.id)?.stats?.vassalState);
                     }
 
                     let hotPersisted = false;

@@ -24,6 +24,26 @@ const FARM_STALL_MS = 5 * 60 * 1000;
 const MAX_FARM_RECOVERIES = 3;
 
 function rowFor(session) { return Registry.find(session.actor?.fetchId()); }
+function snapshot(session) {
+    const row = rowFor(session), bot = session.actor;
+    if (!row || !bot) return null;
+    return {
+        orderRevision: row.orderRevision,
+        seated: bot.state.fetchSeated(),
+        head: bot.fetchHead(),
+        recovering: session.plan === 'resting' || session.recoveryLocked === true,
+        waiting: !session.partyCompanion && row.order === 'service' && session.vassalRun?.phase === 'waiting'
+    };
+}
+function restore(session, saved) {
+    const row = rowFor(session), bot = session.actor;
+    if (!row || !saved || saved.orderRevision !== row.orderRevision || bot.isDead()) return;
+    bot.state.setSeated(saved.seated === true);
+    if (Number.isFinite(saved.head)) bot.setHead(saved.head);
+    if (saved.recovering === true) session.plan = 'resting';
+    if (saved.waiting === true && row.order === 'service')
+        session.vassalRun = { revision: row.orderRevision, phase: 'waiting' };
+}
 function seated(session, value) {
     const bot = session.actor;
     if (bot.state.fetchSeated() === value) return;
@@ -379,8 +399,11 @@ function recovery(session) {
         seated(session, true);
         return true;
     }
+    if (session.plan === 'resting' || session.recoveryLocked) {
+        session.plan = 'hunting';
+        seated(session, false);
+    }
     session.recoveryLocked = false;
-    seated(session, false);
     return false;
 }
 function gatherPointInside(zone, point) {
@@ -787,6 +810,7 @@ function tick(session, Generics, BotAI) {
         return;
     }
     if (defending || incoming || bot.state.fetchHits?.() || (session.plan === 'fleeing')) {
+        if (run.phase === 'waiting') run.phase = 'service';
         pauseJourney(session, 'combat');
         if (session.vassalRest) session.vassalRest.at = null;
         seated(session, false);
@@ -850,10 +874,15 @@ function tick(session, Generics, BotAI) {
             }
             status(session, 'required_supplies_unaffordable');
             serviceReturn(session, row, run, 'shortage');
+        } else if (run.phase === 'waiting') {
+            // Re-running the arrival journey would stand a restored idle actor
+            // and collapse its saved waiting position back onto the Castellan.
+            status(session, 'waiting_at_castellan');
         } else {
             status(session, 'returning_to_castellan');
             if (serviceReturn(session, row, run)) {
                 status(session, 'waiting_at_castellan');
+                if (row.order === 'service') run.phase = 'waiting';
                 if (row.order === 'return') operation(session, () => Registry.replaceNonGatherOrder(row.ownerCharacterId,
                     row.characterId, row.orderRevision, 'service'));
             }
@@ -890,7 +919,7 @@ function useSupplies(session, { speed = true } = {}) {
                 ?? semantic.stats?.pAtkSpdMul ?? semantic.stats?.castSpdMul ?? skill.fetchLevel());
             if (effects.some(effect => effect.stackFamily === semantic.stackFamily && effect.stackOrder >= order)) continue;
             // Service/rest ticks must not drain speed stock while standing still.
-            if (!session.partyCompanion && session.vassalRun?.phase === 'service') continue;
+            if (!session.partyCompanion && ['service', 'waiting'].includes(session.vassalRun?.phase)) continue;
         }
         if (!session.partyCompanion) pauseJourney(session, 'supply_use');
         bot.backpack.useItem(session, item.fetchId());
@@ -905,5 +934,5 @@ function executionFence(session) {
         && Registry.current(row.characterId, row.orderRevision)
         && session.followPlayerSession === leader && session.partyCompanion === party;
 }
-module.exports = { tick, invalidate, separated, targetAllowed, noTarget, died, supplies, useSupplies, enforceClan, executionFence,
+module.exports = { tick, invalidate, separated, snapshot, restore, targetAllowed, noTarget, died, supplies, useSupplies, enforceClan, executionFence,
     clanEligible: session => { const row = rowFor(session); return !!row && eligible(session, row); } };

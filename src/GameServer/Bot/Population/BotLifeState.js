@@ -670,6 +670,7 @@ function recordFromSession(session, phase, reason = '') {
             }
             : null,
         newbieAnchor: !!session.newbieAnchor,
+        ...(session.vassal ? { vassalState: require('../AI/VassalOrders').snapshot(session) } : {}),
         lastReason: reason
     };
 

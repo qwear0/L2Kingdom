@@ -101,7 +101,9 @@ Personal-storage diversion and autonomous redistribution of Lord-led clan stock 
 
 `Lord/Repository.js` owns `lord_characters`, `vassals` and grant receipts: ownership, clan binding, loadout, duty, area, pending resumption and revision are durable state. Economic commits additionally check current duty and synchronize inventory snapshots.
 
-`BotManager` restores only registered owned vassals. `PopulationService` persists owned actors periodically; `Cooldown` refuses their ordinary cold handoff and `HotActorLodPolicy` keeps owned context active even when the Lord is offline. This is server-running activity, not offline-time simulation. See [persistence](persistence.md).
+`BotManager` restores only registered owned vassals at their saved character coordinates. Lifecycle JSON also retains sitting/standing posture, heading, recovery mode and completed service-duty waiting, fenced by the current order revision. Restoration happens before world publication. Completed waiting does not repeat the arrival journey, so an idle vassal keeps its position and posture until recovery, combat or a newer order requires a change. Missing legacy posture metadata uses the normal duty initialization; it cannot reconstruct a previously unsaved pose. Post-party gather interruptions still repeat their full safe-rest interval after restart.
+
+`PopulationService` persists owned actors every 30 seconds and makes a fresh final pass during graceful shutdown after any admitted periodic pass settles. Forced termination can only recover committed state. `Cooldown` refuses their ordinary cold handoff and `HotActorLodPolicy` keeps owned context active even when the Lord is offline. This is server-running activity, not offline-time simulation. See [persistence](persistence.md).
 
 ## Update together
 

@@ -1241,9 +1241,9 @@ const PopulationService = {
         Director.start();
     },
 
-    persistOwnedActors() {
+    persistOwnedActors({ final = false } = {}) {
         if (this.ownedSnapshotPromise) return this.ownedSnapshotPromise;
-        if (!this.ownedSnapshotAdmissionOpen) return Promise.resolve();
+        if (!this.ownedSnapshotAdmissionOpen && !final) return Promise.resolve();
         const pass = (async () => {
             let sliceStartedAt = performance.now();
             const checkpoint = async () => {
@@ -1288,13 +1288,21 @@ const PopulationService = {
 
     stop() {
         if (this.stopPromise) return this.stopPromise;
+        const saveFinalOwnedActors = this.ownedSnapshotAdmissionOpen;
         this.ownedSnapshotAdmissionOpen = false;
         if (this.ownedSnapshotTimer) clearInterval(this.ownedSnapshotTimer);
         this.ownedSnapshotTimer = null;
+        const pendingSnapshot = this.ownedSnapshotPromise;
+        // The periodic pass may predate the latest position/posture. Wait for it
+        // before a fresh final pass; a rejected pass remains a shutdown failure.
+        const finalSnapshot = saveFinalOwnedActors
+            ? Promise.allSettled([pendingSnapshot]).then(() => this.persistOwnedActors({ final: true }))
+            : null;
         // An admitted snapshot may be suspended in setImmediate. Wait for every
         // drain even after failure, before NodeL2 can flush/close its database.
         const drain = Promise.allSettled([
-            this.ownedSnapshotPromise,
+            pendingSnapshot,
+            finalSnapshot,
             Promise.resolve().then(() => ColdSimulationCoordinator.stop()),
             Promise.resolve().then(() => this.stopLocalServices())
         ]).then(results => {
