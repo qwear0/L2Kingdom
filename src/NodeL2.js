@@ -52,6 +52,7 @@ function shutdown(signal) {
         utils.infoWarn('Shutdown', '%s cleanup reported failure', step);
     };
     for (const listener of listeners) listener.listener.close();
+    require('./WorldObserver/BotControlRoutes').shutdown();
     WorldObserver.server?.close();
     forceExit.unref?.();
     // Each step logs its own failure and the next steps still run, so the

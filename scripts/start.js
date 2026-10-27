@@ -9,6 +9,7 @@ const SettingsService = require('../src/WorldObserver/SettingsService');
 const { settingsRoute, sendJson } = require('../src/WorldObserver/SettingsRoutes');
 const { access, managementRoute, proxy } = require('../src/WorldObserver/ManagementRoutes');
 const { serveStatic } = require('../src/WorldObserver/ManagementStatic');
+const BotControlRoutes = require('../src/WorldObserver/BotControlRoutes');
 const controller = new ManagementController();
 const settings = new SettingsService(controller);
 const config = Config.load().effective.WorldObserver || {};
@@ -21,6 +22,7 @@ const server = http.createServer((request, response) => {
     (async () => {
         access(request, controller.binding);
         const url = new URL(request.url, 'http://localhost');
+        if (await BotControlRoutes.proxy(request, response, url, controller)) return;
         if (await settingsRoute(request, response, url, settings)) return;
         if (await managementRoute(request, response, url, controller)) return;
         if (await proxy(request, response, url, controller)) return;

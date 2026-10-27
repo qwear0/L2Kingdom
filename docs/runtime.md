@@ -111,6 +111,10 @@ The wrapper reacts to loss of owning management IPC; a runtime with wrapper IPC 
 
 `scripts/geodata-bootstrap.js` (CLI `scripts/ensure-geodata.js`) downloads the pinned archive only for missing/empty resources, verifies its checksum and stages installation. Region count/required sizes validate an existing directory, not a checksum of every region. Nonempty incomplete geodata is rejected, not overwritten. `npm run geodata` may download/write substantial data without starting gameplay; explicit authorization remains necessary for operations.
 
+## Optional bot MCP process
+
+`scripts/bot-mcp.js` is a separately host-launched SDK stdio bridge, not a runtime launcher. It connects only to the existing loopback management origin; a stopped game or disabled private observer remains unavailable. `[BotControl] enabled` is a Settings-managed, game-restart-required opt-in, while `L2NODE_BOT_CONTROL_TOKEN` belongs only to the private management/bridge environment and is inherited by managed children. No secret is exposed through Settings. See [bot MCP observation](bot-mcp.md) for P1 tools, bounded attachment/receipt lifetimes and deployment prerequisites. The normal game shutdown closes bot observation subscriptions before persistence cleanup; no MCP operation starts/stops the game.
+
 ## Update together
 
 Keep entrypoints, Settings descriptors/runtime adapter, lifecycle IPC, README, [operations](operations.md), [persistence](persistence.md), configuration examples and agent entrypoint guidance synchronized. Syntax/source checks do not establish live readiness, queue suppression, failure recovery, browser behavior or deployment.

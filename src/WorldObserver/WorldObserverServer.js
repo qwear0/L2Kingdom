@@ -3,6 +3,7 @@ const ItemTemplateIndex = require('../GameServer/Item/ItemTemplateIndex');
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const BotControlRoutes = require('./BotControlRoutes');
 
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const ITEM_ICON_CATALOG_DIR = path.join(PUBLIC_DIR, 'item-icons');
@@ -2957,6 +2958,7 @@ function serveStatic(request, response, url) {
 // Checks run in this exact order; each group answers or passes the request on.
 function route(request, response) {
     const url = new URL(request.url, 'http://localhost');
+    if (BotControlRoutes.gameRoute(request, response, url)) return;
     if (redirectObserverRoot(response, url)) return;
     if (serveWorldReads(request, response, url)) return;
     if (handleTeleportControl(request, response, url)) return;

@@ -10,6 +10,7 @@
     "scripts": {
         "start": "node scripts/start.js",
         "NodeL2": "node scripts/run-server.js",
+        "bot:mcp": "node scripts/bot-mcp.js",
         "geodata": "node scripts/ensure-geodata.js",
         "generate:knowledge-base": "node scripts/generate-knowledge-base.js",
         "check:knowledge-base": "node scripts/generate-knowledge-base.js --check",
@@ -22,6 +23,7 @@
     "dependencies": {
         "@langfuse/otel": "^5.10.0",
         "@langfuse/tracing": "^5.10.0",
+        "@modelcontextprotocol/server": "2.4.0",
         "@opentelemetry/sdk-node": "^0.221.0",
         "blowfish-ecb": "^1.0.2",
         "eslint": "^8.36.0",
@@ -31,6 +33,7 @@
         "jsonschema": "^1.4.1",
         "objcrush": "^1.0.1",
         "random-point-in-shape": "^1.0.0",
-        "rsa-raw": "^1.0.3"
+        "rsa-raw": "^1.0.3",
+        "zod": "4.3.6"
     }
 }

@@ -64,6 +64,8 @@ function catalogue(config) {
         'Controls personal estimates and new learning; accumulated knowledge is not erased.', { mode: 'restart', env: 'BOT_KNOWLEDGE_ERRORS_ENABLED' });
     add('bots', 'Vassal behavior', 'BotPopulation', 'useBssdOutOfCombat', 'Use BSSD outside combat', 'boolean', false,
         'Use blessed spiritshots for out-of-combat buffs, healing and other magic. Offensive casts and support during combat still use them when disabled.', { mode: 'restart', env: 'BOT_USE_BSSD_OUT_OF_COMBAT' });
+    add('bots', 'MCP observation', 'BotControl', 'enabled', 'Bot MCP observation enabled', 'boolean', false,
+        'Read-only existing-vassal attachments. Requires the private game observer and L2NODE_BOT_CONTROL_TOKEN in the management environment. No manual gameplay control in P1.', { mode: 'restart' });
     const section = aiSection(config), prefix = section === 'AI' ? 'L2NODE_AI' : 'OPENROUTER';
     add('bots', 'Optional AI dialogue', section, 'enabled', 'AI dialogue enabled', 'boolean', false,
         'External requests transfer dialogue and game context. Native behavior is separate. Disabling gates queued unsent requests; already sent requests may finish.');
