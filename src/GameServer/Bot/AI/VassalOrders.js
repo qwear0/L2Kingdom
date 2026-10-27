@@ -261,8 +261,8 @@ function townTick(session, row, run) {
     const bot = session.actor;
     const town = { locX: -12736, locY: 122816, locZ: -3112 };
     if (session.townEscape || session.pendingActorTeleport) return;
-    if (Math.hypot(bot.fetchLocX() - town.locX, bot.fetchLocY() - town.locY) > 1800
-        || Math.abs(bot.fetchLocZ() - town.locZ) > 128) run.phase = 'town';
+    // Warehouse approaches can lie outside the city arrival radius.
+    // Only the town phase owns that arrival check; local services must keep their phase.
     if (run.phase === 'town') {
         status(session, 'returning_to_gludio');
         if (journeyTo(session, row, run, 'town', town, { xy: 1800, z: 128 }, 'Gludio services').status !== 'arrived') return;
