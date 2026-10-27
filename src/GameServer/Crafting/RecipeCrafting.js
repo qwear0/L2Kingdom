@@ -152,5 +152,6 @@ async function craftSelf(session, recipeId, random = Math.random, options = {}) 
 
 module.exports = {
     craftSelf,
+    busy: actorId => activeCrafters.has(Number(actorId)),
     materialPlan
 };

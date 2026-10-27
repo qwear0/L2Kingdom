@@ -21,6 +21,8 @@ class GameBridge {
         this.queued = 0;
         this.inFlight = 0;
         this.lastIssued = 0;
+        this.leaseGrantHighWater = 0;
+        this.leases = new Map();
     }
     async request(action, payload = {}) {
         if (this.inFlight >= limits.concurrentRequests) throw fault('request_capacity', 429);
@@ -91,13 +93,46 @@ class GameBridge {
         if (this.queued >= limits.concurrentRequests) return Promise.reject(fault('request_capacity', 429));
         this.queued++;
         const work = this.tail.then(async () => {
+            if (this.closing) throw fault('bridge_closing', 409);
             if (action === 'attach') await this.establish(input.runtimeEpoch);
             const identity = this.identity();
             if (identity.runtimeEpoch !== input.runtimeEpoch) throw fault('stale_bridge_session', 409);
             this.lastIssued = Math.max(this.lastIssued, input.requestId);
-            return this.request(action, { ...input, ...identity });
+            const result = await this.request(action, { ...input, ...identity });
+            const grant = result.status === 'succeeded' && result.result;
+            // A retained old grant must not recreate evicted sequencing state.
+            // Only a newly observed acquisition can start a bridge lease context.
+            if (action === 'control' && input.mode === 'manual' && grant?.leaseId && !this.leases.has(grant.leaseId)
+                && result.requestId > this.leaseGrantHighWater) {
+                this.leaseGrantHighWater = result.requestId;
+                while (this.leases.size >= 16) this.leases.delete(this.leases.keys().next().value);
+                this.leases.set(grant.leaseId, { sequence: grant.nextSequence - 1, highWater: 0, requests: new Map(), tail: Promise.resolve() });
+            }
+            return result;
         }).finally(() => { this.queued--; });
         this.tail = work.catch(() => {});
+        return work;
+    }
+    gameplay(input) {
+        if (this.closing) return Promise.reject(fault('bridge_closing', 409));
+        const lease = this.leases.get(input.leaseId);
+        if (!lease) return Promise.reject(fault('bridge_sequence_expired', 410));
+        if (this.queued >= limits.concurrentRequests) return Promise.reject(fault('request_capacity', 429));
+        this.queued++;
+        const work = lease.tail.then(() => {
+            if (this.closing) throw fault('bridge_closing', 409);
+            const identity = this.identity();
+            if (input.runtimeEpoch !== identity.runtimeEpoch) throw fault('stale_bridge_session', 409);
+            let sequence = lease.requests.get(input.requestId);
+            if (!sequence) {
+                if (input.requestId <= lease.highWater) throw fault('request_expired', 410);
+                sequence = ++lease.sequence; lease.highWater = input.requestId;
+                if (lease.requests.size >= limits.terminalReceipts) lease.requests.delete(lease.requests.keys().next().value);
+                lease.requests.set(input.requestId, sequence);
+            }
+            return this.request('action', { ...input, ...identity, sequence });
+        }).finally(() => { this.queued--; });
+        lease.tail = work.catch(() => {});
         return work;
     }
     read(action, input) {
@@ -108,7 +143,7 @@ class GameBridge {
         if (this.closing) return;
         this.closing = true;
         if (this.heartbeat) clearInterval(this.heartbeat);
-        await this.tail;
+        await Promise.all([this.tail, ...[...this.leases.values()].map(lease => lease.tail)]);
         if (this.session) {
             try {
                 const current = await this.request('heartbeat', this.identity());

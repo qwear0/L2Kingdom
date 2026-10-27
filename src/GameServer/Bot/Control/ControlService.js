@@ -5,10 +5,13 @@ const { limits, fault, parse } = require('../../../Mcp/Contracts');
 const World = invoke('GameServer/World/World');
 const Registry = require('../../Lord/VassalService');
 const Observation = require('./Observation');
+const Authority = require('./Authority');
+const Actions = require('./Actions');
+const Results = require('./Results');
 const runtimeEpoch = randomUUID();
-const sessions = new Map(), attachments = new Map(), observed = new Map(), receipts = new Map();
+const sessions = new Map(), attachments = new Map(), observed = new Map(), receipts = Results.entries;
 const incarnations = new WeakMap();
-let receiptBytes = 0, cleanupTimer = null, unsubscribe = null, closed = false;
+let cleanupTimer = null, unsubscribe = null, closed = false;
 function live(characterId) {
     const record = World.registeredActorById(characterId);
     return record && !record.retired && record.session.botSession === true
@@ -25,6 +28,7 @@ function matches(attachment) {
 function dropAttachment(id) {
     const attachment = attachments.get(id);
     if (!attachment) return false;
+    Authority.closeAttachment(id);
     attachments.delete(id);
     sessions.get(attachment.sessionId)?.attachments.delete(id);
     const subscribers = observed.get(attachment.characterId);
@@ -43,10 +47,7 @@ function prune() {
     const now = Date.now();
     for (const [id, session] of sessions) if (now - session.lastSeen >= limits.attachmentTtlMs) dropSession(id);
     for (const [id, attachment] of attachments) if (!matches(attachment)) dropAttachment(id);
-    for (const [key, receipt] of receipts) {
-        if (now - receipt.at < limits.requestTtlMs) continue;
-        receipts.delete(key); receiptBytes -= receipt.bytes;
-    }
+    Results.prune(now);
     if (!sessions.size && cleanupTimer) { clearInterval(cleanupTimer); cleanupTimer = null; }
 }
 function startCleanup() {
@@ -54,8 +55,8 @@ function startCleanup() {
 }
 function subscribe() {
     if (unsubscribe) return;
-    // One world listener for all observed bots. No bot timers, AI work or event
-    // buffers are allocated by this read-only phase; P3 owns semantic journals.
+    // One world listener serves every attachment. Semantic journals remain a
+    // separate P3 concern; retirement also revokes this actor's authority.
     unsubscribe = World.subscribeActorPublications(event => {
         if (event.kind === 'reset') {
             for (const id of [...attachments.keys()]) dropAttachment(id);
@@ -82,18 +83,13 @@ function lookup(sessionId, attachmentId) {
 }
 function replay(receipt) {
     const value = receipt.value;
-    return value.result?.attachmentId ? { ...value, resourceState: attachments.has(value.result.attachmentId) ? 'active' : 'closed' } : value;
+    if (!value.result?.attachmentId) return value;
+    const attachment = attachments.get(value.result.attachmentId);
+    const lease = attachment?.record.session.mcpControl?.lease;
+    return { ...value, resourceState: attachment ? 'active' : 'closed',
+        ...(value.result.leaseId ? { authorityState: lease?.id === value.result.leaseId && Authority.current(lease) ? 'active' : 'expired' } : {}) };
 }
-function remember(key, value) {
-    const bytes = Buffer.byteLength(JSON.stringify(value));
-    while (receipts.size && (receipts.size >= limits.terminalReceipts || receiptBytes + bytes > limits.receiptBytes)) {
-        const oldest = receipts.keys().next().value;
-        receiptBytes -= receipts.get(oldest).bytes; receipts.delete(oldest);
-    }
-    const entry = { value, bytes, at: Date.now() };
-    receipts.set(key, entry); receiptBytes += bytes;
-    return entry;
-}
+const remember = Results.remember;
 function mutate(action, input, operation) {
     const key = `${input.sessionId}:${input.requestId}`;
     const fingerprint = JSON.stringify([action, input]);
@@ -114,12 +110,9 @@ function mutate(action, input, operation) {
     try { value.result = operation(session); value.status = 'succeeded'; }
     catch (error) {
         value.status = error.statusCode ? 'rejected' : 'unknown';
-        value.error = { code: error.statusCode ? error.code : 'control_request_unknown' };
+        value.error = { code: error.statusCode ? error.code : 'control_request_unknown', ...(error.statusCode ? error.details : {}) };
         if (!error.statusCode) throw error;
-    } finally {
-        receiptBytes -= entry.bytes;
-        entry.bytes = Buffer.byteLength(JSON.stringify(value)); receiptBytes += entry.bytes;
-    }
+    } finally { remember(key, value); }
     return publicReceipt(entry);
 }
 function publicReceipt(entry) {
@@ -127,10 +120,14 @@ function publicReceipt(entry) {
     return value;
 }
 function status() {
-    return { runtimeEpoch, phase: 'running', capabilities: { phase: 'P1', readOnlyAttachment: true,
+    return { runtimeEpoch, phase: 'running', capabilities: { phase: 'P2', readOnlyAttachment: true,
         discovery: true, selfObservation: true, localScene: false, semanticEvents: false,
-        manualControl: false, gameplayActions: false }, limits,
-        usage: { sessions: sessions.size, attachments: attachments.size, observedBots: observed.size } };
+        manualControl: true, gameplayActions: true,
+        supported: ['move', 'approach', 'stop', 'target', 'attack:first_swing/target_dead/bounded', 'cast:learned_native',
+            'state:seated/walking', 'item:shots/instant_self', 'equip', 'pickup:in_native_range', 'summon:follow/stop/one_swing'],
+        notImplemented: ['local_scene', 'detail_pages', 'events', 'wait', 'npc_services', 'quests', 'social', 'travel',
+            'corpse_and_utility_skills', 'timed_or_handler_items', 'summon_skills/unsummon/mount', 'pvp_attack'] }, limits,
+        usage: { sessions: sessions.size, attachments: attachments.size, observedBots: observed.size, ...Authority.usage(), pendingActions: Actions.pendingCount() } };
 }
 function dispatch(action, raw) {
     const input = parse(action, raw);
@@ -166,8 +163,11 @@ function dispatch(action, raw) {
         if (!entry) throw fault('request_expired', 410);
         return publicReceipt(entry);
     }
+    if (action === 'action-status') return Actions.read(input);
+    if (action === 'action') return Actions.dispatch(input, () => lookup(input.sessionId, input.attachmentId));
     if (action === 'heartbeat') {
         const session = sessionFor(input.sessionId); session.lastSeen = Date.now();
+        Authority.heartbeat(input.sessionId);
         return { runtimeEpoch, expiresInMs: limits.attachmentTtlMs, nextRequestId: session.highWater + 1,
             attachmentIds: [...session.attachments] };
     }
@@ -192,6 +192,24 @@ function dispatch(action, raw) {
         observed.get(record.id).add(id); subscribe();
         return { attachmentId: id, actorRef: ref(record), mode: 'read_only' };
     });
+    if (action === 'control') return mutate(action, input, () => {
+        const attachment = lookup(input.sessionId, input.attachmentId);
+        if (input.mode === 'manual') {
+            if (input.leaseId || input.controlGeneration) throw fault('invalid_request');
+            return { attachmentId: attachment.id, mode: 'manual', ...Authority.acquire(attachment, ref(attachment.record)) };
+        }
+        const state = attachment.record.session.mcpControl;
+        if (input.mode === 'native_ai' && !state) return { attachmentId: attachment.id, mode: 'native_ai' };
+        const lease = Authority.requireLease(attachment, input);
+        if (input.mode === 'keep_control') {
+            lease.idleUntil = Date.now() + limits.manualIdleMs;
+            lease.aliveUntil = Date.now() + limits.leaseTtlMs;
+            return { attachmentId: attachment.id, mode: 'manual', ...Authority.grant(lease) };
+        }
+        Authority.revoke(state, 'native_ai_requested');
+        return { attachmentId: attachment.id, ...Authority.view(attachment.record.session) };
+    });
+    if (action === 'cancel') return mutate(action, input, () => Actions.cancel(input, lookup(input.sessionId, input.attachmentId)));
     if (action === 'release') return mutate(action, input, () => {
         lookup(input.sessionId, input.attachmentId); dropAttachment(input.attachmentId);
         return { attachmentId: input.attachmentId, released: true };
@@ -201,6 +219,7 @@ function dispatch(action, raw) {
 }
 function shutdown() {
     closed = true;
+    Authority.shutdown();
     for (const id of [...sessions.keys()]) dropSession(id);
     if (cleanupTimer) clearInterval(cleanupTimer);
     cleanupTimer = null;

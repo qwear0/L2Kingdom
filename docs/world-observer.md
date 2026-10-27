@@ -110,7 +110,7 @@ Independent vassal detail includes `movement.journey`, projected by `BotStatus` 
 
 ## Dedicated bot MCP boundary
 
-The optional [bot MCP interface](bot-mcp.md) uses `BotControlRoutes.js` before the normal dynamic/static route families in both parent and private game observer. It is disabled by default and requires a dedicated environment secret plus loopback peer/Host and non-browser requests at both hops. It does not inherit the browser's trusted-LAN mutation policy, and its route family is deliberately absent from the generic known-game proxy allowlist. P1 supports existing-vassal discovery/read-only attachment/self snapshots/release, not manual actions, world editing or lifecycle operations. The parent still owns endpoint discovery; no additional listener or automatic Start is introduced.
+The optional [bot MCP interface](bot-mcp.md) uses `BotControlRoutes.js` before the normal dynamic/static route families in both parent and private game observer. It is disabled by default and requires a dedicated environment secret plus loopback peer/Host and non-browser requests at both hops. It does not inherit the browser's trusted-LAN mutation policy, and its route family is deliberately absent from the generic known-game proxy allowlist. P1–P2 support existing-vassal discovery, read-only attachment/self snapshots and explicit native-action leases with retained results. Manual authority is separate from observation and browser permissions; world editing and lifecycle operations remain excluded. The parent still owns endpoint discovery; no additional listener or automatic Start is introduced.
 
 ## Verification and update boundary
 

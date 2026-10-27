@@ -17,10 +17,12 @@ function attackRequest(session, actor, data) {
     const EffectRestrictions = invoke('GameServer/Effects/EffectRestrictions');
 
     if (actor.isDead()) {
+        data.actionOwner?.nativeEvent?.('native_rejected', { reason: 'actor_dead' });
         return;
     }
 
     if (!EffectRestrictions.canAttack(actor)) {
+        data.actionOwner?.nativeEvent?.('native_rejected', { reason: 'attack_restricted' });
         EffectRestrictions.reject(session);
         return;
     }
@@ -28,6 +30,7 @@ function attackRequest(session, actor, data) {
     const attackData = withNormalAttackRange(actor, data);
 
     if (actor.isBlocked()) {
+        data.actionOwner?.nativeEvent?.('native_queued');
         Generics.queueRequest(session, actor, 'attack', attackData);
         return;
     }

@@ -36,6 +36,8 @@ A vassal belongs to one **character**, with an original `boundClanId`. Another c
 
 `Network/Request/CharDelete.js`, `Database.deleteCharacter` and the owner foreign-key restriction prevent deleting a Lord who still owns vassals.
 
+The optional [MCP interface](bot-mcp.md) observes existing vassals read-only unless an explicit manual lease is acquired. It grants no lord impersonation or direct duty writes. Authorized duty/party/trade commands preempt manual authority at their native ingress; pending native settlement/publication still returns busy rather than being discarded. Returning to AI uses the current valid duty, never a copied pre-takeover order.
+
 ## Duties and party interruption
 
 `VassalOrders` owns duties; `src/GameServer/Lord/GatherAreas.js` supplies five authored gathering polygon sets. Failure to find a safe target does not authorize hunting outside the assigned area.

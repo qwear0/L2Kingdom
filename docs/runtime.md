@@ -113,7 +113,7 @@ The wrapper reacts to loss of owning management IPC; a runtime with wrapper IPC 
 
 ## Optional bot MCP process
 
-`scripts/bot-mcp.js` is a separately host-launched SDK stdio bridge, not a runtime launcher. It connects only to the existing loopback management origin; a stopped game or disabled private observer remains unavailable. `[BotControl] enabled` is a Settings-managed, game-restart-required opt-in, while `L2NODE_BOT_CONTROL_TOKEN` belongs only to the private management/bridge environment and is inherited by managed children. No secret is exposed through Settings. See [bot MCP observation](bot-mcp.md) for P1 tools, bounded attachment/receipt lifetimes and deployment prerequisites. The normal game shutdown closes bot observation subscriptions before persistence cleanup; no MCP operation starts/stops the game.
+`scripts/bot-mcp.js` is a separately host-launched SDK stdio bridge, not a runtime launcher. It connects only to the existing loopback management origin; a stopped game or disabled private observer remains unavailable. `[BotControl] enabled` is a Settings-managed, game-restart-required opt-in, while `L2NODE_BOT_CONTROL_TOKEN` belongs only to the private management/bridge environment and is inherited by managed children. No secret is exposed through Settings. See [bot MCP control and observation](bot-mcp.md) for P1–P2 tools, separate attachment/lease/idle/result lifetimes and deployment prerequisites. Normal game shutdown invalidates manual authority and closes observation subscriptions before persistence cleanup; required native settlement is not a rollback. No MCP operation starts/stops the game.
 
 ## Update together
 

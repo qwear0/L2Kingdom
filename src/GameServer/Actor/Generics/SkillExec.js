@@ -17,7 +17,8 @@ function cancelFailedSupportTarget(session, actor, data, skill) {
 function skillExec(session, actor, data) {
     const owner = data.actionOwner;
     const generation = Number(actor.playerAutoFight?.generation || 0);
-    const current = () => session.actor === actor && ActionOwner.current(session, actor, owner)
+    const controlGeneration = session.mcpControlGeneration;
+    const current = () => session.actor === actor && session.mcpControlGeneration === controlGeneration && ActionOwner.current(session, actor, owner)
         && (!!owner || Number(actor.playerAutoFight?.generation || 0) === generation);
     if (!current()) return;
     const skill = actor.skillset.fetchSkill(data.selfId);

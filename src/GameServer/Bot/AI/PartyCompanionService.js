@@ -475,6 +475,7 @@ function groundPickupTimeoutMs(picker, pickup) {
 }
 
 function startQueuedGroundPickup(pickerSession) {
+    if (pickerSession?.mcpControl) return false;
     const picker = pickerSession?.actor;
     if (!canPickupLoot(pickerSession)) {
         if (pickerSession?.partyGroundPickupInProgress || pickerSession?.partyGroundPickupQueue?.length || picker?.storedPickup) {
@@ -1231,6 +1232,8 @@ const PartyCompanionService = {
         if (!leader || !bot || leader.isDead?.() || bot.isDead?.() || leader.fetchIsOnline?.() === false) return false;
         const Registry = require('../../Lord/VassalService');
         const owned = Registry.find(bot.fetchId());
+        if (owned && Registry.owns(leader.fetchId(), bot.fetchId())
+            && companionSession.mcpControl && !companionSession.mcpControl.preempt('owner_party_admission')) return false;
         if (owned && (!Registry.owns(leader.fetchId(), bot.fetchId()) || !require('./VassalOrders').clanEligible(companionSession)
             || companionSession.vassalAdmission
             || companionSession.vassalOperation || companionSession.vassalReceipt || companionSession.activeTrade
@@ -1326,6 +1329,7 @@ const PartyCompanionService = {
 
     detach(leaderSession, companionSession, options = {}) {
         if (!isActiveCompanion(companionSession, leaderSession)) return false;
+        companionSession.mcpControl?.preempt('party_detach');
 
         const BotManager = invoke('GameServer/Bot/BotManager');
         const BotSocialMemory = invoke('GameServer/Bot/AI/BotSocialMemory');

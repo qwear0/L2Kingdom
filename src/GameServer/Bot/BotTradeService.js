@@ -218,10 +218,12 @@ function createTrade(playerSession, botSession, direction, metadata = {}) {
     };
 }
 
-function canStart(playerSession, botSession, { allowMerchant = false } = {}) {
+function canStart(playerSession, botSession, { allowMerchant = false, preempt = false } = {}) {
     if (!isRealPlayerSession(playerSession) || !isBotSession(botSession) || !botSession.actor) return 'invalid_target';
     if (botSession.vassal) {
         if (!require('../Lord/VassalService').owns(playerSession.actor.fetchId(), botSession.actor.fetchId())) return 'not_owned_vassal';
+        if (preempt && actorDistance(playerSession.actor, botSession.actor) <= TRADE_RANGE && botSession.mcpControl
+            && !botSession.mcpControl.preempt('owner_trade')) return 'vassal_busy';
         if (botSession.vassalOperation || botSession.vassalReceipt || botSession.vassalAdmission) return 'vassal_busy';
         if (botSession.actor.isDead() || botSession.currentTargetId || botSession.actor.state.fetchHits()
             || botSession.actor.state.fetchCasts()) return 'unsafe_combat_state';
@@ -233,7 +235,7 @@ function canStart(playerSession, botSession, { allowMerchant = false } = {}) {
 }
 
 function startPlayerTrade(playerSession, targetSession) {
-    const reason = canStart(playerSession, targetSession);
+    const reason = canStart(playerSession, targetSession, { preempt: true });
     if (reason) return { ok: false, reason };
 
     const existing = activeTradeBetween(playerSession, targetSession);
@@ -253,7 +255,7 @@ function startPlayerTrade(playerSession, targetSession) {
 }
 
 function startBuffTrade(playerSession, botSession, offer) {
-    const reason = canStart(playerSession, botSession);
+    const reason = canStart(playerSession, botSession, { preempt: true });
     if (reason) return { ok: false, reason };
     if (!offer || Number(offer.playerId) !== Number(playerSession.actor.fetchId())
         || Number(offer.providerId) !== Number(botSession.actor.fetchId())
@@ -271,7 +273,7 @@ function startBuffTrade(playerSession, botSession, offer) {
 }
 
 function openBotTrade(botSession, playerSession, negotiation = null, metadata = {}) {
-    const reason = canStart(playerSession, botSession, { allowMerchant: !!negotiation });
+    const reason = canStart(playerSession, botSession, { allowMerchant: !!negotiation, preempt: true });
     if (reason) return { ok: false, reason };
     if (!negotiation && (botSession.partyCompanion !== true || botSession.followPlayerSession !== playerSession)) {
         return { ok: false, reason: 'not_authorized_relationship' };

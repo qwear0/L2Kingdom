@@ -83,6 +83,7 @@ function teleportTo(session, actor, coords, options = {}) {
     if (actor.isDead()) {
         return false;
     }
+    session.mcpControl?.preempt('native_teleport');
     actor.playerAutoFight?.dispose('teleported');
     if (!isBotSession(session)) invoke('GameServer/Bot/AI/BotRaidSafety').endPlayerPartyRaid(session);
 

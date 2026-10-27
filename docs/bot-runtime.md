@@ -134,6 +134,10 @@ The population scheduler timer in the retained coordinator is not evidence of a 
 
 `src/GameServer/Geodata/PathfindingWorkerPool.js` provides bounded queues, cancellation and deadlines with lazy worker creation. NPC movement also uses it. Disabling the **cold simulation worker** does not disable these pathfinding workers.
 
+## Optional MCP manual authority
+
+[Bot MCP control](bot-mcp.md) defaults to read-only attachment. Explicit manual acquisition refuses native busy/publication holds, stops autonomous scheduling, invalidates vassal/journey and queued/async continuations, and uses an explicit `bot-mcp` action owner rather than impersonating player auto-fight. BotAI activation/ticks, provider entry and autonomous queued pickup are gated until handoff settles. World damage/effects/pet lifetime still run; accepted native actions retain their own completion correlation. Deferred SP training reconciles before current-duty resumption. Separate heartbeat and idle deadlines bound authority; a read or replay is not renewal. A native stop vetoes resumption, and an initially inactive AI is not started by observation/release. The shared active-handoff sweep is bounded to 12 states, not a timer or world scan per bot.
+
 ## Update together
 
 For activation changes, inspect `PopulationConfig`, `PopulationService`, BotManager, lifecycle save/restore, `ClanSimulationConfig` and NodeL2 startup together. For scheduling changes, check state handlers, operation fences, native actions and LOD. Never use historical cold counters or successful syntax parsing as proof of current owned-vassal gameplay.

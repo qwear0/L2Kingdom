@@ -3,7 +3,8 @@ const World          = invoke('GameServer/World/World');
 
 function pickupExec(session, actor, data, onComplete, canContinue = () => true) {
     const generation = actor?.automation?.pickupGeneration;
-    const isCurrent = () => actor && session?.actor === actor &&
+    const controlGeneration = session.mcpControlGeneration;
+    const isCurrent = () => actor && session?.actor === actor && session.mcpControlGeneration === controlGeneration &&
         actor.automation?.pickupGeneration === generation &&
         !actor.isDead?.() && actor.fetchIsOnline?.() !== false && canContinue();
     World.fetchItem(data.id).then((item) => {
@@ -26,6 +27,7 @@ function pickupExec(session, actor, data, onComplete, canContinue = () => true) 
             session.dataSendToMeAndOthers(ServerResponse.pickupItem(actor.fetchId(), item), actor);
             // Lisvus awards on arrival; GetItem's client animation does not
             // impose a server-side pickup cooldown.
+            data.actionOwner?.nativeEvent?.('pickup_committing');
             World.pickupItem(session, actor, item, { canContinue: isCurrent }).then(result => {
                 if (session.actor === actor && result.status !== 'awarded') {
                     session.dataSendToMe(ServerResponse.actionFailed());

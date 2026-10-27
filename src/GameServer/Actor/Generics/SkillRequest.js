@@ -9,6 +9,7 @@ function skillRequest(session, actor, data) {
     const skill = actor.skillset.fetchSkill(data.selfId);
 
     if (actor.isDead()) {
+        data.actionOwner?.nativeEvent?.('native_rejected', { reason: 'actor_dead' });
         return;
     }
 
@@ -24,6 +25,7 @@ function skillRequest(session, actor, data) {
     }
 
     if (!EffectRestrictions.canCast(actor)) {
+        data.actionOwner?.nativeEvent?.('native_rejected', { reason: 'cast_restricted' });
         EffectRestrictions.reject(session);
         return;
     }
@@ -56,11 +58,13 @@ function skillRequest(session, actor, data) {
             data.id = actor.fetchId();
         }
         else if (data.id === undefined) {
+            data.actionOwner?.nativeEvent?.('native_rejected', { reason: 'target_required' });
             return;
         }
     }
 
     if (!actor.canUseSkill(skill)) {
+        data.actionOwner?.nativeEvent?.('native_rejected', { reason: 'skill_reuse_or_condition' });
         EffectRestrictions.reject(session);
         return;
     }
@@ -80,6 +84,7 @@ function skillRequest(session, actor, data) {
     }
 
     if (actor.isBlocked()) {
+        data.actionOwner?.nativeEvent?.('native_queued');
         Generics.queueRequest(session, actor, 'skill', data);
         return;
     }

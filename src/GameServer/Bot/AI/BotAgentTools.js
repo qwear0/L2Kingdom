@@ -990,6 +990,10 @@ function registerTools() {
                         : partyJoinActions.has(name) ? isAuthorizedPartyJoinRequester(context) : true;
             },
             execute(context) {
+                if (!NON_MUTATING_ACTIONS.has(name) && context.session?.mcpControl
+                    && !context.session.mcpControl.preempt('authorized_native_command')) {
+                    return { applied: false, reason: 'native_operation_in_flight' };
+                }
                 if (executors[name]) return executors[name](context);
                 return executeLegacy(context.session, context.decision, context.visiblePlayers || []);
             }

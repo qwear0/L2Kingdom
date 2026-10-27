@@ -124,7 +124,8 @@ function select(session, actor, data) {
     const revision = sameIntent ? previous.revision : Number(actor.selectionRevision || 0) + 1;
     actor.selectionRevision = revision;
     actor.selectionIntent = { targetId: Number(data.id), owner: data.actionOwner, revision };
-    const current = () => session.actor === actor && actor.selectionRevision === revision
+    const controlGeneration = session.mcpControlGeneration;
+    const current = () => session.actor === actor && session.mcpControlGeneration === controlGeneration && actor.selectionRevision === revision
         && ActionOwner.current(session, actor, data.actionOwner);
     if (!data.selectionOnly && Number(actor.fetchDestId()) === Number(data.id)) ActionOwner.takeover(session, actor);
     const Generics = invoke(path.actor);
@@ -157,7 +158,9 @@ function select(session, actor, data) {
 
     // Check BotManager sessions first (bots may not be in World.user.sessions)
     const BotManager = invoke('GameServer/Bot/BotManager');
-    const botSession = BotManager.sessions.find(s => Number(s.actor?.fetchId()) === Number(data.id));
+    const indexedSession = data.actionOwner?.source === 'bot-mcp' ? World.registeredActorById(Number(data.id))?.session : null;
+    const botSession = data.actionOwner?.source === 'bot-mcp' ? (indexedSession?.botSession ? indexedSession : null)
+        : BotManager.sessions.find(s => Number(s.actor?.fetchId()) === Number(data.id));
 
     if (botSession) {
         const user = botSession.actor;

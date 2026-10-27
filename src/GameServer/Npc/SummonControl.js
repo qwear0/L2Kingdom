@@ -125,6 +125,7 @@ function sendStopMove(session, summon) {
 }
 
 function stop(session, summon) {
+    summon.autoFightCommandOwner?.nativeEvent?.('native_cancelled');
     summon.commandRevision = Number(summon.commandRevision || 0) + 1;
     summon.autoFightCommandOwner = null;
     delete summon.attackTargetId;
@@ -219,6 +220,7 @@ function scheduleFollowStep(session, actor, summon) {
 
 function startFollowOwner(session, actor, summon, options = {}) {
     const owner = options.commandOwner;
+    if (session.mcpControl && owner?.source !== 'bot-mcp') return;
     if (owner && (!owner.isCurrent() || activeSummon(actor) !== summon)) return;
     const revision = summon.commandRevision = Number(summon.commandRevision || 0) + 1;
     summon.autoFightCommandOwner = owner || null;
@@ -263,7 +265,11 @@ function selectedTarget(actor) {
 }
 
 function moveToTarget(session, actor, summon) {
+    if (session.mcpControl) return;
+    const generation = session.mcpControlGeneration, revision = summon.commandRevision;
     selectedTarget(actor).then((target) => {
+        if (session.actor !== actor || session.mcpControlGeneration !== generation
+            || summon.commandRevision !== revision || activeSummon(actor) !== summon) return;
         if (!target || target === summon) {
             session.dataSendToMe(ServerResponse.actionFailed());
             return;
@@ -281,6 +287,7 @@ function moveToTarget(session, actor, summon) {
 }
 
 function attack(session, actor, summon, options = {}) {
+    if (session.mcpControl && options.commandOwner?.source !== 'bot-mcp') return;
     if (Number(summon.fetchSummonSkillId?.()) === 301) {
         session.dataSendToMe(ServerResponse.actionFailed());
         return;
@@ -289,16 +296,19 @@ function attack(session, actor, summon, options = {}) {
     const owner = options.commandOwner;
     const revision = summon.commandRevision = Number(summon.commandRevision || 0) + 1;
     summon.autoFightCommandOwner = owner || null;
-    const current = () => summon.commandRevision === revision && (!owner ||
+    const generation = session.mcpControlGeneration;
+    const current = () => summon.commandRevision === revision && session.mcpControlGeneration === generation && (!owner ||
         (owner.isCurrent() && session.actor === actor && activeSummon(actor) === summon));
     (options.target ? Promise.resolve(options.target) : selectedTarget(actor)).then((target) => {
         if (!current()) return;
         if (!target || target === summon || (owner && !owner.canAttack(target, summon))) {
+            owner?.nativeEvent?.('native_rejected', { reason: 'summon_target_ineligible' });
             session.dataSendToMe(ServerResponse.actionFailed());
             return;
         }
 
         if (!isValidEnemyTarget(actor, target)) {
+            owner?.nativeEvent?.('native_rejected', { reason: 'summon_target_ineligible' });
             session.dataSendToMe(ServerResponse.actionFailed());
             return;
         }
@@ -309,6 +319,7 @@ function attack(session, actor, summon, options = {}) {
         summon.attackTargetId = target.fetchId();
         summon.followOwner = false;
         summon.attack?.clearTimers?.();
+        owner?.nativeEvent?.('summon_commanded');
 
         const attackRange = Math.max(
             0,
@@ -336,6 +347,7 @@ function releaseAutoCommand(session, summon, owner) {
     summon.followOwner = false;
     summon.state.setHits(false);
     sendStopMove(session, summon);
+    owner.nativeEvent?.('native_cancelled');
 }
 
 function attackTick(session, summon, target, owner = null, revision = summon.commandRevision) {
@@ -383,12 +395,14 @@ function attackTick(session, summon, target, owner = null, revision = summon.com
     invoke('GameServer/Bot/AI/BotMobCompetition').record(summon, target);
     session.dataSendToMeAndOthers(ServerResponse.attack(summon, target.fetchId(), hit), summon);
     summon.state.setHits(true);
+    owner?.nativeEvent?.('summon_started');
 
     summon.attack.queueTimer(() => {
         if (summon.commandRevision !== revision || summon.controlMode !== 'attack' || summon.isDead?.()
             || target.isDead?.() || target.state?.fetchDead?.() === true) return;
         if (!isValidEnemyTarget(session.actor, target) || !Restrictions.canAttack(summon) ||
             !AttackRange.isWithinRange(summon, target, range)) return;
+        const beforeHp = target.fetchHp();
         if (hitLanded) {
             if (target.fetchKind) invoke(path.npc).receivedHit(session, summon, target, hit.damage);
             else invoke(path.actor).receivedHit(session, target, hit.damage, { source: summon });
@@ -396,11 +410,18 @@ function attackTick(session, summon, target, owner = null, revision = summon.com
         } else if (!target.fetchKind && invoke('GameServer/Bot/AI/BotPvpThreats').record(target, summon)) {
             invoke('GameServer/Actor/PvpFlag').mark(session, session.actor);
         }
+        owner?.nativeEvent?.('summon_impact', { targetId: target.fetchId(), hitLanded,
+            hpDamage: Math.max(0, beforeHp - target.fetchHp()), requestedDamage: hit.damage });
     }, speed * 0.644);
 
     summon.attack.queueTimer(() => {
         if (summon.commandRevision !== revision) return;
         summon.state.setHits(false);
+        if (owner?.source === 'bot-mcp') {
+            owner.nativeEvent?.('summon_end');
+            releaseAutoCommand(session, summon, owner);
+            return;
+        }
         if (summon.controlMode !== 'attack' || summon.isDead?.()) return;
         attackTick(session, summon, target, owner, revision);
     }, speed);
@@ -526,6 +547,10 @@ function resolveSkillTarget(actor, summon, config) {
 }
 
 function useSkillAction(session, actor, summon, actionId) {
+    if (session.mcpControl) return false;
+    const generation = session.mcpControlGeneration, revision = summon.commandRevision;
+    const current = () => session.actor === actor && activeSummon(actor) === summon
+        && session.mcpControlGeneration === generation && summon.commandRevision === revision;
     const config = SummonSkillActions.get(Number(actionId));
     if (!config) return false;
 
@@ -549,6 +574,7 @@ function useSkillAction(session, actor, summon, actionId) {
     }
 
     resolveSkillTarget(actor, summon, config).then((target) => {
+        if (!current()) return;
         if (!target) {
             session.dataSendToMe(ServerResponse.actionFailed());
             return;
@@ -571,6 +597,7 @@ function useSkillAction(session, actor, summon, actionId) {
             ensureTimerBag(summon);
             summon.timer.summonResume = setTimeout(() => {
                 summon.timer.summonResume = undefined;
+                if (!current()) return;
                 if (summon.state?.fetchDead?.() === true || summon.isDead?.() === true) return;
                 startFollowOwner(session, actor, summon);
             }, Math.max(100, Number(skill.fetchCalculatedHitTime?.()) || 0) + 50);

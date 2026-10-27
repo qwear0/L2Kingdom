@@ -21,6 +21,7 @@ function stop(session, actor) {
 }
 
 function followSummon(session, actor) {
+    if (session.mcpControl) return;
     for (const pet of [actor?.summon, actor?.pet]) {
         if (pet && pet.controlMode !== 'follow' && Threats.alive(pet) && pet.automation?.scheduleAction &&
             Number(pet.fetchOwnerId?.()) === Number(actor?.fetchId?.())) {
@@ -44,6 +45,7 @@ function usable(actor, skill) {
 }
 
 function cast(session, actor, target, skill, Generics, reason, hostile = false) {
+    if (session.mcpControl) return false;
     if (!usable(actor, skill) || invoke('GameServer/Bot/AI/BotActionFeedback').blocked(actor,target,skill)) return false;
     // Cancel the old auto-attack before a control or heal; otherwise the next
     // queued swing can break Sleep or replace a friendly target mid-cast.

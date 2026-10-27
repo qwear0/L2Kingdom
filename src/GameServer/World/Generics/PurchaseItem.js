@@ -67,4 +67,5 @@ async function awardItem(session, actor, selfId, amount, metadata = {}) {
 
 module.exports = purchaseItem;
 module.exports.serialize = serialize;
+module.exports.busy = backpack => pendingPurchases.has(backpack);
 module.exports.awardItem = awardItem;

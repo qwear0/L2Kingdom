@@ -193,7 +193,7 @@ const BotAI = {
     },
 
     scheduleTick(session, delayMs, { urgent = false } = {}) {
-        if (!session?.actor || !session.aiActive) return false;
+        if (!session?.actor || !session.aiActive || session.mcpControl) return false;
         this.cancelScheduledTick(session);
         const generation = Number(session.aiScheduleGeneration || 0);
         const runAiTick = () => {
@@ -219,6 +219,7 @@ const BotAI = {
     },
 
     init(session) {
+        if (session.mcpControl) return;
         this.cancelScheduledTick(session);
         session.aiActive = true;
         // Once per activation: a later re-init must not bring back a servitor
@@ -232,7 +233,11 @@ const BotAI = {
         this.scheduleTick(session, 1000 + Math.random() * 2000);
     },
 
-    stop(session) {
+    stop(session, { controlHandoff = false } = {}) {
+        if (session.mcpControl && !controlHandoff) {
+            session.mcpControl.wasAiActive = false;
+            session.mcpControl.preempt('native_ai_stopped');
+        }
         if (session.journey) require('./Travel/JourneyExecutor').suspend(session, 'ai_stop');
         session.pendingShoppingMeeting?.controller.abort();
         invoke('GameServer/Bot/AI/TownNpcApproach').reset(session);
@@ -400,6 +405,7 @@ const BotAI = {
     },
 
     tick(session) {
+        if (session.mcpControl) return;
         const bot = session.actor;
         if (!bot) return;
         if (session.vassal && !session.partyCompanion) {

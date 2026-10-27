@@ -133,6 +133,7 @@ function cast(session, actor, summon, skill, Generics, options = {}) {
 }
 
 function combatAction(session, actor, target, Generics, options = {}) {
+    if (session.mcpControl && options.actionOwner?.source !== 'bot-mcp') return { handled: false, reason: 'manual_control' };
     const isSummoner = BotRoles.isSummoner(actor);
     const isNecromancer = BotRoles.isNecromancer(actor);
     if (!actor || (!isSummoner && !isNecromancer && !(options.commandOwner && SummonControl.activeSummon(actor)))) {

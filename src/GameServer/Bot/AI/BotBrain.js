@@ -852,7 +852,7 @@ const BotBrain = {
     maybeThink(session, event, status, text = '', requestContext = null) {
         const cfg = config();
         const bot = session.actor;
-        if (!bot) return false;
+        if (!bot || session.mcpControl) return false;
         if (!ALLOWED_EVENTS.has(event)) {
             debugSkip(session, cfg, `event_not_chat:${event}`);
             return false;

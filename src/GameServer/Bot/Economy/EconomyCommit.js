@@ -89,4 +89,4 @@ function finish(characterId, command) {
 function forget(characterId) { active.delete(Number(characterId)); }
 
 module.exports = { KINDS, MAX_BYTES, MAX_ACTIVE, create, header, valid, pending, completed, result, authority, admit,
-    acceptRow, finish, forget, clear: () => active.clear(), size: () => active.size };
+    acceptRow, finish, forget, busy: characterId => active.has(Number(characterId)), clear: () => active.clear(), size: () => active.size };

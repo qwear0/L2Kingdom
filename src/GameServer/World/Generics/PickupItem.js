@@ -8,7 +8,9 @@ let pendingPickup = Promise.resolve();
 function pickupItem(session, actor, item, { canContinue = () => true } = {}) {
     // Serialize allocation/turn decisions as well as backpack mutations. Random
     // selection happens once; rejection cannot consume the ground or turn.
-    const pending = pendingPickup.then(() => claim.call(this, session, actor, item, canContinue));
+    session.nativePickupPending = Number(session.nativePickupPending || 0) + 1;
+    const pending = pendingPickup.then(() => claim.call(this, session, actor, item, canContinue))
+        .finally(() => { session.nativePickupPending--; });
     pendingPickup = pending.catch(() => {});
     return pending.catch(error => {
         utils.infoWarn('GameServer', 'Pickup award failed actor=%s item=%s error=%s',

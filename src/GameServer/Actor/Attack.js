@@ -83,6 +83,8 @@ class Attack {
     }
 
     clearTimers() {
+        this.activeCast?.actionOwner?.nativeEvent?.('native_cancelled');
+        this.activeSwing?.actionOwner?.nativeEvent?.('native_cancelled');
         this.activeCast = null;
         this.queue.resumeAttack = undefined;
         this.timers.forEach((timer) => clearTimeout(timer));
@@ -223,6 +225,7 @@ class Attack {
         }), actor);
         actor.state.setHits(true);
         const swing = this.activeSwing = { targets: meleeTargets, actionOwner: owner, ctrl: options.ctrl };
+        owner?.nativeEvent?.('swing_started');
 
         this.queueTimer(() => {
             if (session.actor !== actor) return;
@@ -258,6 +261,7 @@ class Attack {
                 if (!invoke('GameServer/Clan/ClanRaidRoster').beforeOffensiveEffect(session, actor, target, raidParty)) return;
 
                 if (!entry.hitLanded || entry.hit.damage <= 0) this.recordPlayerAggression(session, actor, target);
+                const beforeImpactHp = owner?.nativeEvent ? Number(target.fetchHp?.()) || 0 : 0;
                 if (entry.hitLanded) {
                     const beforeHp = Number(target.fetchHp?.()) || 0;
                     this.hit(session, actor, target, entry.hit.damage);
@@ -271,6 +275,8 @@ class Attack {
                 else if (index === 0) {
                     ConsoleText.transmit(session, ConsoleText.caption.missedHit);
                 }
+                owner?.nativeEvent?.('swing_impact', { targetId: target.fetchId(), hitLanded: entry.hitLanded,
+                    hpDamage: Math.max(0, beforeImpactHp - Number(target.fetchHp())), requestedDamage: entry.hit.damage });
             });
 
             releaseBowMovement();
@@ -293,6 +299,7 @@ class Attack {
             // A bow's movement was released at impact, so its later reload must
             // not clear flags belonging to a newer manual swing or cast.
             if (owner) {
+                owner.nativeEvent?.('swing_end');
                 if (this.activeSwing === swing) {
                     this.activeSwing = null;
                     if (!rangedAttack) actor.state.setHits(false);
@@ -343,6 +350,7 @@ class Attack {
             .includes(skill.fetchTargetKind?.());
 
         if (this.blockedPvpDefense(session, actor, creature, skill) || this.checkParticipants(actor, creature, { allowDeadTarget: corpseTarget })) {
+            owner?.nativeEvent?.('native_rejected', { reason: 'invalid_target' });
             invoke('GameServer/Bot/AI/BotActionFeedback').record(session, actor, creature, skill, 'rejected', 'invalid_target');
             invoke('GameServer/Bot/AI/BotSupportPlanner').cancelPendingSupportCast(session, actor, creature, skill, 'invalid_target');
             invoke('GameServer/Bot/AI/BotPartyChat').cancelExpectedSkillResult(session, actor, creature, skill);
@@ -350,6 +358,7 @@ class Attack {
         }
 
         if (actor.canUseSkill?.(skill) === false) {
+            owner?.nativeEvent?.('native_rejected', { reason: 'reuse' });
             invoke('GameServer/Bot/AI/BotActionFeedback').record(session, actor, creature, skill, 'rejected', 'reuse');
             session.dataSendToMe?.(ServerResponse.actionFailed());
             invoke('GameServer/Bot/AI/BotSupportPlanner').cancelPendingSupportCast(session, actor, creature, skill, 'reuse');
@@ -359,6 +368,7 @@ class Attack {
 
         const mpCost = this.skillMpCost(actor, skill);
         if (actor.fetchMp() < mpCost) {
+            owner?.nativeEvent?.('native_rejected', { reason: 'depleted_mp' });
             invoke('GameServer/Bot/AI/BotActionFeedback').record(session, actor, creature, skill, 'rejected', 'depleted_mp');
             ConsoleText.transmit(session, ConsoleText.caption.depletedMp);
             invoke('GameServer/Bot/AI/BotSupportPlanner').cancelPendingSupportCast(session, actor, creature, skill, 'depleted_mp');
@@ -368,6 +378,7 @@ class Attack {
 
         const conditionFailure = this.skillUseConditionFailure(session, actor, skill);
         if (conditionFailure) {
+            owner?.nativeEvent?.('native_rejected', { reason: conditionFailure.code || conditionFailure.reason || 'condition' });
             invoke('GameServer/Bot/AI/BotActionFeedback').record(session, actor, creature, skill, 'rejected', conditionFailure.code || conditionFailure.reason || 'condition');
             this.rejectSkillUseCondition(session, actor, conditionFailure);
             invoke('GameServer/Bot/AI/BotSupportPlanner').cancelPendingSupportCast(session, actor, creature, skill, conditionFailure.code || conditionFailure.reason || 'condition');
@@ -387,6 +398,8 @@ class Attack {
                 || (skill.fetchSkillType?.() === 'manaRecharge'
                     && !invoke('GameServer/Bot/AI/PartyAwareness').underDirectNpcAttack(creature.session)))) return;
         const magicSkill = this.beginRemoteCast(session, actor, creature, skill);
+        if (owner) this.activeCast.actionOwner = owner;
+        owner?.nativeEvent?.('cast_started');
         if (!this.queue.name || this.queue.name === 'skill') this.queue.resumeAttack = options.resumeAttack;
         if (acceptedTargets) {
             this.activeCast.autoFightTargets = acceptedTargets;
@@ -404,6 +417,7 @@ class Attack {
         const land = () => {
             if (owner && (session.actor !== actor || this.activeCast !== cast.castState)) return;
             this.landRemoteCast(session, actor, creature, skill, cast);
+            owner?.nativeEvent?.('cast_end');
             if (owner && !actor.state.fetchCasts() && this.queue.name) this.dequeueEvent(session);
         };
 
@@ -474,6 +488,7 @@ class Attack {
         HotPartyCastTracker.clear(actor);
         if (actionOwner ? (actor.state.fetchDead() || (!corpseTarget && creature.state.fetchDead()))
             : (this.blockedPvpDefense(session, actor, creature, skill) || this.checkParticipants(actor, creature, { allowDeadTarget: corpseTarget }))) {
+            actionOwner?.nativeEvent?.('native_failed', { reason: 'actor_or_target_dead' });
             if (actionOwner) actor.state.setCasts(false);
             invoke('GameServer/Bot/AI/BotSupportPlanner').cancelSupportCast(session, actor);
             invoke('GameServer/Bot/AI/BotPartyChat').cancelExpectedSkillResult(session, actor, creature, skill);
@@ -483,6 +498,7 @@ class Attack {
         const { corpseAreaCast, selfEffectOnly, executionTargets, emptyEnemyAuraCast } = this.remoteCastTargets(session, actor, creature, skill);
 
         if (executionTargets.length === 0 && !emptyEnemyAuraCast && !corpseAreaCast) {
+            actionOwner?.nativeEvent?.('native_failed', { reason: 'no_eligible_targets' });
             actor.state.setCasts(false);
             invoke('GameServer/Bot/AI/BotSupportPlanner').cancelSupportCast(session, actor);
             invoke('GameServer/Bot/AI/BotPartyChat').cancelExpectedSkillResult(session, actor, creature, skill);
@@ -490,6 +506,7 @@ class Attack {
         }
 
         if (!this.consumeSkillItems(session, actor, skill)) {
+            actionOwner?.nativeEvent?.('native_failed', { reason: 'required_items_missing' });
             actor.state.setCasts(false);
             this.rejectSkillUseCondition(session, actor, 'Not enough required items.');
             invoke('GameServer/Bot/AI/BotSupportPlanner').cancelSupportCast(session, actor);
@@ -498,9 +515,11 @@ class Attack {
         }
 
         this.payRemoteCast(session, actor, skill, { magicSkill, launchLead, executionTargets, mpCost });
+        actionOwner?.nativeEvent?.('cast_resources', { mpCost });
 
         const shotState = this.captureShotState(actor);
         if (!selfEffectOnly && executionTargets.length > 0 && RaidCurse.skillBlocked(session, actor, executionTargets, skill)) {
+            actionOwner?.nativeEvent?.('native_failed', { reason: 'raid_curse' });
             this.abandonCursedRemoteCast(session, actor, creature, skill, magicSkill);
             return;
         }
@@ -509,6 +528,7 @@ class Attack {
         // an area skill. Consume it once after the cast has survived all
         // cancellation gates and immediately before authoritative effects.
         if (!this.consumeSkillCharges(session, actor, skill)) {
+            actionOwner?.nativeEvent?.('native_failed', { reason: 'charges_missing' });
             actor.state.setCasts(false);
             this.rejectSkillUseCondition(session, actor, 'Not enough charges.');
             invoke('GameServer/Bot/AI/BotSupportPlanner').cancelSupportCast(session, actor);
@@ -520,7 +540,7 @@ class Attack {
             invoke('GameServer/World/Generics/NpcDecay').decay(invoke('GameServer/World/World'), creature);
         }
         executionTargets.forEach((target) => this.applyRemoteCastEffect(session, actor, target, skill,
-            { corpseAreaCast, raidParty, shotState, magicSkill, selfEffectOnly, castWeapon }));
+            { corpseAreaCast, raidParty, shotState, magicSkill, selfEffectOnly, castWeapon, actionOwner }));
         this.finishRemoteCast(session, actor, skill, magicSkill);
     }
 
@@ -569,12 +589,13 @@ class Attack {
         return;
     }
 
-    applyRemoteCastEffect(session, actor, target, skill, { corpseAreaCast, raidParty, shotState, magicSkill, selfEffectOnly, castWeapon }) {
+    applyRemoteCastEffect(session, actor, target, skill, { corpseAreaCast, raidParty, shotState, magicSkill, selfEffectOnly, castWeapon, actionOwner }) {
         if (target.returningHome) return;
         if ((skill.fetchTargetKind?.() === 'enemy' || corpseAreaCast)
             && !invoke('GameServer/Clan/ClanRaidRoster').beforeOffensiveEffect(session, actor, target, raidParty)) return;
         if (skill.fetchTargetKind?.() === 'enemy') invoke('GameServer/Bot/AI/BotMobCompetition').record(actor, target);
         this.restoreShotState(actor, shotState);
+        const beforeEffectHp = actionOwner?.nativeEvent ? Number(target.fetchHp?.()) || 0 : 0;
         const outcome = SkillEffects.execute(session, actor, target, skill, {
             attack: this,
             magicSkill,
@@ -623,6 +644,11 @@ class Attack {
                 }]);
             }
         }
+        actionOwner?.nativeEvent?.('cast_effect', { targetId: target.fetchId(), skillId: skill.fetchSelfId(),
+            effective: invoke('GameServer/Bot/AI/BotActionFeedback').effective(outcome),
+            hpDamage: Math.max(0, beforeEffectHp - Number(target.fetchHp())), requestedDamage: outcome.damage || 0,
+            heal: outcome.heal || 0, resisted: outcome.resisted === true, missed: outcome.missed === true,
+            effect: Boolean(outcome.effect), mpRestore: outcome.mpRestore || 0 });
         if (!selfEffectOnly) WeaponSA.onCast(session, actor, target, skill, { weapon: castWeapon, outcome, attack: this });
         if (outcome.spoilOnHit) {
             outcome.spoiled = invoke('GameServer/Npc/SpoilSweep').trySpoilCrush(session, actor, target, skill);

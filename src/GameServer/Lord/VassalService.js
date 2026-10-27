@@ -43,6 +43,7 @@ const Service = {
         const validate = () => {
             Access.requireContact(session, actor);
             const bot = invoke('GameServer/Bot/BotManager').sessions.find(entry => Number(entry.actor?.fetchId()) === row.characterId);
+            if (bot?.mcpControl && !bot.mcpControl.preempt('owner_duty_order')) throw Error('vassal_busy');
             if (bot?.vassalAdmission || bot?.vassalOperation || bot?.vassalReceipt || bot?.pendingActorTeleport || bot?.hotBackgroundPartyId) throw Error('vassal_busy');
             if (order === 'gather' && !Areas.suitable(Areas.find(areaId), bot?.actor?.fetchLevel() ?? character?.level)) throw Error('unsuitable_gather_area');
         };

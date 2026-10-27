@@ -14,9 +14,13 @@ function stateFor(actor) {
             selfId: skill.fetchSelfId(), level: skill.fetchLevel() })) } } };
 }
 
-function review(session, { onSpAward = false } = {}) {
+function review(session, { onSpAward = false, controlResume = null } = {}) {
     const actor = session?.actor;
     if (!actor || !String(session.accountId || '').startsWith('bot_')) return Promise.resolve(null);
+    if (session.mcpControl && session.mcpControl !== controlResume) {
+        session.mcpTrainingDeferred = true;
+        return Promise.resolve(null);
+    }
     const gate = session.skillTrainingGate;
     if (onSpAward && gate && gate.level === actor.fetchLevel() && gate.classId === actor.fetchClassId()
         && actor.fetchSp() < gate.nextSp) return Promise.resolve(null);
@@ -44,4 +48,4 @@ function review(session, { onSpAward = false } = {}) {
     return work;
 }
 
-module.exports = { review, stateFor };
+module.exports = { review, stateFor, busy: actor => pending.has(actor) };

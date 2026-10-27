@@ -14,7 +14,7 @@ function snapshot(record, identity) {
     const { session, actor } = record;
     const owner = require('../../Lord/VassalService').find(record.id);
     return { ...identity, sampledAt: Date.now(), view: 'server_diagnostic',
-        control: { attachmentMode: 'read_only', manualLease: null, aiActive: session.aiActive === true,
+        control: { attachmentMode: 'read_only', ...require('./Authority').view(session), aiActive: session.aiActive === true,
             plan: typeof session.plan === 'string' ? session.plan.slice(0, 100) : null,
             busyReasons: busyReasons(session) },
         self: { characterId: record.id, ownerCharacterId: owner.ownerCharacterId,

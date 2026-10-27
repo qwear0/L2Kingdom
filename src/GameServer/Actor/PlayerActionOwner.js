@@ -1,8 +1,10 @@
-// Only explicitly tagged server actions participate in player auto-fight.
-// Untagged native/bot callers retain their existing action contract.
+// MCP uses the existing owned native continuations, but never impersonates
+// player auto-fight. An untagged AI continuation cannot write through a
+// manual handoff; callers with async lookup also capture the generation.
 function current(session, actor, owner) {
-    return !owner || (owner.source === 'player-auto-fight'
-        && session?.actor === actor && owner.isCurrent());
+    if (!owner) return session?.actor !== actor || !session?.mcpControl;
+    return ['player-auto-fight', 'bot-mcp'].includes(owner.source)
+        && session?.actor === actor && owner.isCurrent();
 }
 
 function takeover(session, actor) {

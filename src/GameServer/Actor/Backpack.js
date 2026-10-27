@@ -212,7 +212,7 @@ class Backpack extends BackpackModel {
         });
     }
 
-    useItem(session, id) {
+    useItem(session, id, { onSkillResult } = {}) {
         this.fetchItem(id, (item) => {
             if (item.isWearable()) {
                 if (invoke('GameServer/Pets/PetInventory').gear[item.fetchSelfId()]) return;
@@ -278,7 +278,7 @@ class Backpack extends BackpackModel {
                 }
 
                 const itemSkill = C4ItemSkills.resolve(item.fetchSelfId());
-                if (itemSkill && this.useSkillItem(session, id, itemSkill)) {
+                if (itemSkill && this.useSkillItem(session, id, itemSkill, onSkillResult)) {
                     return;
                 }
 
@@ -574,7 +574,7 @@ class Backpack extends BackpackModel {
         return candidates.find((filename) => utils.fileExists(filename));
     }
 
-    useSkillItem(session, id, itemSkill) {
+    useSkillItem(session, id, itemSkill, onSkillResult) {
         const skill = this.buildItemSkill(itemSkill);
         if (!skill) {
             return false;
@@ -653,12 +653,14 @@ class Backpack extends BackpackModel {
 
             if (itemSkill.consume) {
                 this.deleteItem(session, id, 1, () => {
-                    this.applySelfItemSkill(session, skill);
+                    const outcome = this.applySelfItemSkill(session, skill);
+                    onSkillResult?.(outcome);
                 }, 'potion');
                 return;
             }
 
-            this.applySelfItemSkill(session, skill);
+            const outcome = this.applySelfItemSkill(session, skill);
+            onSkillResult?.(outcome);
         };
 
         if (castTime > 0) {
@@ -1342,7 +1344,7 @@ class Backpack extends BackpackModel {
     }
 
     applySelfItemSkill(session, skill) {
-        SkillEffects.execute(session, session.actor, session.actor, skill, {
+        return SkillEffects.execute(session, session.actor, session.actor, skill, {
             magicSkill: skill.fetchSpell(),
             rng: () => Math.random(),
             attack: { clearLoadedShot() {} }

@@ -549,7 +549,7 @@ function moveTo(session, actor, coords) {
                     townRoute: townRouteDiagnostics,
                     pathLength: movementPath.length,
                     routeUsable: !ownedRouteRejected && (routeFound || fallbackLineOfSight),
-                    ...(ownedRouteRejected ? { reason: 'auto_fight_route_budget' } : {}),
+                    ...(ownedRouteRejected ? { reason: owner.source === 'bot-mcp' ? 'mcp_route_budget' : 'auto_fight_route_budget' } : {}),
                     lowLodWarp: false,
                     distanceToPlayer,
                     destinationDistanceToPlayer,

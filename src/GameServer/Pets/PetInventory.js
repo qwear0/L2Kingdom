@@ -32,7 +32,9 @@ function compatible(pet, entry) {
 }
 function publish(pet) { pet.ownerSession?.dataSendToMe?.(Response.petItemList(items(pet))); }
 function queue(pet, work) {
-    const task = (pet.inventoryTail || Promise.resolve()).catch(() => {}).then(work);
+    pet.inventoryPending = Number(pet.inventoryPending || 0) + 1;
+    const task = (pet.inventoryTail || Promise.resolve()).catch(() => {}).then(work)
+        .finally(() => { pet.inventoryPending--; });
     pet.inventoryTail = task.catch(() => {});
     return task;
 }

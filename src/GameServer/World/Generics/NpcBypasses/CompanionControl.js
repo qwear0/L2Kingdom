@@ -372,6 +372,15 @@ function companionControl(session, parts) {
     const subCommand = parts[1];
     const value = parts[2];
     const requestedPage = subCommand === 'page' ? Number(value) : 0;
+    if (['movement', 'combat', 'pull', 'loot', 'member-pull', 'regroup', 'follow', 'stay', 'summon', 'dismiss'].includes(subCommand)) {
+        const named = ['member-pull', 'follow', 'stay', 'summon', 'dismiss'].includes(subCommand);
+        const target = named ? findCompanion(session, subCommand === 'member-pull' ? parts[3] : value) : null;
+        const members = named ? (target ? [target] : []) : companionSessions(session);
+        if (members.some(member => member.mcpControl && !member.mcpControl.preempt('owner_party_command'))) {
+            session.dataSendToMe(ServerResponse.speak(actor, { kind: 0, text: 'A companion is settling a native operation. Retry the command after it finishes.' }));
+            return;
+        }
+    }
 
     if (subCommand === 'movement') {
         setMovementMode(session, value === 'hold' ? 'hold' : 'follow');

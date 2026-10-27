@@ -32,7 +32,8 @@ function states(session) {
 // two kills cannot both observe the same pre-transition inventory/state.
 function mutate(session, work) {
   const previous = session.questMutationTail || Promise.resolve();
-  const next = previous.catch(() => {}).then(work);
+  session.questMutations = Number(session.questMutations || 0) + 1;
+  const next = previous.catch(() => {}).then(work).finally(() => { session.questMutations--; });
   session.questMutationTail = next.catch(() => {});
   return next;
 }
