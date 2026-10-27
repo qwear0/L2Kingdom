@@ -3,9 +3,9 @@
 </a>
 
 
-# L2Solo (C4: Scions of Destiny)
+# L2Kingdom (C4: Scions of Destiny)
 
-This checkout is **L2Siege** (`L2Kingdom`), a private local Lineage II C4 fork of L2Solo / NodeL2 with player-owned vassals. Upstream names remain in package metadata and runtime identifiers.
+**L2Kingdom** is a private local Lineage II C4 fork of L2Solo / NodeL2 with player-owned vassals. Upstream names remain in package metadata and runtime identifiers.
 
 **Project documentation:** start with the [architecture and ownership map](docs/README.md). It links the [runtime/configuration guide](docs/runtime.md), [operations and side effects](docs/operations.md), [vassal contract](docs/vassals.md), and detailed protocol, persistence, world, economy, AI, observer and content guides. The documentation distinguishes active owned-only behavior from retained upstream systems; it is not a claim of runtime or client acceptance.
 
@@ -67,7 +67,7 @@ Return uses the same journey routing to Gludio (regional recall, available gatek
 
 P1–P4 implementation/preparation is complete; geodata has been installed locally through the pinned-checksum bootstrap. **Gameplay acceptance is still pending user testing.** Syntax/source checks do not establish physical routes, client dialogs, combat, inventory effects or timing. No server start/restart or live-world migration was performed for these phases; migration runs on the next separately authorized startup.
 
-Before applying migration to an irreplaceable saved world, arrange a separately authorized stop of writers and a consistent, readable backup under `/data/!backups/L2Siege/`. Do not copy only a live SQLite main file while ignoring its WAL. A new empty world needs no backup.
+Before applying migration to an irreplaceable saved world, arrange a separately authorized stop of writers and a consistent, readable backup under `/data/!backups/L2Kingdom/`. Do not copy only a live SQLite main file while ignoring its WAL. A new empty world needs no backup.
 
 After a separately requested launch, manually verify:
 

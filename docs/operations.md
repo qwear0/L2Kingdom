@@ -96,7 +96,7 @@ Owners: `src/WorldObserver/ManagementController.js`, `scripts/saved-games.js`, `
 4. Load validates copies and uses the existing paired restore/recovery protocol to replace current world/history; the game remains stopped.
 5. Load creates **no automatic pre-load backup**. Delete permanently removes the selected save; UI confirmations remain mandatory.
 
-Paths remain `tmp/saves`, or `saves` under `L2NODE_RUNTIME_DIR`; existing save discovery/format and configured world/history paths are retained. Application saves are not agent-created persistent backups, which belong only under `/data/!backups/L2Siege/`.
+Paths remain `tmp/saves`, or `saves` under `L2NODE_RUNTIME_DIR`; existing save discovery/format and configured world/history paths are retained. Application saves are not agent-created persistent backups, which belong only under `/data/!backups/L2Kingdom/`.
 
 The persistent `<database>.access.sqlite` file defines the shared access-lock domain. Never unlink it to bypass busy: different processes could then hold different locks. Preserve restore markers/pending files for the recovery owner, not manual deletion.
 
@@ -108,7 +108,7 @@ World deletion commits **before** history cleanup. A committed outbox instructio
 
 ## Separately authorized acceptance/deployment
 
-Code/docs and source/syntax checks do not authorize deployment. Before stop-and-replace cutover, confirm the actual service/start owner and trusted public binding; no live service configuration was inferred from defaults. Back up only threatened unique override/preset/service state under `/data/!backups/L2Siege/`, with restricted permissions and safe readability/parse checks. No database migration/new save format is required by UI consolidation.
+Code/docs and source/syntax checks do not authorize deployment. Before stop-and-replace cutover, confirm the actual service/start owner and trusted public binding; no live service configuration was inferred from defaults. Back up only threatened unique override/preset/service state under `/data/!backups/L2Kingdom/`, with restricted permissions and safe readability/parse checks. No database migration/new save format is required by UI consolidation.
 
 Runtime acceptance remains separate: management assets without a DB; stopped reloads; required-listener and disabled-observer readiness; private endpoint/generation isolation and parent loss/deadlines; proxy ETag/204/compression/dynamic resources; LAN teleport denial; live/restart/stale/invalid/overflow/storage-error settings; AI queued dispatch suppression; navigation/drafts/themes/keyboard/narrow view; preset next-start behavior; log fallback; and explicitly authorized synthetic inference. Save/load/delete/wipe checks require disposable or separately protected consistent world/history data. Do not restore over newer personal state, probe destructive behavior on the live world, or describe source checks as runtime passes.
 
@@ -120,13 +120,13 @@ Runtime acceptance remains separate: management assets without a DB; stopped rel
 
 ## One-commit upstream updates
 
-Use the canonical [upstream-integrator skill](../skills/l2siege-upstream-integrator/SKILL.md) for incremental L2Solo or Mobius C4 updates. It explains one exact commit's purpose, local compatibility, expected behavior, dependencies, performance impact and verification limits, then waits for user approval. L2Solo changes may be integrated as native patches; Mobius changes require native adaptations, not a Java subtree merge or rebase.
+Use the canonical [upstream-integrator skill](../skills/l2kingdom-upstream-integrator/SKILL.md) for incremental L2Solo or Mobius C4 updates. It explains one exact commit's purpose, local compatibility, expected behavior, dependencies, performance impact and verification limits, then waits for user approval. L2Solo changes may be integrated as native patches; Mobius changes require native adaptations, not a Java subtree merge or rebase.
 
-Invoke `/skill:l2siege-upstream-integrator next l2solo` or `next mobius-c4`; use `status` to resume and `refresh <source>` to discover new source tips. Each approval applies only to its saved proposal. After applying, skipping or deferring the commit, the agent records the result and stops rather than applying the next one automatically.
+Invoke `/skill:l2kingdom-upstream-integrator next l2solo` or `next mobius-c4`; use `status` to resume and `refresh <source>` to discover new source tips. Each approval applies only to its saved proposal. After applying, skipping or deferring the commit, the agent records the result and stops rather than applying the next one automatically.
 
-Progress lives in ignored `tmp/upstream-integration/state.md` and per-commit receipts. It persists between local sessions, but is not pushed with Git and is lost if those files are deleted. Integration commit trailers retain source provenance, not skipped decisions. Read the skill's [record contract](../skills/l2siege-upstream-integrator/references/records.md) for recovery. Root restrictions on tests, runtime operations, backups and scoped commits still apply; a pushed code change is not evidence of live activation.
+Progress lives in ignored `tmp/upstream-integration/state.md` and per-commit receipts. It persists between local sessions, but is not pushed with Git and is lost if those files are deleted. Integration commit trailers retain source provenance, not skipped decisions. Read the skill's [record contract](../skills/l2kingdom-upstream-integrator/references/records.md) for recovery. Root restrictions on tests, runtime operations, backups and scoped commits still apply; a pushed code change is not evidence of live activation.
 
-Local discovery follows the existing skill convention: `~/.agents/skills/l2siege-upstream-integrator` links to `skills/l2siege-upstream-integrator/`. Run `/reload` in Pi after installation. The skill is an instruction workflow, not an executable approval guard or background updater.
+Local discovery follows the existing skill convention: `~/.agents/skills/l2kingdom-upstream-integrator` links to `skills/l2kingdom-upstream-integrator/`. Run `/reload` in Pi after installation. The skill is an instruction workflow, not an executable approval guard or background updater.
 
 ## Update together
 

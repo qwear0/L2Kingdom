@@ -1,6 +1,6 @@
 # Integration records
 
-Resolve these paths against the current L2Siege root. The skill's canonical directory owns instructions/templates only; do not put runtime progress inside it.
+Resolve these paths against the current L2Kingdom root. The skill's canonical directory owns instructions/templates only; do not put runtime progress inside it.
 
 ## Storage and authority
 
@@ -8,7 +8,7 @@ Resolve these paths against the current L2Siege root. The skill's canonical dire
 - One proposal/receipt: `tmp/upstream-integration/commits/<source>-<full-sha>.md`.
 - Source keys: `l2solo`, `mobius-c4`.
 - Optional retained source evidence: `tmp/upstream-integration/evidence/`; link exact artifacts from the receipt rather than duplicating them in the summary.
-- Temporary clones and patch previews: `/tmp/L2Siege/`; not authoritative persistent evidence.
+- Temporary clones and patch previews: `/tmp/L2Kingdom/`; not authoritative persistent evidence.
 
 All progress is Git-ignored local task material. It survives ordinary session changes, but is not published by pushing the repository and will be lost if `tmp/` is deleted. Explain that limitation. Git trailers preserve integration provenance, not skipped decisions or historical consent. Do not force-add state, create a database/daemon, or invent approvals when recovering missing records.
 
@@ -19,7 +19,7 @@ Use one active proposal across both sources. Before writing, reread the affected
 Create only on first use; never reinitialize existing progress. Unknown fields stay explicitly unknown. A discovery window is not an integration baseline.
 
 ```markdown
-# L2Siege upstream integration
+# L2Kingdom upstream integration
 
 Updated: <timestamp with timezone>
 Active proposal: none | <source/full SHA, proposal revision, receipt path>

@@ -1,9 +1,9 @@
 ---
-name: l2siege-doc-maintainer
-description: Maintain concise, source-grounded documentation for the L2Siege repository in L2Kingdom, derived from L2Solo / NodeL2. Use for repository orientation, documentation audits and impact checks, and changes to runtime entrypoints, gameplay and vassal ownership, packets, SQLite persistence, WorldObserver, AI integrations, authored data, configuration, verification workflows, skills, or agent instructions. Keep navigation maps and feature docs synchronized without importing upstream assumptions or expanding documentation unnecessarily.
+name: l2kingdom-doc-maintainer
+description: Maintain concise, source-grounded documentation for the L2Kingdom repository, derived from L2Solo / NodeL2. Use for repository orientation, documentation audits and impact checks, and changes to runtime entrypoints, gameplay and vassal ownership, packets, SQLite persistence, WorldObserver, AI integrations, authored data, configuration, verification workflows, skills, or agent instructions. Keep navigation maps and feature docs synchronized without importing upstream assumptions or expanding documentation unnecessarily.
 ---
 
-# L2Siege documentation maintainer
+# L2Kingdom documentation maintainer
 
 Adapted from `qsd-doc-maintainer` for this private Node.js game server. Keep documentation useful for finding code, understanding responsibility boundaries, and deciding what must change together. Do not import QSD's container layout, Python tools, or audit requirements.
 
@@ -24,7 +24,7 @@ Load other references only when needed:
 
 ### 1. Establish the actual repository boundary
 
-- The project is L2Siege; the checkout is named L2Kingdom and upstream README/package names retain L2Solo / NodeL2. Do not rename runtime identifiers merely to align prose.
+- The project and checkout are named L2Kingdom; upstream material and package names retain L2Solo / NodeL2. Do not rename runtime identifiers merely to align prose.
 - This is a Node.js server with integrated observer and SQLite persistence, not QSD's backend/automation/frontend container layout.
 - Distinguish code that exists from behavior enabled by runtime configuration. Legacy bot or clan simulation modules and old planning notes are not evidence that those systems run today.
 - Check authored resources, generated outputs, persisted state, and local configuration separately. Never expose credentials or copy local database contents into docs.
@@ -86,6 +86,6 @@ When a maintained documentation tree is introduced, link its entry map from READ
 
 ## Local availability
 
-The canonical source is `skills/l2siege-doc-maintainer/` in this repository. Expose that directory locally through a symlink at `~/.agents/skills/l2siege-doc-maintainer`; do not maintain a second copied version or replace an unrelated existing skill.
+The canonical source is `skills/l2kingdom-doc-maintainer/` in this repository. Expose that directory locally through a symlink at `~/.agents/skills/l2kingdom-doc-maintainer`; do not maintain a second copied version or replace an unrelated existing skill.
 
-Pi discovers `~/.agents/skills/`. Run `/reload` in an existing Pi session after installation or updates; `/skill:l2siege-doc-maintainer` explicitly loads it. Agents without skill discovery should read the canonical `SKILL.md` directly when `AGENTS.md` requires it.
+Pi discovers `~/.agents/skills/`. Run `/reload` in an existing Pi session after installation or updates; `/skill:l2kingdom-doc-maintainer` explicitly loads it. Agents without skill discovery should read the canonical `SKILL.md` directly when `AGENTS.md` requires it.

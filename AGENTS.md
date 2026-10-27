@@ -14,7 +14,7 @@ Meet requirements with the least implementation, verification, and maintenance c
 
 This repository is a private personal project deployed on a local home server. The author has no plans to sell it or make it publicly available.
 
-The repository is L2Siege, derived from L2Solo / NodeL2. The existing README and package metadata retain upstream names. The runtime is a Node.js Lineage II server emulator with an integrated web observer and SQLite persistence. `package.json` requires Node.js >=22.5.0.
+The repository is L2Kingdom, derived from L2Solo / NodeL2. The existing README and package metadata retain upstream names. The runtime is a Node.js Lineage II server emulator with an integrated web observer and SQLite persistence. `package.json` requires Node.js >=22.5.0.
 
 # Project Workflow
 
@@ -37,18 +37,18 @@ At the end of a task, check whether `README.md`, these instructions, or other af
 
 ## Documentation Maintenance
 
-- Use the `l2siege-doc-maintainer` skill for repository orientation, documentation audits and impact checks, and changes to code layout, runtime entrypoints, documented gameplay, ownership boundaries, packets, persistence, WorldObserver, AI integrations, authored resources, configuration, verification workflows, skills, agent instructions, or documentation itself.
-- The canonical skill is `skills/l2siege-doc-maintainer/SKILL.md`. If skill discovery is unavailable, read that file directly. Local installation uses `~/.agents/skills/l2siege-doc-maintainer` as a symlink to the canonical directory.
+- Use the `l2kingdom-doc-maintainer` skill for repository orientation, documentation audits and impact checks, and changes to code layout, runtime entrypoints, documented gameplay, ownership boundaries, packets, persistence, WorldObserver, AI integrations, authored resources, configuration, verification workflows, skills, agent instructions, or documentation itself.
+- The canonical skill is `skills/l2kingdom-doc-maintainer/SKILL.md`. If skill discovery is unavailable, read that file directly. Local installation uses `~/.agents/skills/l2kingdom-doc-maintainer` as a symlink to the canonical directory.
 - Start with `docs/README.md`, then read the affected feature docs before deep implementation. Use `README.md` for player-facing setup and relevant source-adjacent docs for detailed contracts; verify historical `planning/` material and legacy subsystem descriptions against current source and configuration.
 - Keep documentation changes proportionate. Update affected maps, links, and feature docs in the same task when their claims change; installing the skill alone does not require creating a documentation tree.
 - Validate changed claims, paths, and links and inspect `git diff --check`. There is no bundled documentation auditor; do not import QSD-specific commands or create test infrastructure merely to mirror its workflow.
 
 ## Incremental Upstream Integration
 
-- Use `skills/l2siege-upstream-integrator/SKILL.md` for one-at-a-time L2Solo or Mobius C4 updates. Analyze one exact upstream commit, explain its local effects in Russian, and wait for the user's approval before implementation. Approval does not extend to the next commit or unreviewed prerequisites.
+- Use `skills/l2kingdom-upstream-integrator/SKILL.md` for one-at-a-time L2Solo or Mobius C4 updates. Analyze one exact upstream commit, explain its local effects in Russian, and wait for the user's approval before implementation. Approval does not extend to the next commit or unreviewed prerequisites.
 - L2Solo is the Git upstream; Mobius C4 is a source for native behavior/content adaptations, not a rebase target. Preserve local ownership, runtime, persistence and performance contracts.
 - Keep resumable decisions under ignored `tmp/upstream-integration/`; record source provenance in integration commits. Do not silently mark skipped/deferred commits as applied. See the skill for approval, recovery and publication boundaries.
-- Local skill discovery uses `~/.agents/skills/l2siege-upstream-integrator` as a symlink to the canonical repository directory. Installing the skill does not authorize any upstream integration.
+- Local skill discovery uses `~/.agents/skills/l2kingdom-upstream-integrator` as a symlink to the canonical repository directory. Installing the skill does not authorize any upstream integration.
 
 ## Code Intelligence Retrieval
 
@@ -58,7 +58,7 @@ Use CodeGraph or an equivalent semantic/code graph for bounded cross-file discov
 - Treat graph relationships as candidates, not proof of completeness.
 - Verify negative, exhaustive, dynamic, and high-risk conclusions against source, runtime configuration, or targeted `rg` searches.
 - Fall back to `rg` and direct reads when the index is unavailable, stale, ambiguous, or conflicting.
-- For documentation impact decisions, follow `skills/l2siege-doc-maintainer/references/semantic-retrieval-policy.md`.
+- For documentation impact decisions, follow `skills/l2kingdom-doc-maintainer/references/semantic-retrieval-policy.md`.
 
 ## Verification and Tests
 
@@ -75,10 +75,10 @@ Do not automatically build, start, stop, or restart the server. Changes and Git 
 
 ## Backups and Task Artifacts
 
-- Store persistent backups only in `/data/!backups/L2Siege/`.
+- Store persistent backups only in `/data/!backups/L2Kingdom/`.
 - Store task artifacts worth retaining in the repository's Git-ignored `tmp/` directory: plans in `tmp/plans/`, reports in `tmp/reports/`, and investigation results or verification evidence in appropriate subfolders.
 - If the user explicitly requests a report, create it in a dedicated subfolder under `tmp/reports/`. Do not store investigation reports in documentation directories.
-- Store disposable files, temporary task artifacts, and short-lived backups only in `/tmp/L2Siege/`.
+- Store disposable files, temporary task artifacts, and short-lived backups only in `/tmp/L2Kingdom/`.
 
 ## Git
 

@@ -1,6 +1,6 @@
-# L2Siege project map
+# L2Kingdom project map
 
-L2Siege is the private Lineage II C4 server in the `L2Kingdom` checkout, derived from L2Solo / NodeL2. Package names, runtime identifiers and upstream material still use those names. This map explains where current behavior lives and what must change together; it is not a generated file inventory.
+L2Kingdom is a private Lineage II C4 server derived from L2Solo / NodeL2. Package names, runtime identifiers and upstream material still use those names. This map explains where current behavior lives and what must change together; it is not a generated file inventory.
 
 ## Scope and current runtime
 
@@ -15,7 +15,7 @@ L2Siege is the private Lineage II C4 server in the `L2Kingdom` checkout, derived
 1. Read [`AGENTS.md`](../AGENTS.md) for execution, language, artifact and Git policy; read the root [`README.md`](../README.md) for player-facing setup/current-fork context.
 2. Read [runtime/configuration](runtime.md) and inspect `package.json`, `config/default.ini` and the relevant owner.
 3. Choose the feature below; follow its entrypoint → state owner → persistence/asynchronous boundary → client/observer consumer.
-4. Use CodeGraph for bounded cross-file discovery where available; validate dynamic wiring and critical negative claims against source/configuration. See the [retrieval policy](../skills/l2siege-doc-maintainer/references/semantic-retrieval-policy.md).
+4. Use CodeGraph for bounded cross-file discovery where available; validate dynamic wiring and critical negative claims against source/configuration. See the [retrieval policy](../skills/l2kingdom-doc-maintainer/references/semantic-retrieval-policy.md).
 
 ## Documentation by question
 
@@ -23,7 +23,7 @@ L2Siege is the private Lineage II C4 server in the `L2Kingdom` checkout, derived
 | --- | --- | --- |
 | How does the application start, select config and shut down? | [Runtime and lifecycle](runtime.md) | `scripts/start.js`, `scripts/run-server.js`, `src/NodeL2.js`, `src/ConfigLoader.js`, `src/Global.js` |
 | Which commands download, write, delete or start processes? | [Operations and verification](operations.md) | `package.json`, `scripts/`, `AGENTS.md` |
-| How are upstream changes reviewed and integrated one commit at a time? | [Upstream update workflow](operations.md#one-commit-upstream-updates) | `skills/l2siege-upstream-integrator/SKILL.md`, ignored `tmp/upstream-integration/` |
+| How are upstream changes reviewed and integrated one commit at a time? | [Upstream update workflow](operations.md#one-commit-upstream-updates) | `skills/l2kingdom-upstream-integrator/SKILL.md`, ignored `tmp/upstream-integration/` |
 | Who admits accounts and dispatches client packets? | [Protocol and sessions](protocol.md) | `src/Server.js`, `src/AuthenticationServer/`, `src/GameServer/Network/`, `src/Packet/` |
 | Which state is durable, and who can replace it? | [Persistence and durability](persistence.md), [auto-fight preferences](persistence.md#connected-player-auto-fight-preferences) | `src/Database*.js`, `src/History*.js`, `src/GameServer/Persistence/`, `src/GameServer/Actor/PlayerAutoFightSettings.js` |
 | Who owns a vassal, its orders and interrupted duties? | [Castellan and vassals](vassals.md) | `src/GameServer/Lord/`, `src/GameServer/Bot/AI/VassalOrders.js`, `src/GameServer/Bot/AI/PartyCompanionService.js` |
@@ -80,6 +80,6 @@ New plans/reports belong under ignored `tmp/` according to `AGENTS.md`, not in t
 
 ## Maintenance and verification
 
-Use the canonical [documentation-maintainer skill](../skills/l2siege-doc-maintainer/SKILL.md). Update the smallest affected feature and this map when ownership, reading paths or contracts change. Keep root README as an overview rather than duplicating every flow.
+Use the canonical [documentation-maintainer skill](../skills/l2kingdom-doc-maintainer/SKILL.md). Update the smallest affected feature and this map when ownership, reading paths or contracts change. Keep root README as an overview rather than duplicating every flow.
 
 For documentation changes, inspect source-backed claims, paths, relative links and `git diff --check`. JavaScript syntax checks, automated suites, runtime operations and independent review have separate scopes; see [operations](operations.md). The documentation describes implementation boundaries and known limitations, not a blanket claim that those checks passed.
