@@ -7,7 +7,9 @@ description: Review and incrementally integrate one L2Solo or L2J Mobius C4 comm
 
 ## Contract
 
-Explain **one upstream commit**, wait for the user's decision, implement only the approved scope, record the result, and stop. This is a conversational workflow, not an automatic updater or a batch-rebase instruction.
+Explain **one upstream commit**, wait for the user's decision, implement only the approved scope, and record the result. This is a conversational workflow, not an automatic updater or a batch-rebase instruction.
+
+**Default continuation:** after successful publication or an explicit skip/defer, immediately analyze the next unreviewed commit in the same source's pinned queue and present its decision card; do not wait for `next`. Stop at the next approval gate, a blocker, an exhausted queue, or the user's request to pause. Never auto-approve, refresh the source tip, or switch sources.
 
 - Communicate in Russian; write skill documentation and saved records in English. Preserve the user's actual Russian approval wording in the decision record.
 - Read repository `AGENTS.md`, `docs/README.md`, the affected feature documentation and `skills/l2kingdom-doc-maintainer/SKILL.md`. Their verification, Git and runtime policies remain authoritative.
@@ -81,7 +83,7 @@ Write the proposal to its receipt and show a concise Russian decision card using
 - Bind the decision to source/full SHA, proposal revision, local baseline, exact intended scope/exclusions, approach and verification limits. Preserve the user message and session/message reference when available; never fabricate an identifier.
 - Recheck HEAD, relevant source, index and working changes immediately before editing. A moving source branch does not change the approved SHA. If local HEAD moved, revalidate: unrelated changes can be recorded with an explanation, but changed assumptions, conflicts, prerequisites or affected contracts require a revised card and renewed approval.
 - A saved `approved` label alone is not sufficient proof of consent in a later session. Locate the recorded user authorization/context; if it cannot be verified or no longer matches the proposal, ask again before writes.
-- `skip` is an explicit decision with a reason; `defer` remains unresolved and can be revisited on request or when its stated prerequisite changes. Neither authorizes code changes. Stop after recording the decision unless the user also requests the next analysis.
+- `skip` is an explicit decision with a reason; `defer` remains unresolved and can be revisited on request or when its stated prerequisite changes. Neither authorizes code changes. After recording the decision, follow the default continuation rule.
 
 ## 5. Implement only the approved change
 
@@ -91,7 +93,7 @@ Write the proposal to its receipt and show a concise Russian decision card using
 - If implementation reveals an unexpected dependency, materially different behavior, broader write scope, unsafe data transformation or an unresolved conflict, stop with the exact state and revise the proposal. No automatic “ours/theirs”, reset, abort, replacement implementation, or next-commit continuation.
 - Run only authorized checks, inspect the complete task diff and `git diff --check`, and report actual results. Do not build/start/stop/restart the server. A migration or generated-content operation with side effects needs its own explicit authorization and protection for threatened unique data under `/data/!backups/L2Kingdom/`.
 
-## 6. Record, publish, then stop
+## 6. Record, publish, then prepare the next proposal
 
 After successful implementation/checks, follow root Git policy: commit only task-owned non-ignored files with a Russian description and push without force. For a direct cherry-pick, prefer non-committing application followed by the reviewed scoped commit so the message and provenance follow local policy; choose a merge parent only when it was explicitly analyzed. Respect any active coordination tool's Git ownership rules. Do not include someone else's staged changes or rewrite published commits.
 
@@ -108,7 +110,7 @@ Use `mobius-c4` and `adaptation` as appropriate. Set `Upstream-Scope: partial` w
 
 Before committing, save the approved scope/check outcomes; afterwards record the resulting local SHA. Record push separately as pending/succeeded/failed and preserve the blocker. Do not mark success merely because a command was issued. If push fails, keep the committed change, report it, and do not reapply or start another integration. If a session ended between commit and receipt, recover using exact Git provenance and diff inspection, not an automatic retry.
 
-Finish in Russian with: what changed, local/upstream SHAs, exclusions, checks and gaps, publication outcome, unchanged runtime status, and state path. One completed decision is one step of progress. **Do not automatically integrate the next commit.**
+Report in Russian: what changed, local/upstream SHAs, exclusions, checks and gaps, publication outcome, unchanged runtime status, and state path. Then follow the default continuation rule. **The next commit still requires its own approval before integration.**
 
 ## Installation
 
