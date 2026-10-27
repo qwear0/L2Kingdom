@@ -124,7 +124,7 @@ function transportWaiting(session) {
     const state = session.journey;
     if (session.pendingActorTeleport || session.pendingPathRequest || session.townNpcQueue) return true;
     if (!state || state.terminal) return false;
-    if (state.flight || state.paymentUncertain) return true;
+    if (state.flight || state.paymentUncertain || state.planning) return true;
     if (state.status === 'blocked') return state.scope === 'resource';
     if (state.status !== 'waiting') return false;
     return ['npc_slot', 'interaction_dwell'].includes(state.reason)

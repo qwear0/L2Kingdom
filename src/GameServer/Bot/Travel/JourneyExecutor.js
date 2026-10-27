@@ -8,6 +8,8 @@ const Slots = invoke('GameServer/Bot/AI/TownNpcSlots');
 const Transit = invoke('GameServer/Bot/AI/TownTransitPolicy');
 const TownTravel = invoke('GameServer/Bot/AI/BotTownTravel');
 const Payment = require('./TripPayment');
+const PathCosts = require('./JourneyPathCosts');
+const Geodata = invoke('GameServer/Geodata/GeodataEngine');
 
 const EXCLUSION_MS = 60000;
 const EXCLUSION_LIMIT = 64;
@@ -67,6 +69,10 @@ function release(session, state) {
     delete state.interactionReadyAt;
 }
 function discard(session, state) {
+    if (state.planning) {
+        state.planning.costs.cancel(state.planning.owner);
+        state.planning = null;
+    }
     release(session, state);
     state.itinerary = null;
     state.index = 0;
@@ -91,7 +97,7 @@ function suspend(session, reason = 'suspended') {
     state.flight?.recall?.cancel(reason);
     if (state.fatal) return report(state);
     if (state.flight) release(session, state);
-    else if (state.itinerary || state.localOwned) discard(session, state);
+    else if (state.itinerary || state.localOwned || state.planning) discard(session, state);
     return report(state, 'waiting', reason, 'priority');
 }
 function fatal(session, state, reason, error = null) {
@@ -345,6 +351,55 @@ function reconcile(session, state, now) {
     }
     return report(state, 'waiting', 'teleport');
 }
+function plan(session, state, point, values, now) {
+    if (!state.planning) {
+        const planner = getPlanner();
+        state.actor.automation.abortAll(state.actor);
+        Approach.reset(session);
+        Navigation.clear(session);
+        session.lastPathfinding = null;
+        state.localOwned = true;
+        state.moveGeneration = session.moveRouteGeneration;
+        const costs = PathCosts.forPool(session.pathfindingWorkerPool);
+        const planning = state.planning = { costs, owner: { cancelled: false }, point,
+            revision: Geodata.navigationRevision || 0, result: null, error: null };
+        const generation = state.generation;
+        planner.plan({ ...state.request, ...values, from: point,
+            remainingFare: Math.max(0, state.cap - state.paidFare), exclusions: exclusionInput(state, now) },
+        (from, to, arrival) => costs.measure(from, to, arrival, planning.owner)).then(result => {
+            if (state.planning === planning && state.generation === generation && current(session, state)) planning.result = result;
+        }, error => {
+            if (state.planning === planning && state.generation === generation && current(session, state)) planning.error = error;
+        });
+    }
+    const planning = state.planning;
+    if (planning.revision !== (Geodata.navigationRevision || 0)) {
+        discard(session, state);
+        return report(state, 'waiting', 'route_estimate_stale', 'resource');
+    }
+    if (planning.error) return fatal(session, state, 'route_estimate_failed', planning.error);
+    if (!planning.result) return report(state, 'waiting', 'route_estimate_pending', 'resource');
+    if (!near(point, planning.point, 96, 64)) {
+        discard(session, state);
+        return report(state, 'waiting', 'route_estimate_relocated', 'resource');
+    }
+    const selected = planning.result;
+    state.planning = null;
+    if (selected.status === 'waiting') {
+        state.retryAt = now + (selected.reason === 'geodata_missing' ? EXCLUSION_MS : REPLAN_BACKOFF_MS);
+        return report(state, 'waiting', selected.reason, 'resource');
+    }
+    if (selected.status === 'blocked') {
+        const [reason, scope] = blockedReason(state);
+        state.retryAt = state.expiresAt;
+        return report(state, 'blocked', reason, scope);
+    }
+    state.itinerary = selected;
+    state.plannedFare = selected.fee;
+    state.index = 0;
+    state.retryAt = 0;
+    return null;
+}
 function tick(session) {
     const state = session.journey;
     if (!state) return { status: 'cancelled', reason: 'no_journey' };
@@ -357,7 +412,7 @@ function tick(session) {
     const pause = interrupted(session, state);
     if (pause) return suspend(session, pause);
     if (session.pendingActorTeleport) {
-        if (state.itinerary || state.localOwned) discard(session, state);
+        if (state.itinerary || state.localOwned || state.planning) discard(session, state);
         return report(state, 'waiting', 'external_teleport');
     }
     const values = snapshot(state.actor);
@@ -374,24 +429,8 @@ function tick(session) {
     }
     if (now < state.retryAt) return report(state);
     if (!state.itinerary) {
-        const exclusions = exclusionInput(state, now);
-        const selected = getPlanner().plan({ ...state.request, ...values, from: point,
-            remainingFare: Math.max(0, state.cap - state.paidFare), exclusions });
-        if (selected.status === 'blocked') {
-            const [reason, scope] = blockedReason(state);
-            state.retryAt = state.expiresAt;
-            return report(state, 'blocked', reason, scope);
-        }
-        state.actor.automation.abortAll(state.actor);
-        Approach.reset(session);
-        Navigation.clear(session);
-        session.lastPathfinding = null;
-        state.localOwned = true;
-        state.moveGeneration = session.moveRouteGeneration;
-        state.itinerary = selected;
-        state.plannedFare = selected.fee;
-        state.index = 0;
-        state.retryAt = 0;
+        const pendingPlan = plan(session, state, point, values, now);
+        if (pendingPlan) return pendingPlan;
     }
     const leg = state.itinerary.legs[state.index];
     if (!leg) {

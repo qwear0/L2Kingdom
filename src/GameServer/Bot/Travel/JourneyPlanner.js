@@ -3,6 +3,10 @@ const TownRespawn = require('../../World/TownRespawn');
 const Karma = require('../../Karma');
 
 const ENTRY_LIMIT = 3;
+const ROUTE_PROBE_LIMIT = 6;
+const KEEPER_ARRIVAL = Object.freeze({ xy: 96, z: 128 });
+const DEFERRED_CODES = new Set(['QUEUE_FULL', 'PATH_PREEMPTED', 'PATH_TIMEOUT', 'PATH_BUDGET',
+    'PATH_NODE_LIMIT', 'WORKER_UNAVAILABLE', 'WORKER_EXIT', 'POOL_SHUTDOWN', 'GEODATA_MISSING']);
 const PAID_HOP_THRESHOLD = 50000;
 const MIN_SAVING_MS = 30000;
 const MIN_SAVING_RATIO = 0.2;
@@ -62,7 +66,7 @@ function compileRoutes(entry, byNpc) {
     for (const route of TravelRoutes.exitRoutes(entry.townKey)) {
         if (route.steps[0].npcId !== entry.npcId) continue;
         const sources = [entry];
-        let transferDistance = 0;
+        const transferWalks = [];
         let requiredAdena = 0;
         let paid = 0;
         for (let index = 0; index < route.steps.length; index++) {
@@ -81,7 +85,7 @@ function compileRoutes(entry, byNpc) {
                 }
                 if (!closest) break;
                 sources.push(closest);
-                transferDistance += bestDistance;
+                transferWalks.push(Object.freeze({ from: pointOf(previous), to: pointOf(closest), arrival: KEEPER_ARRIVAL }));
             }
             if (step.fee > 0) {
                 // The threshold applies BEFORE each debit, not to the remainder.
@@ -93,7 +97,7 @@ function compileRoutes(entry, byNpc) {
         if (sources.length !== route.steps.length) continue;
         const exit = route.steps[route.steps.length - 1];
         result.push(Object.freeze({
-            route, sources: Object.freeze(sources), transferDistance, requiredAdena,
+            route, sources: Object.freeze(sources), transferWalks: Object.freeze(transferWalks), requiredAdena,
             exit, exitKey: landingKey(exit)
         }));
     }
@@ -102,8 +106,8 @@ function compileRoutes(entry, byNpc) {
 
 // Construct ONCE after authored service rows are loaded, using
 // TownServiceCatalog.rows(ROLES.GATEKEEPER), never targetFromRow/live actors.
-// The returned planner is immutable static data plus pure per-goal selection;
-// no world scans, geodata, timers, inventory effects or session mutation.
+// Static candidates are shared; per-goal selection requests injected walk
+// costs asynchronously. No live-world scans or gameplay effects belong here.
 function create(gatekeeperRows) {
     const sources = compileSources(gatekeeperRows);
     const byNpc = new Map();
@@ -113,8 +117,9 @@ function create(gatekeeperRows) {
     }
     const entries = sources.map(source => Object.freeze({ source, routes: compileRoutes(source, byNpc) }));
 
-    function plan({ from, to, speed, adena, remainingFare = Infinity, karma = 0, scrollCount = 0,
-        allowedModes = ['walk', 'gatekeeper', 'recall'], arrival = { xy: 96, z: 128 }, exclusions = {} }) {
+    async function plan({ from, to, speed, adena, remainingFare = Infinity, karma = 0, scrollCount = 0,
+        allowedModes = ['walk', 'gatekeeper', 'recall'], arrival = { xy: 96, z: 128 }, exclusions = {} }, measureWalk) {
+        if (typeof measureWalk !== 'function') throw new TypeError('Journey planning requires measured walking costs');
         from = pointOf(from);
         to = pointOf(to);
         if (!Number.isFinite(speed) || speed <= 0) throw new TypeError('Journey speed must be positive and finite');
@@ -133,38 +138,37 @@ function create(gatekeeperRows) {
             edges: new Set(exclusions.edges || []),
             exits: new Set(exclusions.exits || [])
         };
-        const walkingMs = (first, second) => distance(first, second) / speed * 1000;
+        const walk = (first, second, tolerance = arrival) => ({ from: first, to: second, arrival: tolerance });
+        const lowerBound = segment => Math.max(0, distance(segment.from, segment.to)
+            - Math.hypot(segment.arrival.xy, segment.arrival.z)) / speed * 1000;
+        const candidate = (values, walks, fixedMs = 0) => ({ ...values, walks, fixedMs,
+            lowerBoundMs: fixedMs + walks.reduce((total, segment) => total + lowerBound(segment), 0) });
         const candidates = [];
         const direct = modes.has('walk') && !exclusions.directWalk
-            ? { key: '0:walk', mode: 'walk', fee: 0, hops: 0, etaMs: walkingMs(from, to), landing: from }
+            ? candidate({ key: '0:walk', mode: 'walk', fee: 0, hops: 0, landing: from }, [walk(from, to)])
             : null;
-        if (direct) candidates.push(direct);
         const transportAllowed = !Karma.closesTowns(karma);
         const recall = transportAllowed && modes.has('recall') && scrollCount >= 1 && !exclusions.recall
             ? pointOf(TownRespawn.getRespawnCoords(from.locX, from.locY, from.locZ)) : null;
         const recallMs = RECALL_CAST_MS + TELEPORT_MS;
         if (recall && !excluded.exits.has(landingKey(recall))) {
-            candidates.push({ key: '1:recall', mode: 'recall_walk', fee: 0, hops: 0,
-                etaMs: recallMs + walkingMs(recall, to), landing: recall, recall });
+            candidates.push(candidate({ key: '1:recall', mode: 'recall_walk', fee: 0, hops: 0,
+                landing: recall, recall }, [walk(recall, to)], recallMs));
         }
 
         function addTransport(origin, selectedEntries, recallLanding = null) {
             for (const entry of selectedEntries) {
-                const approachMs = walkingMs(origin, entry.source);
                 for (const compiled of entry.routes) {
                     const { route, sources: hopSources, exit } = compiled;
                     if (route.fee > remainingFare || compiled.requiredAdena > adena
                         || excluded.exits.has(compiled.exitKey)
                         || hopSources.some(source => excluded.sources.has(source.key))
                         || route.steps.some(step => excluded.edges.has(step.key))) continue;
-                    const etaMs = (recallLanding ? recallMs : 0) + approachMs
-                        + compiled.transferDistance / speed * 1000
-                        + route.hops * (TELEPORT_MS + INTERACTION_MS) + walkingMs(exit, to);
-                    if (route.fee > 0 && direct && (direct.etaMs - etaMs < MIN_SAVING_MS
-                        || etaMs > direct.etaMs * (1 - MIN_SAVING_RATIO))) continue;
-                    candidates.push({ key: `${recallLanding ? '3' : '2'}:${entry.source.key}:${route.key}`,
+                    candidates.push(candidate({ key: `${recallLanding ? '3' : '2'}:${entry.source.key}:${route.key}`,
                         mode: recallLanding ? 'recall_gatekeeper' : 'gatekeeper', fee: route.fee,
-                        hops: route.hops, etaMs, landing: exit, compiled, recall: recallLanding });
+                        hops: route.hops, landing: exit, compiled, recall: recallLanding },
+                    [walk(origin, entry.source, KEEPER_ARRIVAL), ...compiled.transferWalks, walk(exit, to)],
+                    (recallLanding ? recallMs : 0) + route.hops * (TELEPORT_MS + INTERACTION_MS)));
                 }
             }
         }
@@ -181,9 +185,59 @@ function create(gatekeeperRows) {
                 addTransport(recall, nearest(recall, available.filter(entry => entry.source.townKey === townKey)), recall);
             }
         }
-        if (!candidates.length) return { status: 'blocked', reason: 'no_permitted_route', legs: [] };
-        const fastest = Math.min(...candidates.map(candidate => candidate.etaMs));
-        const selected = candidates.filter(candidate => candidate.etaMs <= fastest * (1 + NEAR_BEST_RATIO))
+        if (!direct && !candidates.length) return { status: 'blocked', reason: 'no_permitted_route', legs: [] };
+        const verified = [], walkCosts = new Map();
+        let deferred = null, directMs = null, fastest = Infinity, probed = direct ? 1 : 0;
+        async function measure(option) {
+            let etaMs = option.fixedMs;
+            try {
+                for (const segment of option.walks) {
+                    const key = [segment.from.locX, segment.from.locY, segment.from.locZ,
+                        segment.to.locX, segment.to.locY, segment.to.locZ, segment.arrival.xy, segment.arrival.z].join(':');
+                    if (!walkCosts.has(key)) walkCosts.set(key, measureWalk(segment.from, segment.to, segment.arrival));
+                    const length = await walkCosts.get(key);
+                    if (length === null) return null;
+                    if (!Number.isFinite(length) || length < 0) throw Error('journey_path_cost_invalid');
+                    etaMs += length / speed * 1000;
+                }
+                return { ...option, etaMs };
+            } catch (error) {
+                if (!DEFERRED_CODES.has(error.code)) throw error;
+                deferred ||= error.code;
+                return null;
+            }
+        }
+        if (direct) {
+            const measured = await measure(direct);
+            if (measured) {
+                verified.push(measured);
+                fastest = directMs = measured.etaMs;
+            } else if (deferred) {
+                // A work limit is not disconnected terrain. This lower bound
+                // may conservatively prove savings, but never becomes an ETA
+                // or an executable route without a complete measured walk.
+                directMs = direct.lowerBoundMs;
+            }
+        }
+        const savesEnough = (option, etaMs) => !option.fee || directMs === null
+            || directMs - etaMs >= MIN_SAVING_MS && etaMs <= directMs * (1 - MIN_SAVING_RATIO);
+        candidates.sort((a, b) => a.lowerBoundMs - b.lowerBoundMs || a.fee - b.fee || compareKey(a, b));
+        for (const option of candidates) {
+            // Once there is a usable route, cap alternatives rather than
+            // probing the whole network. Without one, keep looking for a
+            // verified fallback; unknown work never becomes a fake route.
+            if ((probed >= ROUTE_PROBE_LIMIT && verified.length) || option.lowerBoundMs > fastest * (1 + NEAR_BEST_RATIO)) break;
+            if (!savesEnough(option, option.lowerBoundMs)) continue;
+            probed++;
+            const measured = await measure(option);
+            if (!measured || !savesEnough(option, measured.etaMs)) continue;
+            verified.push(measured);
+            fastest = Math.min(fastest, measured.etaMs);
+        }
+        if (!verified.length) return deferred
+            ? { status: 'waiting', reason: deferred === 'GEODATA_MISSING' ? 'geodata_missing' : 'route_estimate_deferred', legs: [] }
+            : { status: 'blocked', reason: 'no_permitted_route', legs: [] };
+        const selected = verified.filter(option => option.etaMs <= fastest * (1 + NEAR_BEST_RATIO))
             .sort((left, right) => left.fee - right.fee || left.hops - right.hops || compareKey(left, right))[0];
 
         // Only the selected itinerary becomes executable legs. A gatekeeper

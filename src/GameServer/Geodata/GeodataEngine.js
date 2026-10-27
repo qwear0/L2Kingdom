@@ -609,6 +609,9 @@ const GeodataEngine = {
             nodesExpanded++;
             if ((nodesExpanded & 127) === 0) checkBudget?.();
             if (nodesExpanded > maxNodes) {
+                // Route estimates must distinguish an unfinished search from
+                // an exhausted open set; only the latter rejects terrain.
+                if (options.requireComplete) throw Object.assign(Error('path node budget exceeded'), { code: 'PATH_NODE_LIMIT' });
                 break;
             }
 
@@ -689,15 +692,28 @@ const GeodataEngine = {
 
             while (currentIdx < pathPoints.length - 1) {
                 checkBudget?.();
-                let checkIdx = pathPoints.length - 1;
-                while (checkIdx > currentIdx + 1) {
-                    if ((checkIdx & 31) === 0) checkBudget?.();
-                    const startPt = pathPoints[currentIdx];
-                    const endPt = pathPoints[checkIdx];
-                    if (this.walkSegment(startPt, endPt)) {
-                        break;
+                let checkIdx = currentIdx + 1;
+                if (options.fastSmoothing) {
+                    // Long-distance cost probes need a connected path, not
+                    // quadratic farthest-first smoothing. Every accepted
+                    // shortcut still follows the same layer/NSWE checks.
+                    for (let stride = 2; checkIdx < pathPoints.length - 1; stride *= 2) {
+                        checkBudget?.();
+                        const next = Math.min(currentIdx + stride, pathPoints.length - 1);
+                        if (!this.walkSegment(pathPoints[currentIdx], pathPoints[next])) break;
+                        checkIdx = next;
                     }
-                    checkIdx--;
+                } else {
+                    checkIdx = pathPoints.length - 1;
+                    while (checkIdx > currentIdx + 1) {
+                        if ((checkIdx & 31) === 0) checkBudget?.();
+                        const startPt = pathPoints[currentIdx];
+                        const endPt = pathPoints[checkIdx];
+                        if (this.walkSegment(startPt, endPt)) {
+                            break;
+                        }
+                        checkIdx--;
+                    }
                 }
                 smoothedPath.push(pathPoints[checkIdx]);
                 currentIdx = checkIdx;

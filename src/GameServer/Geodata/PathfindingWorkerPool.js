@@ -155,7 +155,8 @@ class BoundedPathfindingWorkerPool {
         }
         this.workers.forEach((slot) => {
             if (!slot || slot.task) return;
-            const eligible = this.queue.findIndex((task) => !task.request.townCorridor || task.priority >= 100 || this.townWorkMs < 80);
+            const eligible = this.queue.findIndex((task) => !(task.request.townCorridor || task.request.journeyEstimate)
+                || task.priority >= 100 || this.townWorkMs < 80);
             if (eligible < 0) {
                 if (this.queue.length && !this.budgetTimer) {
                     DiagnosticConfig.developerDiagnostics && (this.metrics.budgetDeferrals++);
@@ -183,7 +184,7 @@ class BoundedPathfindingWorkerPool {
         slot.task = null;
         const workerMs = Math.max(0, Number(message.workerMs) || 0);
         DiagnosticConfig.developerDiagnostics && (this.metrics.workerMs += workerMs);
-        if (task.request.townCorridor && task.priority < 100) this.townWorkMs += workerMs;
+        if ((task.request.townCorridor || task.request.journeyEstimate) && task.priority < 100) this.townWorkMs += workerMs;
         if (!task.cancelled) {
             if (message.ok) {
                 this.restartAttempts[slot.index] = 0;
