@@ -568,13 +568,20 @@ function travelToGatherPoint(session, row, area, run) {
     const bot = session.actor, now = Date.now(), point = Areas.pointOf(bot);
     const travel = run.gatherTravel || (run.gatherTravel = {});
     if (!travel.destination) {
-        if (now < Number(travel.retryAt || 0)) return;
+        if (now < Number(travel.retryAt || 0)) {
+            pauseClocks(session);
+            status(session, 'no_safe_gather_destination');
+            return;
+        }
         travel.destination = gatherDestination(session, area, run);
         if (!travel.destination) {
+            travel.waitingForTarget = true;
+            pauseJourney(session, 'gather_targets_unavailable');
             status(session, 'no_safe_gather_destination');
             travel.retryAt = now + 30000;
             return;
         }
+        travel.waitingForTarget = false;
         travel.progressPoint = point;
         travel.progressAt = null;
     }
@@ -617,7 +624,11 @@ function travelToGatherPoint(session, row, area, run) {
 function gatherTick(session, row, run, Generics, BotAI) {
     const bot = session.actor, area = Areas.find(row.areaId);
     if (!area) throw Error('gather_area_data_missing');
-    if (!Areas.suitable(area, bot.fetchLevel())) { status(session, 'no_safe_targets_in_assigned_area'); return; }
+    if (!Areas.suitable(area, bot.fetchLevel())) {
+        pauseClocks(session);
+        status(session, 'no_safe_targets_in_assigned_area');
+        return;
+    }
     if (!session.currentTargetId && recovery(session)) return;
     if (!session.currentTargetId && Date.now() >= Number(session.vassalNextRestockAt || 0)) {
         const Shop = invoke('GameServer/World/Generics/NpcShopBuyLists');
@@ -647,6 +658,7 @@ function targetAllowed(session, target) {
     return row.order === 'gather' && !row.gatherResumePending && Areas.contains(Areas.find(row.areaId), target);
 }
 function noTarget(session) {
+    pauseClocks(session);
     status(session, 'no_safe_targets_in_assigned_area');
     // Try only another authored polygon of the same assignment, never a global spot.
     const row = rowFor(session), run = session.vassalRun, area = Areas.find(row?.areaId);
@@ -689,6 +701,14 @@ function farmWatchdog(session, row, run, paused) {
         watch.castToken = null;
         watch.stalledMs = 0;
         watch.retryAt = now + 60000;
+    }
+    // No eligible destination is a world/target availability wait, not a
+    // failed physical journey. Retain the order and attempt allowance, but
+    // do not carry an old stall clock into the eventual departure.
+    if (run.phase === 'gather' && run.gatherTravel?.waitingForTarget) {
+        watch.state = 'paused';
+        watch.stalledMs = 0;
+        return false;
     }
     if (paused || bot.state.fetchCasts() || bot.state.fetchSeated() || session.recoveryLocked
         || now < Number(session.vassalBlockedUntil || 0)

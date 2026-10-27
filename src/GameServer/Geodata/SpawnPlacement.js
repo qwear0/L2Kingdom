@@ -41,12 +41,16 @@ class BudgetStop extends Error {
     }
 }
 
-// Reservations precede searches/decodes. Counts include failed work and strict
-// route validation, not just successful proofs. Native expansions are allowances.
+// Work quotas bound renewable startup windows, not the number of territories
+// allowed to receive a first attempt. Renewal keeps every proof/cursor and
+// per-target counter; wall time, RSS and capacities remain hard global stops.
+// Counts include failed work; native expansions are reserved allowances.
 class Budget {
     constructor() {
         this.started = performance.now();
         this.work = counters();
+        this.window = counters();
+        this.windows = 1;
         this.target = null;
         this.stopped = null;
         this.lastRss = -Infinity;
@@ -89,9 +93,15 @@ class Budget {
         try { this.poll(true); return fn(); }
         finally { target.activeMs += performance.now() - this.entered; this.target = null; }
     }
-    reserve(name, amount, globalLimit, targetLimit) {
-        if (this.work[name] + amount > globalLimit) this.stop(name, true);
+    reserve(name, amount, windowLimit, targetLimit) {
         if (this.target && targetLimit && this.target.work[name] + amount > targetLimit) this.stop(`target:${name}`);
+        if (amount > windowLimit) this.stop(name, true);
+        if (this.work[name] - this.window[name] + amount > windowLimit) {
+            this.checkpoint();
+            this.window = { ...this.work };
+            this.windows++;
+            utils.infoSuccess('SpawnPlacement', 'continuing preparation in work window %d (%s quota)', this.windows, name);
+        }
     }
     add(name, amount = 1) {
         this.work[name] += amount;
@@ -665,10 +675,11 @@ function describe(inv, proofs, budget, fixed, cacheHit) {
             directWalkScope: 'strictWalkCalls_includes_local_audits_and_reachable_internal_walks',
             pathNodeAllowanceKind: 'upper_bound_not_measured_expansions', fixedGlobalStatus: fixed.global,
             maxRssBytes: budget.maxRssBytes, memberships: proofs.memberships, rememberedPairs: proofs.pairs.size,
-            batches: budget.batches + 1, maxBatchCells: Math.max(budget.maxBatchCells, budget.batchCells),
+            windows: budget.windows, batches: budget.batches + 1, maxBatchCells: Math.max(budget.maxBatchCells, budget.batchCells),
             maxBatchLayers: Math.max(budget.maxBatchLayers, budget.batchLayers) },
         blocker: budget.stopped,
-        enforcedLimits: { ...LIMITS, capacities: CAPACITY, globalWorkBudget: true, deterministicFallback: true, fixedProofCache: true } };
+        enforcedLimits: { ...LIMITS, capacities: CAPACITY, globalWorkBudget: false, renewableWorkWindows: true,
+            deterministicFallback: true, fixedProofCache: true } };
 }
 
 function init(definitions, cacheOptions = {}) {
@@ -773,14 +784,15 @@ function init(definitions, cacheOptions = {}) {
         territories: inv ? inv.definitionRecords.filter(d => d.randomIndex !== null).length : null,
         unavailable, points: [...pools.values()].reduce((sum, values) => sum + values.length / 3, 0),
         fixed: fixed && { unique: fixed.unique, proven: fixed.proven, invalid: fixed.invalid, unknown: fixed.unknown },
-        blocker: budget.stopped, elapsedMs: Math.round(performance.now() - budget.started) };
+        blocker: budget.stopped, workWindows: budget.windows, elapsedMs: Math.round(performance.now() - budget.started) };
     utils.infoSuccess('SpawnPlacement', 'preparation: %d unavailable definitions, %d fixed proofs; %d ms; cache hit=%s; blocker=%s',
         unavailable, fixed?.proven || 0, result.elapsedMs, result.cacheHit, result.blocker || 'none');
     if (cacheOptions.diagnostics) result.diagnostics = inv && proofs ? describe(inv, proofs, budget, fixed, result.cacheHit) : {
         version: 2, inventoryComplete: false, definitions: [], pools: [], roots: proofs?.roots || [],
         fixed: { global: 'incomplete', unique: null, invalid: null, proven: null, unknown: null, records: [] },
-        work: budget.work, blocker: budget.stopped, fixedOnlyAnchorsExcluded: 0,
-        enforcedLimits: { ...LIMITS, capacities: CAPACITY, globalWorkBudget: true, deterministicFallback: true, fixedProofCache: true }
+        work: { ...budget.work, windows: budget.windows }, blocker: budget.stopped, fixedOnlyAnchorsExcluded: 0,
+        enforcedLimits: { ...LIMITS, capacities: CAPACITY, globalWorkBudget: false, renewableWorkWindows: true,
+            deterministicFallback: true, fixedProofCache: true }
     };
     return result;
 }

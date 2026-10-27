@@ -284,7 +284,12 @@ function spawnNpcs() {
     this.npc.placementRetryTimer = null;
     this.npc.deferredPlacements = new Map();
     this.npc.periodDefinitions = [];
-    SpawnPlacement.init(DataCache.npcSpawns);
+    const placement = SpawnPlacement.init(DataCache.npcSpawns);
+    // A resource-limited preparation is not a geometry rejection. Do not
+    // publish a permanently empty world and let active duties retry it.
+    if (!placement.inventoryComplete || placement.blocker) {
+        throw Error(`spawn_preparation_incomplete:${placement.blocker || 'inventory'}`);
+    }
     // These templates are created only by the quest encounter handler. Keeping
     // C4's old shared duel spawns would duplicate a player's personal opponent.
     const exclusive = new Set(invoke('GameServer/Quest/QuestService').quests()

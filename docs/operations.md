@@ -44,7 +44,7 @@ node scripts/profile-spawn-placement.js --output tmp/profiles/spawns-warm --cach
 
 Each output directory must be new and below repository `tmp/`. The default cache is inside that output directory; `--cache` explicitly selects another file below `tmp/`. `--cold` bypasses a valid cache and atomically replaces it after preparation. A fixed seed (default `1`) affects only this profiling process, making cold comparisons reproducible while normal gameplay keeps its random source. Do not change geodata or algorithm sources during a run: cache publication is rejected if those inputs change.
 
-`spawn-placement.cpuprofile` is a standard V8 CPU profile, sampled every 10 ms. `summary.json` reports cache hit/miss, territory/unavailable/point counts, preparation elapsed time (including hashing, the fixed-position audit and diagnostic accounting), process CPU usage, memory and top self-time frames. DataCache/geodata initialization happens before profiling; these numbers are not complete server startup time or client acceptance. Compare availability as well as time, since faster rejection is not a successful optimization.
+`spawn-placement.cpuprofile` is a standard V8 CPU profile, sampled every 10 ms. `summary.json` reports cache hit/miss, territory/unavailable/point counts, `workWindows`, preparation elapsed time (including hashing, the fixed-position audit and diagnostic accounting), process CPU usage, memory and top self-time frames. DataCache/geodata initialization happens before profiling; these numbers are not complete server startup time or client acceptance. Compare availability as well as time, since faster rejection is not a successful optimization.
 
 The profiler opts into `SpawnPlacement.init(..., { diagnostics: true })` and writes versioned `diagnostics.json` alongside the summary. Normal startup does not retain the detailed inventory. It includes:
 
@@ -56,17 +56,19 @@ The profiler opts into `SpawnPlacement.init(..., { diagnostics: true })` and wri
 
 Diagnostic/cache version 2 retains failure provenance on warm reuse. `sampling_miss_or_absence` describes incomplete discovery, never exhaustive absence; only completed cell-centre enumeration with all in-polygon cells decoded and no admissible layer permits `no_layer_in_z_interval`. An empty decode (including missing/malformed/obstacle-masked data) prevents that absence claim and retains `surface_unavailable`. `surface_unavailable` combines absent, malformed and obstacle-masked data. `root_unavailable` means no nearby admitted proof was considered; `connectivity_unknown` and `budget_exhausted` are not proofs that no route exists. Partial discovery, inadequate pools and unknown fixed proofs cannot satisfy offline acceptance.
 
-Preparation enforces these non-configurable limits; target counters do not reset on a retry, queue wake or discovery batch:
+Preparation enforces these non-configurable limits. Time/RSS and capacity limits apply to the whole preparation; aggregate work quotas apply to renewable windows. A quota boundary retains the current proof/scanner stack and starts a new work window, so earlier definitions cannot consume the only opportunity to prepare later territories. Target counters do not reset on window renewal, retry, queue wake or discovery batch:
 
-| Work | Whole preparation | One random shared pool / fixed normalized-cell target |
+| Work | Whole preparation / renewable work window | One random shared pool / fixed normalized-cell target |
 | --- | ---: | ---: |
-| Elapsed time | 900,000 ms wall, including identity/cache work | 90,000 ms active work |
-| Observed process RSS | 1,536 MiB stop | Shared process limit |
+| Elapsed time | 900,000 ms wall for the whole preparation, including identity/cache work | 90,000 ms active work |
+| Observed process RSS | 1,536 MiB hard stop for the whole preparation | Shared process limit |
 | Native searches | 4,096 | 24 (initial random allowance 12) |
 | Reserved node expansions | 16,000,000 | 300,000 |
 | Strict walks / cardinal transitions | 250,000 / 64,000,000 | 4,096 / 1,000,000 |
 | Decoded layers | 16,000,000 | 1,000,000 |
 | Deterministic bounding-box cells | 2,000,000 | 262,144 |
+
+The search, node, walk, transition, layer and deterministic-cell numbers above are per work window, not total-work ceilings. `work` counters remain cumulative across windows, with `work.windows` reporting their count; `enforcedLimits.renewableWorkWindows` is true and `globalWorkBudget` is false. A hard global blocker or incomplete inventory rejects runtime world initialization before NPC publication; the offline profiler still returns diagnostic evidence. Per-target unknown/limited results remain explicitly reported, not certified as inaccessible.
 
 A strict walk permits at most 8,192 cardinal transitions. Synchronous batch checkpoints retain scanner/walk/route-validation state, poll time/RSS and reset only batch counters: at most 4,096 tested XY cells and 65,536 decoded layers, with 4,096 resident candidate points per pool window. The decoder reserves room for 255 layers before reading a cell. Fixed local audits charge global work separately from grouped global targets. Native `findPath()` receives the existing budget callback; strict validation of its returned route uses the same context. No general pathfinder change or runtime per-actor search is introduced.
 
