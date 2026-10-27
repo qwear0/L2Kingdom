@@ -109,7 +109,8 @@ function fatal(session, state, reason, error = null) {
 }
 function exclusionInput(state, now) {
     const input = { entries: [], sources: [], edges: [], exits: [], directWalk: false,
-        recall: !!state.recallLanding && near(pointOf(state.actor), state.recallLanding, 96, 64) };
+        recall: Transit.townAt(state.actor) !== null
+            || !!state.recallLanding && near(pointOf(state.actor), state.recallLanding, 96, 64) };
     state.expiresAt = Infinity;
     for (const [id, row] of state.exclusions) {
         if (row.until <= now) { state.exclusions.delete(id); continue; }
@@ -289,6 +290,9 @@ function gatekeeper(session, state, leg, now) {
     return report(state, 'waiting', result.reason, 'eligibility');
 }
 function recall(session, state, now) {
+    // Planning is asynchronous: recheck town presence before spending a scroll
+    // even if the actor crossed into town after the origin was measured.
+    if (Transit.townAt(state.actor)) return exclude(session, state, 'recall', 'recall', 'recall_in_town', now);
     release(session, state);
     const flight = state.flight = { generation: state.generation, kind: 'recall', phase: 'casting' };
     try {

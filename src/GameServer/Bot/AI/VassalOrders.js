@@ -8,6 +8,7 @@ const Approach = invoke('GameServer/Bot/AI/TownNpcApproach');
 const Catalog = invoke('GameServer/Bot/Economy/TownServiceCatalog');
 const Rest = invoke('GameServer/Bot/AI/RestPolicy');
 const Travel = invoke('GameServer/Bot/AI/BotTownTravel');
+const Transit = invoke('GameServer/Bot/AI/TownTransitPolicy');
 const Navigation = invoke('GameServer/Bot/AI/CompanionNavigationRecovery');
 const Journey = require('../Travel/JourneyExecutor');
 const TargetMatchup = invoke('GameServer/Bot/AI/BotTargetMatchup');
@@ -721,6 +722,19 @@ function farmWatchdog(session, row, run, paused) {
     Navigation.clear(session);
     Approach.reset(session);
     session.townRoutePlan = null;
+    // Town/service stalls need fresh local navigation, not another recall to
+    // the same town. Keep the goal's paid fare/exclusions and the finite
+    // watchdog allowance so replanning cannot hide a persistent blockage.
+    if (Transit.townAt(bot)) {
+        watch.attempts++;
+        watch.state = 'monitoring';
+        watch.method = 'town_replan';
+        watch.from = point;
+        watch.stalledMs = 0;
+        watch.retryAt = now + 60000;
+        status(session, 'farm_recovery_town_replan');
+        return true;
+    }
     const current = fence(session, row);
     const isCurrent = () => current() && eligible(session, row) && session.vassalRun === run
         && !session.activeTrade && !session.trade && !session.activeNegotiation;
