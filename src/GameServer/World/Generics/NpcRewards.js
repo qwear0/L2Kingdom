@@ -9,13 +9,18 @@ function isBotSession(session) {
     return !!(session && (session.constructor.name === 'BotSession' || (session.accountId && session.accountId.startsWith('bot_'))));
 }
 
-function awardDrop(world, session, npc, selfId, amount) {
+function awardDrop(world, session, npc, selfId, amount, drops) {
     DataCache.fetchItemFromSelfId(selfId, (itemDetails) => {
-        const stackable = utils.crushOb(itemDetails).stackable === true;
+        const details = utils.crushOb(itemDetails);
+        const stackable = details.stackable === true;
         const instances = stackable ? 1 : amount;
         const instanceAmount = stackable ? amount : 1;
         for (let index = 0; index < instances; index++) {
             spawnGroundDrop(world, session, npc, selfId, instanceAmount);
+        }
+        if (drops) {
+            const previous = drops.get(selfId);
+            drops.set(selfId, { name: details.name, amount: (previous?.amount || 0) + amount });
         }
         if (!isBotSession(session)) {
             BotLootEtiquette.observeDrop(session, npc, selfId, amount);
@@ -47,7 +52,11 @@ function spawnGroundDrop(world, session, npc, selfId, amount) {
 }
 
 function npcRewards(session, npc) {
+    let drops = null;
+    // DataCache callbacks are synchronous. Return the actual ground-drop totals
+    // for raid announcements without rerolling rewards or retaining per-NPC state.
     DataCache.fetchNpcRewardsFromSelfId(npc.fetchSelfId(), (result) => {
+        if (npc.fetchIsRaidBoss?.() === true) drops = new Map();
         const rewards = result.rewards ?? [];
         const dropState = npc.model ?? npc;
         const rewardContext = {
@@ -62,10 +71,11 @@ function npcRewards(session, npc) {
                 const item = ProgressionRates.selectDropItem(reward, groupRoll.itemRate);
                 if (!item) return;
                 const amount = ProgressionRates.rollDropAmount(reward, item, groupRoll.itemRate);
-                awardDrop(this, session, npc, item.selfId, amount);
+                awardDrop(this, session, npc, item.selfId, amount, drops);
             }
         });
     });
+    return drops;
 }
 
 module.exports = npcRewards;

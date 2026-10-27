@@ -50,7 +50,7 @@ function removeNpc(session, npc) {
     }
 
     try {
-        this.npcRewards(session, npc);
+        return this.npcRewards(session, npc);
     }
     catch (error) {
         // Rewards are auxiliary to corpse cleanup. A bad drop row or a

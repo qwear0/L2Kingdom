@@ -144,6 +144,25 @@ function autoSweepSpoiledCorpse(npc, Generics) {
     return invoke('GameServer/Bot/BotAI').trySweep(spoilerSession, spoiler, npc, Generics);
 }
 
+function announceRaidDefeat(npc, rewards, drops, exp, sp) {
+    const recipients = rewards.filter(({ session }) => !session.accountId?.startsWith('bot_'));
+    if (!recipients.length) return;
+
+    const lines = [
+        `${npc.fetchName()} has been defeated!`,
+        'The victors receive:',
+        `${exp} EXP and ${sp} SP`,
+        ...Array.from(drops.values(), ({ name, amount }) => `${name} x${amount}`)
+    ];
+    if (!drops.size) lines.push('No items dropped.');
+
+    const ServerResponse = invoke('GameServer/Network/Response');
+    const packets = lines.map(line => ServerResponse.systemMessage.text(line));
+    for (const { session } of recipients) {
+        for (const packet of packets) session.dataSendToMe(packet);
+    }
+}
+
 function npcDied(session, actor, npc) {
     const Generics = invoke(path.actor);
 
@@ -173,7 +192,7 @@ function npcDied(session, actor, npc) {
         session = ownerSession;
     }
 
-    World.removeNpc(session, npc);
+    const raidDrops = World.removeNpc(session, npc);
     if (typeof actor?.fetchKind === 'function' && actor.fetchIsSummon?.() !== true) {
         // ConfuseMob's killer is an NPC, not the player whose session relayed
         // its packets. Preserve corpse/respawn handling without player credit.
@@ -217,12 +236,18 @@ function npcDied(session, actor, npc) {
         utils.infoWarn('Quest', 'kill callback failed: %s', error.message);
     });
 
+    let grantedExp = 0;
+    let grantedSp = 0;
     rewards.forEach(({ session: memberSession, exp, sp }) => {
         const pet = memberSession.actor.pet;
         const share = pet?.petData?.version === 1 && !pet.state.fetchDead() && !memberSession.actor.mounted
             ? invoke('GameServer/Pets/PetRules').typeForNpc(pet.fetchSelfId())?.ownerShare || 0 : 0;
         if (share) PetRuntime.award(pet, exp * share, sp * share);
-        Generics.experienceReward(memberSession, memberSession.actor, exp * (1 - share), sp * (1 - share));
+        const award = Generics.experienceReward(memberSession, memberSession.actor, exp * (1 - share), sp * (1 - share));
+        if (raidDrops) {
+            grantedExp += award.grantedExp;
+            grantedSp += award.grantedSp;
+        }
     });
     for (const reward of rewards) if (reward.session?.accountId?.startsWith('bot_')) {
         const saved = reward.session.coldLifeState;
@@ -236,6 +261,7 @@ function npcDied(session, actor, npc) {
         reward.session.coldLifeState = { ...saved, stats: { ...saved.stats, ...life } };
     }
     invoke('GameServer/Social/SharedHuntMemory').recordHot(rewards, npc);
+    if (raidDrops) announceRaidDefeat(npc, rewards, raidDrops, grantedExp, grantedSp);
 }
 
 module.exports = npcDied;
