@@ -1263,7 +1263,7 @@ const FollowingState = {
         // pull target is still assigned. A held incoming target is hidden
         // from the camp until delivery, so without this guard low HP could
         // make the puller sit in front of the mob it is returning with.
-        const needsMpRecovery = BotRoles.shouldRestForMana(bot) && botVitals.mpRatio < 0.15;
+        const needsMpRecovery = role !== 'mage' && BotRoles.shouldRestForMana(bot) && botVitals.mpRatio < 0.15;
         if (!partyThreat && !leaderTargetId && !isActiveBotPuller && (botVitals.hpRatio < 0.30 || needsMpRecovery)) {
             // Do not leave a hunting field just to recover.  This shortcut is
             // available only when the companion is already in a starter town

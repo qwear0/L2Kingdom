@@ -7,6 +7,7 @@ const BotStatus      = invoke('GameServer/Bot/AI/BotStatus');
 const BotRoles       = invoke('GameServer/Bot/AI/BotRoles');
 const BotCombatUtility = invoke('GameServer/Bot/AI/BotCombatUtility');
 const PartyArcherCombatPolicy = invoke('GameServer/Bot/AI/PartyArcherCombatPolicy');
+const PartyMageRecovery = invoke('GameServer/Bot/AI/PartyMageRecovery');
 const PopulationService = invoke('GameServer/Bot/Population/PopulationService');
 const BotEquipmentUpgrade = invoke('GameServer/Bot/AI/BotEquipmentUpgrade');
 const PartyCompanionService = invoke('GameServer/Bot/AI/PartyCompanionService');
@@ -94,6 +95,7 @@ function clearTacticalState(session) {
     session.targetStallTicks = 0;
     session.incomingThreatId = undefined;
     session.incomingThreatAt = undefined;
+    session.partyMageRecovering = false;
     session.roleDecision = undefined;
     session.lastDecision = undefined;
     session.lastTargetEvaluation = undefined;
@@ -655,6 +657,8 @@ const BotAI = {
         if (!session.plan) {
             session.plan = 'hunting';
         }
+
+        if (PartyMageRecovery.tick(session, bot)) return;
 
         const equipmentStartedAt = DiagnosticConfig.developerDiagnostics ? performance.now() : 0;
         BotEquipmentUpgrade.applyBestUpgrades(session);

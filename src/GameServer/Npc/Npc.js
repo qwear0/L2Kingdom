@@ -551,6 +551,16 @@ class Npc extends NpcModel {
             }, 100);
 
         }, 1000);
+
+        // Group assistance belongs to combat acquisition, not just damage:
+        // proximity aggro and taunts must also wake a raid's idle members.
+        // Manager-driven assistance skips redistribution to avoid nested group scans.
+        if (!options.skipMinionAssist && (this.fetchIsRaidBoss() || this.minionBossObjectId)) {
+            const MinionManager = invoke('GameServer/World/RaidBossMinionManager');
+            const World = invoke('GameServer/World/World');
+            if (this.minionBossObjectId) MinionManager.onMinionAttacked(World, this, target, session);
+            else MinionManager.onBossAttacked(World, this, target, session);
+        }
     }
 
     fetchCombatAttackRange(actor) {

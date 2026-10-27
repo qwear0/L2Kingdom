@@ -4,6 +4,7 @@ const Threats = invoke('GameServer/Bot/AI/BotPvpThreats');
 const Restrictions = invoke('GameServer/Effects/EffectRestrictions');
 const Tactics = invoke('GameServer/Bot/AI/BotPvpTactics');
 const RestPolicy = invoke('GameServer/Bot/AI/RestPolicy');
+const Roles = invoke('GameServer/Bot/AI/BotRoles');
 const Support = invoke('GameServer/Bot/AI/BotSupportPlanner');
 const HuntingVisibility = invoke('GameServer/Bot/AI/BotHuntingVisibility');
 // The cold party resolver's target rule: one answer for hot and cold parties.
@@ -330,8 +331,11 @@ function tick(session, bot, Generics, AI, now = Date.now()) {
     if (!combatLegal(target) || (!incoming && Threats.distance(owner.actor, target) > 2000)) target = null;
     if (!incoming && target && !HuntingVisibility.canSee(owner.actor, target)) target = null;
     if (!target && !incoming) {
+        // Mage MP recovery is actor-local and must not stop the whole party.
         const low = members.some(s => RestPolicy.needsRest(s.actor, ratio(s.actor.fetchHp(), s.actor.fetchMaxHp()),
-            ratio(s.actor.fetchMp(), s.actor.fetchMaxMp()), { party: true }));
+            ratio(s.actor.fetchMp(), s.actor.fetchMaxMp()), { party: true })
+            && (Roles.inferRole(s.actor) !== 'mage'
+                || ratio(s.actor.fetchHp(), s.actor.fetchMaxHp()) < RestPolicy.THRESHOLDS.party.hp));
         if (low) {
             Tactics.stop(session, bot);
             session.currentTargetId = undefined;

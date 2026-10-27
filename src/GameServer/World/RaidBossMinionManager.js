@@ -175,7 +175,7 @@ function onBossAttacked(world, boss, attacker, sourceSession) {
         aliveMinions(world, group).forEach((minion) => {
             if (minion.state?.fetchCombats?.() === true) return;
             try {
-                minion.enterCombatState?.(session, attacker);
+                minion.enterCombatState?.(session, attacker, { skipMinionAssist: true });
                 if (minion.state?.fetchCombats?.() === true) alerted++;
             } catch (_) {}
         });
@@ -210,10 +210,10 @@ function leaderGroup(world, leader) {
     return members;
 }
 
-// C4/Lisvus treats a minion hit as an attack on the raid group. The leader
-// joins the fight first, then calls every other idle minion to the attacker.
-// Keep the native guard: an already engaged leader does not retarget its
-// existing encounter just because a second minion was hit.
+// A raid minion's aggression alerts the whole group, including idle respawns
+// while the boss is already fighting. Do not retarget an engaged boss or fan
+// assistance back through each member; one bounded group pass is enough.
+// Ordinary leaders retain their existing idle-only assistance rule.
 function onMinionAttacked(world, minion, attacker, sourceSession) {
     if (!minion || !attacker || minion.state?.fetchDead?.() === true || attacker.isDead?.() === true) return 0;
 
@@ -222,14 +222,16 @@ function onMinionAttacked(world, minion, attacker, sourceSession) {
         !boss ||
         boss.state?.fetchDead?.() === true ||
         boss.isDead?.() === true ||
-        boss.state?.fetchCombats?.() === true
+        (boss.state?.fetchCombats?.() === true && !isRaidBoss(boss))
     ) return 0;
 
     const session = sourceSession || {
         dataSendToMeAndOthers() {},
         dataSendToMe() {}
     };
-    boss.enterCombatState?.(session, attacker);
+    if (boss.state?.fetchCombats?.() !== true) {
+        boss.enterCombatState?.(session, attacker, { skipMinionAssist: true });
+    }
     if (boss.state?.fetchCombats?.() !== true) return 0;
     return onBossAttacked(world, boss, attacker, session);
 }
