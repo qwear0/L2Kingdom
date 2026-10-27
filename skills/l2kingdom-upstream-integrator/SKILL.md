@@ -1,13 +1,13 @@
 ---
 name: l2kingdom-upstream-integrator
-description: Review and incrementally integrate one L2Solo or L2J Mobius C4 commit into L2Kingdom at a time. Use for upstream discovery, compatibility explanations, approval-gated ports, skipping or deferring commits, and resuming saved integration progress. Never apply an upstream change before the user approves its specific proposal.
+description: Review and incrementally integrate L2Solo and L2J Mobius C4 commits into L2Kingdom, one approved commit per source at a time. Supports parallel source sessions with separate progress and coordinated writes/publication. Use for upstream discovery, compatibility explanations, approval-gated ports, skipping or deferring commits, and resuming saved progress. Never apply an upstream change before the user approves its specific proposal.
 ---
 
 # L2Kingdom upstream integrator
 
 ## Contract
 
-Explain **one upstream commit**, wait for the user's decision, implement only the approved scope, and record the result. This is a conversational workflow, not an automatic updater or a batch-rebase instruction.
+Explain **one upstream commit per source**, wait for the user's decision, implement only the approved scope, and record the result. L2Solo and Mobius may progress in parallel in separate sessions; each source keeps its own single active proposal and owner. This is a conversational workflow, not an automatic updater or a batch-rebase instruction.
 
 **Default continuation:** after successful publication or an explicit skip/defer, immediately analyze the next unreviewed commit in the same source's pinned queue and present its decision card; do not wait for `next`. Stop at the next approval gate, a blocker, an exhausted queue, or the user's request to pause. Never auto-approve, refresh the source tip, or switch sources.
 
@@ -28,7 +28,7 @@ Accept “Mobius”, “L2Mobius” and “L2J Mobius” as the second source. K
 
 ## Local progress and invocation
 
-Use ignored `tmp/upstream-integration/state.md` for the small source/queue summary and `tmp/upstream-integration/commits/<source>-<full-sha>.md` for each proposal and receipt. Read [references/records.md](references/records.md) before creating or updating records. Never overwrite existing progress to initialize a session. Disposable clones/previews belong under `/tmp/L2Kingdom/`; do not depend on them for durable progress.
+Use ignored `tmp/upstream-integration/sources/<source>/state.md` for each source's queue, active proposal and ownership/scope, and `tmp/upstream-integration/commits/<source>-<full-sha>.md` for each proposal and receipt. The old combined `tmp/upstream-integration/state.md` is a legacy recovery record, not a concurrent write target. Read [references/records.md](references/records.md) for ownership, locking and non-destructive legacy recovery before creating or updating records. Never overwrite existing progress to initialize a session. Disposable clones/previews belong under `/tmp/L2Kingdom/`; do not depend on them for durable progress.
 
 Natural-language requests are sufficient. Examples:
 
@@ -40,15 +40,22 @@ Natural-language requests are sufficient. Examples:
 - `Пропусти <sha>: <reason>` or `Отложи <sha>`
 - `/skill:l2kingdom-upstream-integrator refresh l2solo`
 
-`status` reads progress and reconciles it with Git without applying changes. `refresh` discovers/pins a new source tip without approving changes. `next` prepares one unresolved proposal and stops; it does not silently skip candidates. An invocation without a source resumes the one active proposal; if neither source is selected and both are available, ask which source to process.
+`status [source]` reads progress and reconciles it with Git without applying changes; without a source it reports both lanes. `refresh` discovers/pins a new source tip without approving changes. `next` prepares one unresolved proposal in the selected source and stops; it does not silently skip candidates. Without an explicit source, resume this session's established source, or the sole active proposal if unambiguous. If both sources have active proposals and this session has no source context, ask which to process; never adopt another session's ownership.
 
 ## 1. Establish the current state
 
 1. Read existing state/receipt, inspect HEAD, branch, working tree, index, remotes and any merge/rebase/cherry-pick in progress. Do not stash, reset, clean, abort or switch branches to make the workspace convenient.
-2. Preserve unrelated work. If it overlaps the intended edits, or another session is integrating the same scope/state, pause for coordination. Unrelated dirty files do not authorize including them in the commit. Never perform a cherry-pick over an uncontrolled index.
+2. Preserve unrelated work. Another source's active proposal is not itself a blocker. Before writing progress, acquire this source's ownership as described in the record contract. Read the other source's state/declared scope and any still-active legacy receipt; pause only the conflicting work when ownership, files or required contracts overlap or cannot be established safely. Unrelated dirty files do not authorize including them in the commit. Never perform a cherry-pick over an uncontrolled index.
 3. Resolve source refs to full immutable SHAs and record repository URL, branch, pinned tip, fetch time and local baseline HEAD. Verify configured remotes rather than trust their names. Never reuse the historical report's counts or abbreviated revisions as current facts.
 4. Read per-commit receipts and search local Git provenance before claiming something is new. An ancestor, `cherry-pick -x` record, patch equivalence or matching trailer is useful evidence, but a later revert or rewrite can invalidate it; verify current behavior too.
 5. On missing or inconsistent state, reconstruct what Git and saved records actually prove. Do not invent past approvals, skipped decisions or complete coverage. If work/commit/publication was interrupted, inspect exact local and remote state before retrying; never apply the same patch again just because a receipt is unfinished.
+
+### Parallel source sessions
+
+- Discovery, read-only analysis and approval discussions may run concurrently. Bind local evidence to an observed HEAD and identify relevant uncommitted changes; do not treat files another session is editing as a stable baseline. A blocked or unpublished integration stops only its own source's continuation, unless the blocker affects the other source's scope.
+- Before implementation, publish exact write paths (including docs/resources) and assumption-critical dependencies in the source state. Re-read both lanes after publishing or expanding scope. In one checkout, concurrent edits require disjoint files and compatible contracts; different hunks in one file are not disjoint ownership. Serialize overlapping work, then revalidate/revise the waiting proposal. Separate checkouts isolate files but do not eliminate semantic conflicts or final integration checks; creating/managing them requires the applicable explicit authorization and ownership workflow.
+- Use the shared publication lock from the record contract for staging, commit, cherry-pick/application that changes the index, integration and push. Recheck HEAD, index, task diff and approval assumptions after acquiring it. Keep the critical section short; release it before waiting for user approval. Other sessions must not mutate that checkout's index/HEAD while it is held. Never bypass an active coordination tool's ownership rules.
+- Locks are cooperative instructions, not enforced by installing this skill. Existing sessions must adopt this protocol before concurrent implementation in the same checkout. Until then, other-source discovery/analysis can proceed, but shared-checkout implementation/publication waits for coordination. Do not rewrite an active legacy session's state or assume a stale-looking lock is abandoned.
 
 ## 2. Discover a bounded queue
 
@@ -58,7 +65,7 @@ Natural-language requests are sufficient. Examples:
 - At first Mobius discovery, inspect available provenance and recommend a bounded starting range. A revision in quest comments is a quest reference, **not** a whole-server import baseline. Record older/unexamined coverage as unknown. Dates can bound discovery, but cannot prove ancestry, completeness or missing functionality.
 - Freeze each discovery window at a full source tip. Retain entries by `(source, full SHA)`, not date or a single “last applied” cursor; skipping or deferring one commit must not hide earlier gaps. New tips append newly discovered candidates. If history is rewritten/non-descendant, reconcile explicitly; do not erase prior decisions.
 - Keep inventory pagination/range completion separate from per-commit review completion. “All reviewed” can mean only all entries of a stated, fully enumerated window, never all of Mobius or full C4 parity.
-- Select **one** unresolved commit. If it needs unapproved prerequisites, name them and propose reviewing them individually first. Do not silently bundle dependencies. For a very large/mixed commit, propose one explicit partial adaptation with exclusions or defer it; record partial coverage honestly.
+- Select **one** unresolved commit in this source's lane. If it needs unapproved prerequisites, name them and propose reviewing them individually first. Do not silently bundle dependencies. For a very large/mixed commit, propose one explicit partial adaptation with exclusions or defer it; record partial coverage honestly.
 
 ## 3. Analyze compatibility, not just patch application
 
@@ -79,7 +86,7 @@ Write the proposal to its receipt and show a concise Russian decision card using
 
 ## 4. Bind approval to the proposal
 
-- There must be exactly one active proposal. A clear `да` in direct response to it can approve that proposal; ambiguous approval with multiple candidates requires clarification.
+- There may be one active proposal per source, owned by one session. A clear `да` in direct response to this session's sole decision card can approve that proposal, even while another source has its own proposal. Never resolve approval through a global active pointer; ambiguous source/commit/session context requires clarification.
 - Bind the decision to source/full SHA, proposal revision, local baseline, exact intended scope/exclusions, approach and verification limits. Preserve the user message and session/message reference when available; never fabricate an identifier.
 - Recheck HEAD, relevant source, index and working changes immediately before editing. A moving source branch does not change the approved SHA. If local HEAD moved, revalidate: unrelated changes can be recorded with an explanation, but changed assumptions, conflicts, prerequisites or affected contracts require a revised card and renewed approval.
 - A saved `approved` label alone is not sufficient proof of consent in a later session. Locate the recorded user authorization/context; if it cannot be verified or no longer matches the proposal, ask again before writes.
@@ -95,7 +102,7 @@ Write the proposal to its receipt and show a concise Russian decision card using
 
 ## 6. Record, publish, then prepare the next proposal
 
-After successful implementation/checks, follow root Git policy: commit only task-owned non-ignored files with a Russian description and push without force. For a direct cherry-pick, prefer non-committing application followed by the reviewed scoped commit so the message and provenance follow local policy; choose a merge parent only when it was explicitly analyzed. Respect any active coordination tool's Git ownership rules. Do not include someone else's staged changes or rewrite published commits.
+After successful implementation/checks, acquire the shared publication lock and follow root Git policy: commit only task-owned non-ignored files with a Russian description and push without force. In a shared checkout, require an empty unrelated index before staging; after staging inspect the exact staged paths/diff and recheck HEAD. Inspect the resulting commit's paths/delta and push target; record the exact committed and published SHA separately from a later HEAD. If ownership or the expected HEAD changes unexpectedly, stop and reconcile rather than retry. Release the publication lock after recording the outcome; retain the source claim for blocked recovery. For a direct cherry-pick, prefer non-committing application followed by the reviewed scoped commit so the message and provenance follow local policy; choose a merge parent only when it was explicitly analyzed. Respect any active coordination tool's Git ownership rules. Do not include someone else's staged changes or rewrite published commits.
 
 Add provenance trailers to the local integration commit:
 
@@ -108,7 +115,7 @@ Upstream-Scope: complete
 
 Use `mobius-c4` and `adaptation` as appropriate. Set `Upstream-Scope: partial` whenever upstream changes/hunks were deliberately omitted, including tests; list those exclusions in the commit body and receipt. For merge commits also identify the reviewed parent/delta. Trailers are provenance, not proof of live activation or permanent behavioral equivalence.
 
-Before committing, save the approved scope/check outcomes; afterwards record the resulting local SHA. Record push separately as pending/succeeded/failed and preserve the blocker. Do not mark success merely because a command was issued. If push fails, keep the committed change, report it, and do not reapply or start another integration. If a session ended between commit and receipt, recover using exact Git provenance and diff inspection, not an automatic retry.
+Before committing, save the approved scope/check outcomes; afterwards record the resulting local SHA. Record push separately as pending/succeeded/failed and preserve the blocker. Do not mark success merely because a command was issued. If push fails, keep the committed change, report it, and do not reapply or start another integration in this source. The other source may continue independent analysis; it must not incidentally publish the failed lane's pending commit without an explicit publication handoff. If a session ended between commit and receipt, recover using exact Git provenance and diff inspection, not an automatic retry.
 
 Report in Russian: what changed, local/upstream SHAs, exclusions, checks and gaps, publication outcome, unchanged runtime status, and state path. Then follow the default continuation rule. **The next commit still requires its own approval before integration.**
 

@@ -23,7 +23,7 @@ L2Kingdom is a private Lineage II C4 server derived from L2Solo / NodeL2. Packag
 | --- | --- | --- |
 | How does the application start, select config and shut down? | [Runtime and lifecycle](runtime.md) | `scripts/start.js`, `scripts/run-server.js`, `src/NodeL2.js`, `src/ConfigLoader.js`, `src/Global.js` |
 | Which commands download, write, delete or start processes? | [Operations and verification](operations.md) | `package.json`, `scripts/`, `AGENTS.md` |
-| How are upstream changes reviewed and integrated one commit at a time? | [Upstream update workflow](operations.md#one-commit-upstream-updates) | `skills/l2kingdom-upstream-integrator/SKILL.md`, ignored `tmp/upstream-integration/` |
+| How are upstream changes reviewed one commit per source, including parallel source sessions? | [Upstream update workflow](operations.md#one-commit-upstream-updates) | `skills/l2kingdom-upstream-integrator/SKILL.md`, ignored `tmp/upstream-integration/` |
 | Who admits accounts and dispatches client packets? | [Protocol and sessions](protocol.md) | `src/Server.js`, `src/AuthenticationServer/`, `src/GameServer/Network/`, `src/Packet/` |
 | Which state is durable, and who can replace it? | [Persistence and durability](persistence.md), [auto-fight preferences](persistence.md#connected-player-auto-fight-preferences) | `src/Database*.js`, `src/History*.js`, `src/GameServer/Persistence/`, `src/GameServer/Actor/PlayerAutoFightSettings.js` |
 | Who owns a vassal, its orders and interrupted duties? | [Castellan and vassals](vassals.md) | `src/GameServer/Lord/`, `src/GameServer/Bot/AI/VassalOrders.js`, `src/GameServer/Bot/AI/PartyCompanionService.js` |
