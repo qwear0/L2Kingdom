@@ -68,6 +68,7 @@ async function main() {
         const summary = { ...result, seed, cold: settings.cold, cachePath, node: process.version,
             cpuUsage, memory: process.memoryUsage(), maxRssKiB: process.resourceUsage().maxRSS, top,
             diagnosticsFile: 'diagnostics.json', diagnosticVersion: diagnostics.version,
+            inventoryComplete: diagnostics.inventoryComplete,
             fixed: fixedSummary, work: diagnostics.work, enforcedLimits: diagnostics.enforcedLimits,
             rejectedRoots: diagnostics.roots.filter(root => root.included && root.reason).length,
             fixedOnlyAnchorsExcluded: diagnostics.fixedOnlyAnchorsExcluded,

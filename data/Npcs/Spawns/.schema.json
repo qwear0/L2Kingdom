@@ -34,7 +34,7 @@
                 }
             },
             "spawnAnchors": {
-                "description": "Authored player-accessible entry points for random spawn connectivity; never inferred from monster coordinates.",
+                "description": "Authored player-accessible entry points for shared random and fixed monster connectivity, including fixed-only definitions. These must identify an evidenced accessible surface; never infer them from monster coordinates.",
                 "type": "array",
                 "items": {
                     "type": "object",

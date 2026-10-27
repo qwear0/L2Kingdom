@@ -5,7 +5,7 @@ const MAX_STEP = 64;
 // Spawn admission must distinguish an actual surface from the movement API's
 // permissive missing-geodata fallback, and must see every floor, not just the
 // layer nearest a territory's upper Z bound.
-function layers(x, y) {
+function decodeLayers(x, y) {
     if (!Number.isFinite(x) || !Number.isFinite(y)) return [];
     const rx = (x >> 15) + 20;
     const ry = (y >> 15) + 18;
@@ -42,39 +42,50 @@ function layers(x, y) {
     return result;
 }
 
-function cell(x, y, z) {
+function layers(x, y, budget) {
+    // Reserve the format's maximum 255 layers before decoding an untrusted cell.
+    budget?.beforeLayers();
+    const result = decodeLayers(x, y);
+    budget?.decoded(result.length);
+    return result;
+}
+
+function cell(x, y, z, budget) {
     if (!Number.isFinite(z)) return null;
     let closest = null;
-    for (const layer of layers(x, y)) {
+    for (const layer of layers(x, y, budget)) {
         if (!closest || Math.abs(layer.z - z) < Math.abs(closest.z - z)) closest = layer;
     }
     return closest && closest.nswe && Math.abs(closest.z - z) <= MAX_STEP ? closest : null;
 }
 
-function supported(point) {
+function supported(point, budget) {
     if (!point) return null;
-    const surface = cell(point.locX, point.locY, point.locZ);
+    const surface = cell(point.locX, point.locY, point.locZ, budget);
     return surface ? { locX: point.locX, locY: point.locY, locZ: surface.z } : null;
 }
 
 // This proves connectivity, not a motion interpolation: diagonal steps must
 // have a valid cardinal route, with reciprocal NSWE and real data at each cell.
 // A successful result without a destination Z follows the source floor.
-function walk(from, to) {
+function walk(from, to, budget) {
+    budget?.walk();
     if (!from || !to || ![from.locX, from.locY, from.locZ, to.locX, to.locY].every(Number.isFinite)) return null;
+    let transitions = 0;
     let cx = from.locX >> 4, cy = from.locY >> 4;
     const ex = to.locX >> 4, ey = to.locY >> 4;
-    let current = cell(from.locX, from.locY, from.locZ);
+    let current = cell(from.locX, from.locY, from.locZ, budget);
     if (!current) return null;
     const steps = Math.max(Math.abs(ex - cx), Math.abs(ey - cy));
     const dx = steps ? (ex - cx) / steps : 0;
     const dy = steps ? (ey - cy) / steps : 0;
     let fx = cx, fy = cy;
     const cross = (source, x, y, sx, sy) => {
+        budget?.transition(++transitions);
         const bit = sx ? (sx > 0 ? 1 : 2) : (sy > 0 ? 4 : 8);
         const opposite = sx ? (sx > 0 ? 2 : 1) : (sy > 0 ? 8 : 4);
         if (!(source.nswe & bit)) return null;
-        const target = cell((x << 4) + 8, (y << 4) + 8, source.z);
+        const target = cell((x << 4) + 8, (y << 4) + 8, source.z, budget);
         return target && (target.nswe & opposite) ? target : null;
     };
     for (let i = 0; i < steps; i++) {
@@ -96,17 +107,19 @@ function walk(from, to) {
     return { locX: to.locX, locY: to.locY, locZ: current.z };
 }
 
-function reachable(from, to, maxNodes) {
-    if (walk(from, to)) return true;
+function reachable(from, to, maxNodes, budget, skipDirect = false) {
+    if (!skipDirect && walk(from, to, budget)) return true;
+    budget?.search(maxNodes + 1);
     const route = Geo.findPath(from.locX, from.locY, from.locZ,
-        to.locX, to.locY, to.locZ, maxNodes, { debug: false });
+        to.locX, to.locY, to.locZ, maxNodes, { debug: false, checkBudget: budget && (() => budget.poll()) });
+    budget?.poll();
     if (!route?.length) return false;
     let previous = from;
     for (const point of route) {
-        if (!walk(previous, point)) return false;
+        if (!walk(previous, point, budget)) return false;
         previous = point;
     }
-    return !!walk(previous, to);
+    return !!walk(previous, to, budget);
 }
 
 module.exports = { layers, supported, walk, reachable };

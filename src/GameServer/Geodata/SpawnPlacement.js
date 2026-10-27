@@ -1,83 +1,163 @@
+const { performance } = require('node:perf_hooks');
 const Geo = invoke('GameServer/Geodata/GeodataEngine');
 const Surface = require('./SpawnSurface');
 const DiskCache = require('./SpawnPlacementCache');
 
 const POOL_SIZE = 128;
 const SAMPLE_ATTEMPTS = 512;
-const PATH_SEARCHES = 12;
 const PATH_NODES = 20000;
 const ANCHOR_RADIUS = 32768;
+const BUCKET_SIZE = 8192;
+const LIMITS = Object.freeze({ wallMs: 900000, targetMs: 90000, rssBytes: 1536 * 1024 * 1024,
+    searches: 4096, nodeAllowance: 16000000, walks: 250000, transitions: 64000000,
+    decodedLayers: 16000000, deterministicCells: 2000000, targetSearches: 24,
+    targetNodeAllowance: 300000, targetWalks: 4096, targetTransitions: 1000000,
+    targetLayers: 1000000, targetCells: 262144, callTransitions: 8192,
+    batchCells: 4096, batchLayers: 65536, candidateWindow: 4096, fastSearches: 12 });
+const CAPACITY = DiskCache.CAPACITY;
 const pools = new Map();
+const poolStates = new Map();
 const cursors = new WeakMap();
-let trusted = [];
-let trustedKeys = new Set();
+const EMPTY = new Int32Array();
 let revision = -1;
-let territories = [];
 let warned = new Set();
 
-function keyFor(bounds, anchors) {
-    return JSON.stringify([bounds, anchors || []]);
+const keyFor = (bounds, anchors) => JSON.stringify([bounds, anchors || []]);
+const xyz = p => [p.locX, p.locY, p.locZ];
+const pointKey = p => xyz(p).join(':');
+const cellKey = p => `${p.locX >> 4}:${p.locY >> 4}:${p.locZ}`;
+const distanceSquared = (a, b) => (a.locX - b.locX) ** 2 + (a.locY - b.locY) ** 2 + (a.locZ - b.locZ) ** 2;
+const counters = () => ({ xyDraws: 0, sampledCells: 0, decodedLayers: 0, candidateLayers: 0,
+    surfaceUnavailableCells: 0, blockedLayers: 0, outOfRangeLayers: 0,
+    deterministicCells: 0, directWalkCalls: 0, strictWalkCalls: 0, localAuditWalkCalls: 0,
+    walkTransitions: 0, pathSearchRequests: 0, pathNodeAllowance: 0 });
+
+class BudgetStop extends Error {
+    constructor(limit, global = false) {
+        super(`spawn preparation budget exhausted: ${limit}`);
+        this.code = 'SPAWN_BUDGET';
+        this.limit = limit;
+        this.global = global;
+    }
 }
 
-function distanceSquared(a, b) {
-    return (a.locX - b.locX) ** 2 + (a.locY - b.locY) ** 2 + (a.locZ - b.locZ) ** 2;
+// Reservations precede searches/decodes. Counts include failed work and strict
+// route validation, not just successful proofs. Native expansions are allowances.
+class Budget {
+    constructor() {
+        this.started = performance.now();
+        this.work = counters();
+        this.target = null;
+        this.stopped = null;
+        this.lastRss = -Infinity;
+        this.maxRssBytes = 0;
+        this.local = false;
+        this.batchCells = 0; this.batchLayers = 0; this.batches = 0;
+        this.maxBatchCells = 0; this.maxBatchLayers = 0;
+    }
+    checkpoint() {
+        // Preparation is synchronous. A checkpoint retains the active scanner,
+        // walk or route-validation cursor on the stack; it is not a failed proof.
+        this.poll(true);
+        this.maxBatchCells = Math.max(this.maxBatchCells, this.batchCells);
+        this.maxBatchLayers = Math.max(this.maxBatchLayers, this.batchLayers);
+        this.batchCells = 0; this.batchLayers = 0; this.batches++;
+    }
+    tested() {
+        if (this.batchCells >= LIMITS.batchCells) this.checkpoint();
+        this.batchCells++;
+    }
+    stop(limit, global = false) {
+        if (global) this.stopped ||= limit;
+        throw new BudgetStop(limit, global);
+    }
+    poll(force = false) {
+        if (this.stopped) this.stop(this.stopped, true);
+        const now = performance.now();
+        if (now - this.started >= LIMITS.wallMs) this.stop('wallMs', true);
+        if (this.target && this.target.activeMs + now - this.entered >= LIMITS.targetMs) this.stop('targetMs');
+        if (force || now - this.lastRss >= 10) {
+            this.lastRss = now;
+            const rss = process.memoryUsage.rss();
+            this.maxRssBytes = Math.max(this.maxRssBytes, rss);
+            if (rss >= LIMITS.rssBytes) this.stop('rssBytes', true);
+        }
+    }
+    enter(target, fn) {
+        this.target = target;
+        this.entered = performance.now();
+        try { this.poll(true); return fn(); }
+        finally { target.activeMs += performance.now() - this.entered; this.target = null; }
+    }
+    reserve(name, amount, globalLimit, targetLimit) {
+        if (this.work[name] + amount > globalLimit) this.stop(name, true);
+        if (this.target && targetLimit && this.target.work[name] + amount > targetLimit) this.stop(`target:${name}`);
+    }
+    add(name, amount = 1) {
+        this.work[name] += amount;
+        if (this.target) this.target.work[name] += amount;
+    }
+    beforeLayers() {
+        if (this.batchLayers + 255 > LIMITS.batchLayers) this.checkpoint();
+        this.reserve('decodedLayers', 255, LIMITS.decodedLayers, LIMITS.targetLayers);
+        if ((this.work.strictWalkCalls & 127) === 0) this.poll();
+    }
+    decoded(count) { this.add('decodedLayers', count); this.batchLayers += count; }
+    walk() {
+        this.reserve('strictWalkCalls', 1, LIMITS.walks, LIMITS.targetWalks);
+        this.add('strictWalkCalls');
+        if (this.local) this.add('localAuditWalkCalls');
+        if ((this.work.strictWalkCalls & 127) === 0) this.poll();
+    }
+    transition(callCount) {
+        if (callCount > LIMITS.callTransitions) this.stop('callTransitions');
+        this.reserve('walkTransitions', 1, LIMITS.transitions, LIMITS.targetTransitions);
+        this.add('walkTransitions');
+        if ((this.work.walkTransitions & 127) === 0) this.poll();
+    }
+    search(nodes) {
+        this.poll(true);
+        this.reserve('pathSearchRequests', 1, LIMITS.searches, LIMITS.targetSearches);
+        this.reserve('pathNodeAllowance', nodes, LIMITS.nodeAllowance, LIMITS.targetNodeAllowance);
+        this.add('pathSearchRequests');
+        this.add('pathNodeAllowance', nodes);
+    }
+    scan() {
+        this.tested();
+        this.reserve('deterministicCells', 1, LIMITS.deterministicCells, LIMITS.targetCells);
+        this.add('deterministicCells');
+    }
+    capacity(name, size) {
+        if (size > CAPACITY[name]) this.stop(`capacity:${name}`, true);
+        if ((size & 127) === 0) this.poll();
+    }
 }
 
 function nearest(points, target, limit) {
-    return points.map(point => ({ point, distance: distanceSquared(point, target) }))
-        .sort((a, b) => a.distance - b.distance).slice(0, limit).map(entry => entry.point);
+    // Bounded insertion avoids sorting the global trusted set per target.
+    const best = [];
+    for (const point of points) {
+        const distance = distanceSquared(point.point || point, target);
+        let i = 0;
+        while (i < best.length && best[i].distance <= distance) i++;
+        if (i >= limit) continue;
+        best.splice(i, 0, { point, distance });
+        if (best.length > limit) best.pop();
+    }
+    return best.map(entry => entry.point);
 }
 
-// layers() deliberately conflates absent, malformed and obstacle-masked data.
-// Do not turn that absence, or a failed bounded search, into an unreachable claim.
-function supportFailure(point) {
-    if (!point || ![point.locX, point.locY, point.locZ].every(Number.isFinite)) return 'invalid_coordinate';
-    const layers = Surface.layers(point.locX, point.locY);
-    if (!layers.length) return 'surface_unavailable';
-    const closest = layers.reduce((a, b) => Math.abs(a.z - point.locZ) <= Math.abs(b.z - point.locZ) ? a : b);
-    return !closest.nswe ? 'surface_blocked' : 'height_mismatch';
-}
-
-function addTrusted(point, source, roots) {
-    const valid = Surface.supported(point);
-    if (roots) roots.push({ source, authored: point, normalized: valid,
-        included: true, reason: valid ? null : supportFailure(point) });
-    if (!valid) return;
-    const key = `${valid.locX >> 4}:${valid.locY >> 4}:${valid.locZ}`;
-    if (trustedKeys.has(key)) return;
-    trustedKeys.add(key);
-    trusted.push(valid);
-}
-
-function reset(roots) {
-    revision = Number(Geo.navigationRevision || 0);
-    pools.clear();
-    trusted = [];
-    trustedKeys = new Set();
-    warned = new Set();
-    const gatekeepers = invoke('GameServer/World/C4GatekeeperTeleports');
-    for (const [npcId, routes] of Object.entries(gatekeepers.lists)) {
-        for (const [id] of routes) addTrusted(gatekeepers.destination(npcId, id), `gatekeeper:${npcId}:${id}`, roots);
+function supportInfo(point, budget) {
+    if (!point || !xyz(point).every(value => Number.isInteger(value) && value >= -2147483648 && value <= 2147483647)) {
+        return { normalized: null, reason: 'invalid_coordinate' };
     }
-    for (const [id, point] of invoke('GameServer/World/C4CrumaTowerTeleports').DESTINATIONS) addTrusted(point, `cruma:${id}`, roots);
-    for (const [index, dungeon] of invoke('GameServer/World/C4SevenSignsDungeonTeleports').DUNGEONS.entries()) {
-        for (const side of ['inside', 'outside']) {
-            const [locX, locY, locZ] = dungeon[side].destination;
-            addTrusted({ locX, locY, locZ }, `seven-signs:${index}:${side}`, roots);
-        }
-    }
-    for (const [index, template] of invoke('GameServer/DataCache').newbieSpawns.entries()) {
-        for (const [i, point] of template.spawns.entries()) addTrusted(point, `player-start:${index}:${i}`, roots);
-    }
-    // Explicit anchors are an authored access contract, not automatically
-    // inferred from monster positions, polygon centres or the largest roof.
-    for (const [index, territory] of territories.entries()) {
-        for (const [i, point] of (territory.spawnAnchors || []).entries()) addTrusted(point, `territory:${index}:${territory.selfId}:${i}`, roots);
-    }
-}
-
-function ensureRevision() {
-    if (revision !== Number(Geo.navigationRevision || 0)) reset();
+    const layers = Surface.layers(point.locX, point.locY, budget);
+    if (!layers.length) return { normalized: null, reason: 'surface_unavailable' };
+    let closest = layers[0];
+    for (const layer of layers) if (Math.abs(layer.z - point.locZ) < Math.abs(closest.z - point.locZ)) closest = layer;
+    const delta = Math.abs(closest.z - point.locZ);
+    const reason = !closest.nswe ? 'surface_blocked' : delta > 64 ? 'height_mismatch' : null;
+    return { normalized: reason ? null : { locX: point.locX, locY: point.locY, locZ: closest.z }, reason, delta };
 }
 
 function inside(x, y, bounds) {
@@ -90,311 +170,640 @@ function inside(x, y, bounds) {
     return result;
 }
 
-function candidates(bounds, work) {
+function domain(bounds) {
     if (!Array.isArray(bounds) || bounds.length < 3 || bounds.some(point =>
-        ![point.locX, point.locY, point.minZ, point.maxZ].every(Number.isFinite))) {
-        if (work) work.reason = 'invalid_bounds';
-        return [];
+        ![point.locX, point.locY, point.minZ, point.maxZ].every(Number.isFinite))) return null;
+    const d = { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity, minZ: Infinity, maxZ: -Infinity };
+    for (const p of bounds) {
+        d.minX = Math.min(d.minX, p.locX); d.maxX = Math.max(d.maxX, p.locX);
+        d.minY = Math.min(d.minY, p.locY); d.maxY = Math.max(d.maxY, p.locY);
+        d.minZ = Math.min(d.minZ, p.minZ); d.maxZ = Math.max(d.maxZ, p.maxZ);
     }
-    const minX = Math.min(...bounds.map(point => point.locX));
-    const maxX = Math.max(...bounds.map(point => point.locX));
-    const minY = Math.min(...bounds.map(point => point.locY));
-    const maxY = Math.max(...bounds.map(point => point.locY));
-    const minZ = Math.min(...bounds.map(point => point.minZ));
-    const maxZ = Math.max(...bounds.map(point => point.maxZ));
-    const points = [];
-    const seen = new Set();
-    // Bound rejection sampling too: a malformed or very thin polygon must
-    // not trap startup in the old random-point helper's unbounded loop.
-    for (let i = 0; i < SAMPLE_ATTEMPTS * 8 && seen.size < SAMPLE_ATTEMPTS; i++) {
-        if (work) work.xyDraws++;
-        const locX = (((minX + Math.random() * (maxX - minX)) >> 4) << 4) + 8;
-        const locY = (((minY + Math.random() * (maxY - minY)) >> 4) << 4) + 8;
-        const key = `${locX}:${locY}`;
-        if (seen.has(key) || !inside(locX, locY, bounds)) continue;
-        seen.add(key);
-        const layers = Surface.layers(locX, locY);
-        if (work) {
-            work.sampledCells++;
-            work.decodedLayers += layers.length;
-            if (!layers.length) work.surfaceUnavailableCells++;
+    d.x0 = Math.ceil((d.minX - 8) / 16); d.x1 = Math.floor((d.maxX - 8) / 16);
+    d.y0 = Math.ceil((d.minY - 8) / 16); d.y1 = Math.floor((d.maxY - 8) / 16);
+    return d;
+}
+
+function inventory(definitions, budget) {
+    budget.capacity('definitions', definitions.length);
+    const monsters = new Set(invoke('GameServer/DataCache').npcs.filter(npc => npc.template?.kind === 'Monster').map(npc => Number(npc.selfId)));
+    const byKey = new Map(), fixedByKey = new Map(), fixed = [], references = [], definitionRecords = [];
+    let randomIndex = 0, rows = 0, slots = 0;
+    for (const [definitionId, territory] of definitions.entries()) {
+        budget.poll();
+        const positive = [];
+        let randomSlots = 0;
+        for (const [row, spawn] of territory.spawns.entries()) {
+            if (spawn.total <= 0) continue;
+            positive.push({ row, npcId: spawn.selfId, mode: spawn.coords.length ? 'fixed' : 'random',
+                declaredSlots: spawn.total * (spawn.coords.length || 1) });
+            if (!spawn.coords.length) randomSlots += spawn.total;
+            if (!spawn.coords.length || !monsters.has(Number(spawn.selfId))) continue;
+            rows++; slots += spawn.total * spawn.coords.length;
+            for (const [coordinate, p] of spawn.coords.entries()) {
+                budget.capacity('references', references.length + 1);
+                const key = pointKey(p);
+                let record = fixedByKey.get(key);
+                if (!record) {
+                    budget.capacity('fixed', fixed.length + 1);
+                    record = { id: fixed.length, authored: { locX: p.locX, locY: p.locY, locZ: p.locZ }, references: [],
+                        local: 'budget_exhausted', normalized: null, global: 'unknown', witness: null, reason: 'budget_exhausted' };
+                    fixedByKey.set(key, record); fixed.push(record);
+                }
+                record.references.push({ definitionId, row, coordinate, npcId: spawn.selfId, slots: spawn.total });
+                references.push([record.id, definitionId, row, coordinate, spawn.total]);
+            }
         }
-        for (const layer of layers) {
-            if (work && !layer.nswe) work.blockedLayers++;
-            if (work && (layer.z < minZ || layer.z > maxZ)) work.outOfRangeLayers++;
-            if (!layer.nswe || layer.z < minZ || layer.z > maxZ) continue;
-            if (work) work.candidateLayers++;
-            points.push({ locX, locY, locZ: layer.z });
+        let target = null;
+        if (randomSlots) {
+            const key = keyFor(territory.bounds, territory.spawnAnchors);
+            target = byKey.get(key);
+            if (!target) {
+                budget.capacity('pools', byKey.size + 1);
+                target = { id: byKey.size, kind: 'random', key, territory, domain: domain(territory.bounds), slots: 0, definitionIds: [],
+                    points: [], acceptedKeys: new Set(), admissions: 0, work: counters(), activeMs: 0, attempts: [],
+                    reason: null, complete: false, scanned: 0, eligible: 0, unavailableCells: 0, cursor: 0,
+                    discoveryVersion: 0, proofVersion: 0, scanVersion: 0, retryScan: false, stopped: false };
+                byKey.set(key, target);
+            }
+            target.slots += randomSlots; target.definitionIds.push(definitionId);
         }
+        definitionRecords.push({ definitionId, territoryId: territory.selfId, randomIndex: target ? randomIndex++ : null,
+            poolId: target?.id ?? null, rows: positive });
+    }
+    return { targets: [...byKey.values()], fixed, references, definitionRecords, rows, slots,
+        expected: { keys: [...byKey.keys()], fixed: fixed.map(record => xyz(record.authored)), references,
+            definitions: definitions.map((t, i) => [i, t.selfId]),
+            signature: [definitions, [...monsters].sort((a, b) => a - b)] } };
+}
+
+class Proofs {
+    constructor(budget) {
+        this.budget = budget;
+        this.trusted = [];
+        this.trustedKeys = new Map();
+        this.sources = new Map();
+        this.targets = new Map();
+        this.memberships = 0;
+        this.queue = [];
+        this.pairs = new Set();
+        this.roots = [];
+    }
+    buckets(d, radius, visit) {
+        for (let x = Math.floor((d.minX - radius) / BUCKET_SIZE); x <= Math.floor((d.maxX + radius) / BUCKET_SIZE); x++) {
+            for (let y = Math.floor((d.minY - radius) / BUCKET_SIZE); y <= Math.floor((d.maxY + radius) / BUCKET_SIZE); y++) visit(`${x}:${y}`);
+        }
+    }
+    membership(index, key, value) {
+        this.budget.capacity('memberships', this.memberships + 1);
+        let entries = index.get(key);
+        if (!entries) index.set(key, entries = []);
+        entries.push(value); this.memberships++;
+    }
+    register(target) {
+        if (!target.domain) return;
+        this.buckets(target.domain, 0, key => this.membership(this.targets, key, target));
+    }
+    relevant(point, d) {
+        const dx = Math.max(d.minX - point.locX, 0, point.locX - d.maxX);
+        const dy = Math.max(d.minY - point.locY, 0, point.locY - d.maxY);
+        return dx * dx + dy * dy <= ANCHOR_RADIUS ** 2;
+    }
+    enqueue(target) {
+        if (target.pending || target.stopped || (target.kind === 'fixed' && target.proven)) return;
+        if (target.kind === 'random' && adequate(target).accepted) return;
+        target.pending = true;
+        this.queue.push(target);
+    }
+    add(point) {
+        const key = cellKey(point);
+        if (this.trustedKeys.has(key)) return this.trustedKeys.get(key);
+        this.budget.capacity('trusted', this.trusted.length + 1);
+        const index = this.trusted.length;
+        const bucket = `${Math.floor(point.locX / BUCKET_SIZE)}:${Math.floor(point.locY / BUCKET_SIZE)}`;
+        this.membership(this.sources, bucket, index);
+        this.trusted.push(point); this.trustedKeys.set(key, index);
+        const seen = new Set();
+        this.buckets({ minX: point.locX, maxX: point.locX, minY: point.locY, maxY: point.locY }, ANCHOR_RADIUS, bucketKey => {
+            for (const target of this.targets.get(bucketKey) || []) {
+                if (seen.has(target.id) || !this.relevant(point, target.domain)) continue;
+                seen.add(target.id); target.proofVersion++;
+                if (target.complete) target.retryScan = true;
+                this.enqueue(target);
+            }
+        });
+        return index;
+    }
+    nearby(target, point, limit = 8, candidates) {
+        const found = [];
+        this.buckets(target.domain, ANCHOR_RADIUS, key => {
+            for (const index of this.sources.get(key) || []) {
+                const source = this.trusted[index];
+                if (!this.relevant(source, target.domain)) continue;
+                const choices = candidates ? nearest(candidates, source, 2) : [target.point];
+                if (!choices.some(p => !this.pairs.has(`${target.id}/${index}/${cellKey(p)}`))) continue;
+                found.push({ index, point: source });
+            }
+        });
+        return nearest(found, point, limit);
+    }
+    pair(target, source, point) {
+        const key = `${target.id}/${source}/${cellKey(point)}`;
+        if (this.pairs.has(key)) return false;
+        this.budget.capacity('pairs', this.pairs.size + 1);
+        this.pairs.add(key);
+        return true;
+    }
+    failed(target, source, point, kind, remember = false) {
+        const key = `${kind}/${target.id}/${cellKey(source)}/${cellKey(point)}`;
+        if (this.pairs.has(key)) return true;
+        if (remember) {
+            this.budget.capacity('pairs', this.pairs.size + 1);
+            this.pairs.add(key);
+        }
+        return false;
+    }
+    root(point, source) {
+        const info = supportInfo(point, this.budget);
+        this.roots.push({ source, authored: point, normalized: info.normalized, included: true, reason: info.reason });
+        if (info.normalized) this.add(info.normalized);
+    }
+    collect(definitions) {
+        const gatekeepers = invoke('GameServer/World/C4GatekeeperTeleports');
+        for (const [npcId, routes] of Object.entries(gatekeepers.lists)) {
+            for (const [id] of routes) this.root(gatekeepers.destination(npcId, id), `gatekeeper:${npcId}:${id}`);
+        }
+        for (const [id, point] of invoke('GameServer/World/C4CrumaTowerTeleports').DESTINATIONS) this.root(point, `cruma:${id}`);
+        for (const [index, dungeon] of invoke('GameServer/World/C4SevenSignsDungeonTeleports').DUNGEONS.entries()) {
+            for (const side of ['inside', 'outside']) {
+                const [locX, locY, locZ] = dungeon[side].destination;
+                this.root({ locX, locY, locZ }, `seven-signs:${index}:${side}`);
+            }
+        }
+        for (const [index, template] of invoke('GameServer/DataCache').newbieSpawns.entries()) {
+            for (const [i, point] of template.spawns.entries()) this.root(point, `player-start:${index}:${i}`);
+        }
+        // Collect from the complete inventory, including fixed-only/inactive
+        // definitions. Monster positions themselves never establish an entrance.
+        for (const [definitionId, territory] of definitions.entries()) {
+            for (const [i, point] of (territory.spawnAnchors || []).entries()) this.root(point, `territory:${definitionId}:${territory.selfId}:${i}`);
+        }
+    }
+}
+
+function extent(points) {
+    const cells = new Set(), z = new Set();
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    for (const p of points) {
+        cells.add(`${p.locX >> 4}:${p.locY >> 4}`); z.add(p.locZ);
+        minX = Math.min(minX, p.locX); maxX = Math.max(maxX, p.locX);
+        minY = Math.min(minY, p.locY); maxY = Math.max(maxY, p.locY);
+    }
+    return { uniqueCells: cells.size, floorZ: [...z].sort((a, b) => a - b),
+        extent: points.length ? { minX, maxX, minY, maxY } : null };
+}
+
+function adequate(target) {
+    const blocked = target.reason === 'budget_exhausted';
+    const cached = target.adequacyCache;
+    if (cached && cached.points === target.points && cached.version === target.admissions && cached.blocked === blocked) return cached.value;
+    const summary = extent(target.points);
+    const demand = Math.min(POOL_SIZE, target.slots);
+    const spans = !summary.extent || !target.domain ? [false, false] : [
+        target.domain.maxX - target.domain.minX < 256 || summary.extent.maxX - summary.extent.minX >= (target.domain.maxX - target.domain.minX) * 0.25,
+        target.domain.maxY - target.domain.minY < 256 || summary.extent.maxY - summary.extent.minY >= (target.domain.maxY - target.domain.minY) * 0.25];
+    const flags = [];
+    if (blocked) flags.push('budget_exhausted');
+    if (!target.points.length) flags.push('empty_pool');
+    if (summary.uniqueCells < demand) flags.push('insufficient_unique_cells');
+    if (target.slots > 1 && summary.uniqueCells === 1) flags.push('one_cell_multiple_slots');
+    if (!spans.every(Boolean)) flags.push('insufficient_extent');
+    const value = { ...summary, demand, accepted: flags.length === 0, status: flags.length ? 'review_required' : 'accepted', flags, intendedArea: null };
+    target.adequacyCache = { points: target.points, version: target.admissions, blocked, value };
+    return value;
+}
+
+function discoverCell(target, locX, locY, budget, points, seen) {
+    if (!inside(locX, locY, target.territory.bounds)) return;
+    const layers = Surface.layers(locX, locY, budget);
+    budget.add('sampledCells');
+    if (!layers.length) { budget.add('surfaceUnavailableCells'); target.unavailableCells++; }
+    for (const layer of layers) {
+        if (!layer.nswe) budget.add('blockedLayers');
+        if (layer.z < target.domain.minZ || layer.z > target.domain.maxZ) budget.add('outOfRangeLayers');
+        if (!layer.nswe || layer.z < target.domain.minZ || layer.z > target.domain.maxZ) continue;
+        budget.add('candidateLayers'); target.eligible++;
+        const p = { locX, locY, locZ: layer.z }, key = cellKey(p);
+        if (seen.has(key) || target.acceptedKeys.has(key)) continue;
+        seen.add(key); points.push(p);
+    }
+}
+
+function fastCandidates(target, budget) {
+    const points = [], seen = new Set(), cells = new Set(), d = target.domain;
+    for (let i = 0; i < SAMPLE_ATTEMPTS * 8 && cells.size < SAMPLE_ATTEMPTS; i++) {
+        budget.add('xyDraws');
+        const x = (((d.minX + Math.random() * (d.maxX - d.minX)) >> 4) << 4) + 8;
+        const y = (((d.minY + Math.random() * (d.maxY - d.minY)) >> 4) << 4) + 8;
+        const key = `${x}:${y}`;
+        if (cells.has(key) || !inside(x, y, target.territory.bounds)) continue;
+        cells.add(key); budget.tested(); discoverCell(target, x, y, budget, points, seen);
+        if (points.length >= LIMITS.candidateWindow - 255) break;
     }
     return points;
 }
 
-function build(territory, attempts) {
-    const work = attempts && { xyDraws: 0, sampledCells: 0, decodedLayers: 0,
-        surfaceUnavailableCells: 0, blockedLayers: 0, outOfRangeLayers: 0,
-        candidateLayers: 0, nearbyRoots: 0, directWalkCalls: 0, pathSearchRequests: 0, reason: null };
-    const walk = (from, to) => {
-        if (work) work.directWalkCalls++;
-        return Surface.walk(from, to);
-    };
-    const points = candidates(territory.bounds, work);
-    const accepted = [];
-    let searches = 0;
-    if (points.length) {
-        const centre = {
-            locX: territory.bounds.reduce((sum, p) => sum + p.locX, 0) / territory.bounds.length,
-            locY: territory.bounds.reduce((sum, p) => sum + p.locY, 0) / territory.bounds.length,
-            locZ: territory.bounds[0].minZ
-        };
-        const anchors = nearest(trusted.filter(point =>
-            Math.hypot(point.locX - centre.locX, point.locY - centre.locY) <= ANCHOR_RADIUS), centre, 8);
-        if (work) work.nearbyRoots = anchors.length;
-        // Prove one entry into the territory first. Later points can reuse that
-        // proof; no search starts from an unverified surface, even on retry.
-        for (const anchor of anchors) {
-            for (const point of nearest(points, anchor, 2)) {
-                let connected = walk(anchor, point);
-                if (!connected && searches < PATH_SEARCHES / 2) {
-                    searches++;
-                    if (work) work.pathSearchRequests++;
-                    connected = Surface.reachable(anchor, point, PATH_NODES);
-                }
-                if (connected) {
-                    accepted.push(point);
-                    break;
-                }
-            }
-            if (accepted.length) break;
-        }
-        if (accepted.length) {
-            const seen = new Set(accepted);
-            // Two passes allow points behind an obstacle to connect through a
-            // point admitted later. Keep all work here, never on an AI tick.
-            for (let pass = 0; pass < 2 && accepted.length < POOL_SIZE; pass++) {
-                for (const point of points) {
-                    if (seen.has(point)) continue;
-                    const neighbours = nearest(accepted, point, 4);
-                    let valid = neighbours.some(anchor => walk(anchor, point));
-                    if (!valid && searches < PATH_SEARCHES) {
-                        searches++;
-                        if (work) work.pathSearchRequests++;
-                        valid = Surface.reachable(neighbours[0], point, PATH_NODES);
-                    }
-                    if (!valid) continue;
-                    accepted.push(point);
-                    seen.add(point);
-                    if (accepted.length >= POOL_SIZE) break;
-                }
-            }
-            // Share only a few proven entries, not every point in every pool.
-            // This lets adjacent territories connect without a new town route.
-            for (let i = 0; i < accepted.length; i += 32) addTrusted(accepted[i]);
-        }
+function fallbackCandidates(target, budget, proofs) {
+    const points = [], seen = new Set(), d = target.domain;
+    const width = Math.max(0, d.x1 - d.x0 + 1), height = Math.max(0, d.y1 - d.y0 + 1);
+    const total = width * height;
+    if (!Number.isSafeInteger(total)) budget.stop('target:boundingBox');
+    const startedLayers = budget.work.decodedLayers;
+    if (!target.cursor) target.scanVersion = target.proofVersion;
+    let batch = 0;
+    while (target.cursor < total && batch < LIMITS.batchCells && points.length <= LIMITS.candidateWindow - 255
+        && budget.work.decodedLayers - startedLayers <= LIMITS.batchLayers - 255) {
+        budget.scan();
+        const index = target.cursor++;
+        target.scanned++; batch++;
+        const x = ((d.x0 + Math.floor(index / height)) * 16) + 8;
+        const y = ((d.y0 + index % height) * 16) + 8;
+        discoverCell(target, x, y, budget, points, seen);
     }
-    if (work) {
-        work.reason ||= accepted.length ? null : !points.length ? 'sampling_miss_or_absence'
-            : !work.nearbyRoots ? 'root_unavailable' : 'connectivity_unknown';
-        work.pathNodeAllowance = work.pathSearchRequests * (PATH_NODES + 1);
-        work.searchLimitReached = searches >= (accepted.length ? PATH_SEARCHES : PATH_SEARCHES / 2);
-        attempts.push(work);
-    }
-    const packed = new Int32Array(accepted.length * 3);
-    accepted.forEach((point, index) => packed.set([point.locX, point.locY, point.locZ], index * 3));
-    return packed;
+    budget.poll(true);
+    if (target.cursor >= total) {
+        target.complete = true;
+        // Only a newly admitted relevant proof may cause a targeted revisit.
+        // The source/candidate pair set still forbids repeating old failures.
+        if (target.scanVersion < target.proofVersion) target.retryScan = true;
+    } else proofs.enqueue(target);
+    target.discoveryVersion++;
+    return points;
 }
 
-function prepare(territory, work) {
-    ensureRevision();
-    const key = keyFor(territory.bounds, territory.spawnAnchors);
-    if (!pools.has(key)) {
-        if (work && !work.has(key)) work.set(key, []);
-        pools.set(key, build(territory, work?.get(key)));
+function connect(from, to, target, budget, initial, direct = true) {
+    if (direct) {
+        budget.add('directWalkCalls');
+        if (Surface.walk(from, to, budget)) return true;
     }
-    return pools.get(key);
+    const maxSearches = initial ? LIMITS.fastSearches : LIMITS.targetSearches;
+    if (target.work.pathSearchRequests >= maxSearches) return false;
+    return Surface.reachable(from, to, PATH_NODES, budget, true);
 }
 
-function auditFixed(definitions, detailed) {
-    const monsters = new Set(invoke('GameServer/DataCache').npcs
-        .filter(npc => npc.template?.kind === 'Monster').map(npc => Number(npc.selfId)));
-    const seen = new Set();
-    const examples = [];
-    const records = detailed ? new Map() : null;
-    const failures = {};
-    const heightBuckets = { '65-128': 0, '129-256': 0, '257-512': 0, 'above-512': 0 };
-    let invalid = 0, rows = 0, coordinateReferences = 0, declaredSlots = 0;
-    for (const [definitionId, territory] of definitions.entries()) {
-        for (const [row, spawn] of territory.spawns.entries()) {
-            if (!monsters.has(Number(spawn.selfId)) || spawn.total <= 0 || !spawn.coords.length) continue;
-            rows++;
-            coordinateReferences += spawn.coords.length;
-            declaredSlots += spawn.total * spawn.coords.length;
-            for (const [coordinate, point] of spawn.coords.entries()) {
-                const key = `${point.locX}:${point.locY}:${point.locZ}`;
-                const reference = detailed && { definitionId, row, coordinate, npcId: spawn.selfId, slots: spawn.total };
-                if (seen.has(key)) {
-                    records?.get(key).references.push(reference);
-                    continue;
-                }
-                seen.add(key);
-                const supported = Surface.supported(point);
-                const exit = supported && [[16, 0], [-16, 0], [0, 16], [0, -16]].some(([dx, dy]) =>
-                    Surface.walk(supported, { locX: supported.locX + dx, locY: supported.locY + dy }));
-                const reason = !detailed || exit ? null : supported ? 'local_exit_missing' : supportFailure(point);
-                if (records) records.set(key, { authored: point, normalized: supported, local: reason || 'supported',
-                    global: 'not_prepared', references: [reference] });
-                if (exit) continue;
-                if (detailed) failures[reason] = (failures[reason] || 0) + 1;
-                if (reason === 'height_mismatch') {
-                    const delta = Math.min(...Surface.layers(point.locX, point.locY).map(layer => Math.abs(layer.z - point.locZ)));
-                    heightBuckets[delta <= 128 ? '65-128' : delta <= 256 ? '129-256' : delta <= 512 ? '257-512' : 'above-512']++;
-                }
-                invalid++;
-                if (examples.length < 10) examples.push(`${territory.selfId}/${spawn.selfId}@${key}`);
+function accept(target, point, proofs) {
+    const key = cellKey(point);
+    if (target.acceptedKeys.has(key)) return;
+    if (target.points.length >= POOL_SIZE) {
+        const summary = adequate(target), box = summary.extent;
+        if (target.points.some(p => (p.locX >> 4) === (point.locX >> 4) && (p.locY >> 4) === (point.locY >> 4))) return;
+        let index = -1;
+        // Multiple layers at one XY can fill 128 slots before XY demand is
+        // met. Replacing a duplicate XY preserves every established extreme.
+        if (summary.uniqueCells < summary.demand) {
+            const counts = new Map();
+            for (const p of target.points) {
+                const xy = `${p.locX >> 4}:${p.locY >> 4}`;
+                counts.set(xy, (counts.get(xy) || 0) + 1);
             }
+            index = target.points.findIndex(p => counts.get(`${p.locX >> 4}:${p.locY >> 4}`) > 1);
         }
-    }
-    if (invalid) utils.infoWarn('SpawnPlacement',
-        '%d authored monster positions lack a supported surface or local exit; kept unchanged for content correction. Examples: %s',
-        invalid, examples.join(', '));
-    return { rows, coordinateReferences, declaredSlots, unique: seen.size, invalid, failures, heightBuckets, global: 'not_prepared',
-        ...(records && { records: [...records.values()] }) };
+        if (index < 0) {
+            if (point.locX >= box.minX && point.locX <= box.maxX && point.locY >= box.minY && point.locY <= box.maxY) return;
+            const extremes = [0, 0, 0, 0];
+            for (const p of target.points) {
+                if (p.locX === box.minX) extremes[0]++;
+                if (p.locX === box.maxX) extremes[1]++;
+                if (p.locY === box.minY) extremes[2]++;
+                if (p.locY === box.maxY) extremes[3]++;
+            }
+            index = target.points.findIndex(p => (p.locX !== box.minX || extremes[0] > 1)
+                && (p.locX !== box.maxX || extremes[1] > 1) && (p.locY !== box.minY || extremes[2] > 1)
+                && (p.locY !== box.maxY || extremes[3] > 1));
+        }
+        if (index < 0) return;
+        target.acceptedKeys.delete(cellKey(target.points[index])); target.points[index] = point;
+    } else target.points.push(point);
+    target.acceptedKeys.add(key);
+    if (target.admissions++ % 32 === 0) proofs.add(point);
 }
 
-// Detailed accounting is opt-in and never supplies new roots or relaxes admission.
-// In particular, a nonempty pool is not an adequacy or global fixed-access proof.
-function describe(definitions, roots, work, fixed) {
-    const poolRecords = [...pools].map(([key, values], poolId) => {
-        const cells = new Set(), floors = new Set();
-        let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-        for (let i = 0; i < values.length; i += 3) {
-            const [x, y, z] = values.subarray(i, i + 3);
-            cells.add(`${x >> 4}:${y >> 4}`);
-            floors.add(z);
-            minX = Math.min(minX, x); maxX = Math.max(maxX, x);
-            minY = Math.min(minY, y); maxY = Math.max(maxY, y);
-        }
-        return { poolId, key, definitionIds: [], declaredSlots: 0, points: values.length / 3,
-            uniqueCells: cells.size, floorZ: [...floors].sort((a, b) => a - b),
-            extent: values.length ? { minX, maxX, minY, maxY } : null,
-            attempts: work.get(key) || null };
-    });
-    const byKey = new Map(poolRecords.map(record => [record.key, record]));
-    const randomIndices = new Map(territories.map((territory, index) => [territory, index]));
-    const definitionRecords = definitions.map((territory, definitionId) => {
-        const randomIndex = randomIndices.get(territory);
-        const pool = randomIndex === undefined ? null : byKey.get(keyFor(territory.bounds, territory.spawnAnchors));
-        const rows = territory.spawns.flatMap((spawn, row) => spawn.total > 0 ? [{ row, npcId: spawn.selfId,
-            mode: spawn.coords.length ? 'fixed' : 'random', declaredSlots: spawn.total * (spawn.coords.length || 1) }] : []);
-        if (pool) {
-            pool.definitionIds.push(definitionId);
-            pool.declaredSlots += rows.filter(row => row.mode === 'random').reduce((sum, row) => sum + row.declaredSlots, 0);
-        } else {
-            for (const [index, point] of (territory.spawnAnchors || []).entries()) {
-                const normalized = Surface.supported(point);
-                roots.push({ source: `fixed-only:${definitionId}:${territory.selfId}:${index}`, authored: point,
-                    normalized, included: false, reason: 'fixed_only_root_excluded',
-                    supportReason: normalized ? null : supportFailure(point) });
+function fillPool(target, points, budget, proofs, initial) {
+    if (!points.length) return;
+    if (!target.points.length || (!initial && !adequate(target).accepted)) {
+        const centre = { locX: (target.domain.minX + target.domain.maxX) / 2,
+            locY: (target.domain.minY + target.domain.maxY) / 2, locZ: target.domain.minZ };
+        const sources = proofs.nearby(target, centre, 8, points);
+        target.nearbyRoots = Math.max(target.nearbyRoots || 0, sources.length);
+        let entered = false;
+        for (const source of sources) {
+            for (const point of nearest(points, source.point, 2)) {
+                if (!proofs.pair(target, source.index, point)) continue;
+                const entrySearches = target.work.pathSearchRequests;
+                // Preserve the fast entry allowance; later discovery may use
+                // the remaining per-target budget, never a fresh reset.
+                const canSearch = !initial || entrySearches < LIMITS.fastSearches / 2;
+                budget.add('directWalkCalls');
+                if (Surface.walk(source.point, point, budget)
+                    || (canSearch && connect(source.point, point, target, budget, initial, false))) {
+                    accept(target, point, proofs); entered = true; break;
+                }
             }
+            if (entered) break;
         }
-        return { definitionId, territoryId: territory.selfId, randomIndex: randomIndex ?? null, poolId: pool?.poolId ?? null, rows };
-    });
-    for (const pool of poolRecords) {
-        const last = pool.attempts?.at(-1);
-        pool.reason = pool.points ? null : last?.reason || 'cached_unresolved';
-        pool.adequacy = { status: 'unreviewed', flags: [], intendedArea: null };
-        if (!pool.points) pool.adequacy.flags.push('empty_pool');
-        if (pool.uniqueCells === 1 && pool.declaredSlots > 1) pool.adequacy.flags.push('one_cell_multiple_slots');
-        if (pool.points > 0 && pool.points < POOL_SIZE) pool.adequacy.flags.push('underfilled_pool');
-        if (pool.adequacy.flags.length) pool.adequacy.status = 'review_required';
     }
-    const counters = { xyDraws: 0, sampledCells: 0, decodedLayers: 0, candidateLayers: 0,
-        directWalkCalls: 0, pathSearchRequests: 0, pathNodeAllowance: 0 };
-    for (const attempts of work.values()) for (const attempt of attempts) {
-        for (const key of Object.keys(counters)) counters[key] += attempt[key];
+    if (!target.points.length) return;
+    const lastProof = new Map();
+    for (let pass = 0; pass < 2 && (target.points.length < POOL_SIZE || !adequate(target).accepted); pass++) {
+        for (const point of points) {
+            const key = cellKey(point);
+            if (target.acceptedKeys.has(key) || lastProof.get(key) === target.admissions) continue;
+            const neighbours = nearest(target.points, point, 4);
+            let connected = false;
+            for (const source of neighbours) {
+                if (proofs.failed(target, source, point, 'walk')) continue;
+                budget.add('directWalkCalls');
+                if (Surface.walk(source, point, budget)) { connected = true; break; }
+                proofs.failed(target, source, point, 'walk', true);
+            }
+            const source = neighbours[0];
+            if (!connected && !proofs.failed(target, source, point, 'path')) {
+                const before = target.work.pathSearchRequests;
+                connected = connect(source, point, target, budget, initial, false);
+                if (!connected && target.work.pathSearchRequests > before) proofs.failed(target, source, point, 'path', true);
+            }
+            if (connected) accept(target, point, proofs);
+            else lastProof.set(key, target.admissions);
+            if (target.points.length >= POOL_SIZE && adequate(target).accepted) break;
+        }
     }
-    return { version: 1, definitions: definitionRecords, pools: poolRecords, roots, fixed,
-        nonRandomDefinitions: definitionRecords.filter(record => record.randomIndex === null).length,
-        fixedOnlyDefinitions: definitionRecords.filter(record => record.randomIndex === null && record.rows.some(row => row.mode === 'fixed')).length,
-        fixedOnlyAnchorsExcluded: roots.filter(root => !root.included).length,
-        work: { ...counters, scope: 'random_preparation_only',
-            directWalkScope: 'build_calls_only_excludes_reachable_internal_walks',
-            pathNodeAllowanceKind: 'upper_bound_not_measured_expansions',
-            fixedConnectivitySearches: 0, fixedGlobalStatus: 'not_prepared' },
-        enforcedLimits: { poolPoints: POOL_SIZE, sampledCellsPerAttempt: SAMPLE_ATTEMPTS,
-            xyDrawsPerAttempt: SAMPLE_ATTEMPTS * 8, pathSearchesPerAttempt: PATH_SEARCHES,
-            pathNodeParameter: PATH_NODES, pathExpansionUpperBoundPerCall: PATH_NODES + 1,
-            globalWorkBudget: null, deterministicFallback: false, fixedProofCache: false } };
+}
+
+function poolAttempt(target, initial, budget, proofs) {
+    const before = { ...target.work };
+    try {
+        budget.enter(target, () => {
+            if (!target.domain) { target.reason = 'invalid_bounds'; target.stopped = true; return; }
+            if (!initial && target.complete) {
+                if (!target.retryScan) return;
+                target.retryScan = false; target.complete = false; target.cursor = 0;
+            }
+            const points = initial ? fastCandidates(target, budget) : fallbackCandidates(target, budget, proofs);
+            fillPool(target, points, budget, proofs, initial);
+            const adequacy = adequate(target);
+            target.reason = adequacy.accepted ? null : target.points.length ? 'inadequate_pool'
+                : target.complete && !target.eligible ? (target.unavailableCells ? 'surface_unavailable' : 'no_layer_in_z_interval')
+                    : !target.eligible ? 'sampling_miss_or_absence'
+                        : !target.nearbyRoots ? 'root_unavailable' : 'connectivity_unknown';
+            if (!initial && target.retryScan) proofs.enqueue(target);
+        });
+    } catch (error) {
+        if (error.code !== 'SPAWN_BUDGET') throw error;
+        target.reason = 'budget_exhausted'; target.limit = error.limit; target.stopped = true;
+    }
+    target.attempts.push({ phase: initial ? 'fast' : 'deterministic', ...Object.fromEntries(Object.keys(before)
+        .map(key => [key, target.work[key] - before[key]])), reason: target.reason, limit: target.limit || null });
+}
+
+function auditFixed(inv, budget, proofs) {
+    const groups = new Map();
+    for (const record of inv.fixed) {
+        try {
+            budget.poll();
+            const info = supportInfo(record.authored, budget);
+            record.normalized = info.normalized; record.delta = info.delta;
+            let exit = false;
+            if (info.normalized) {
+                budget.local = true;
+                try {
+                    exit = [[16, 0], [-16, 0], [0, 16], [0, -16]].some(([dx, dy]) => Surface.walk(info.normalized,
+                        { locX: info.normalized.locX + dx, locY: info.normalized.locY + dy }, budget));
+                } finally { budget.local = false; }
+            }
+            record.local = info.reason || (exit ? 'supported' : 'local_exit_missing');
+            record.global = record.local === 'supported' ? 'unknown' : 'invalid';
+            record.reason = record.local === 'supported' ? 'connectivity_unknown' : record.local;
+            record.witness = null;
+            if (record.local !== 'supported') continue;
+            const key = cellKey(record.normalized);
+            let target = groups.get(key);
+            if (!target) {
+                const p = record.normalized;
+                target = { id: inv.targets.length + groups.size, kind: 'fixed', point: p, records: [], work: counters(), activeMs: 0,
+                    domain: { minX: p.locX, maxX: p.locX, minY: p.locY, maxY: p.locY }, proofVersion: 0, stopped: false };
+                groups.set(key, target); proofs.register(target); proofs.enqueue(target);
+            }
+            target.records.push(record);
+        } catch (error) {
+            if (error.code !== 'SPAWN_BUDGET') throw error;
+            record.local = 'budget_exhausted'; record.global = 'unknown'; record.reason = 'budget_exhausted';
+            record.witness = null; record.normalized ||= null; record.limit = error.limit;
+        }
+    }
+    return [...groups.values()];
+}
+
+function proveFixed(target, budget, proofs) {
+    try {
+        budget.enter(target, () => {
+            const sources = proofs.nearby(target, target.point);
+            for (const source of sources) {
+                if (!proofs.pair(target, source.index, target.point)) continue;
+                if (!connect(source.point, target.point, target, budget, false)) continue;
+                target.proven = true;
+                for (const record of target.records) {
+                    record.global = 'proven'; record.reason = null; record.witness = source.index;
+                }
+                // Share selected fixed proofs, not every authored coordinate.
+                if (target.id % 32 === 0) proofs.add(target.point);
+                return;
+            }
+            for (const record of target.records) record.reason = sources.length ? 'connectivity_unknown' : 'root_unavailable';
+        });
+    } catch (error) {
+        if (error.code !== 'SPAWN_BUDGET') throw error;
+        target.stopped = true;
+        for (const record of target.records) {
+            // A completed proof survives a subsequent capacity stop while
+            // sharing it; only unfinished proof work is unknown.
+            if (record.global === 'proven') continue;
+            record.reason = 'budget_exhausted'; record.limit = error.limit;
+        }
+    }
+}
+
+function fixedSummary(inv, detailed) {
+    const failures = {}, reasons = {}, heightBuckets = { '65-128': 0, '129-256': 0, '257-512': 0, 'above-512': 0 };
+    let invalid = 0, proven = 0, unknown = 0, localUnknown = 0;
+    for (const record of inv.fixed) {
+        if (record.local === 'budget_exhausted') localUnknown++;
+        else if (record.local !== 'supported') { invalid++; failures[record.local] = (failures[record.local] || 0) + 1; }
+        if (record.global === 'proven') proven++;
+        else if (record.global === 'unknown') unknown++;
+        if (record.reason) reasons[record.reason] = (reasons[record.reason] || 0) + 1;
+        if (record.local === 'height_mismatch') {
+            const delta = record.delta;
+            heightBuckets[delta <= 128 ? '65-128' : delta <= 256 ? '129-256' : delta <= 512 ? '257-512' : 'above-512']++;
+        }
+    }
+    return { rows: inv.rows, coordinateReferences: inv.references.length, declaredSlots: inv.slots, unique: inv.fixed.length,
+        invalid, proven, unknown, localUnknown, failures, reasons, heightBuckets, global: proven === inv.fixed.length ? 'proven' : 'incomplete',
+        ...(detailed && { records: inv.fixed }) };
+}
+
+function describe(inv, proofs, budget, fixed, cacheHit) {
+    return { version: 2, inventoryComplete: true, definitions: inv.definitionRecords, roots: proofs.roots, fixed,
+        pools: inv.targets.map(target => ({ poolId: target.id, key: target.key,
+            definitionIds: target.definitionIds,
+            declaredSlots: target.slots, points: target.points.length, ...extent(target.points),
+            reason: target.reason, limit: target.limit || null, adequacy: adequate(target),
+            discovery: { complete: target.complete, scanned: target.scanned, candidateLayerObservations: target.eligible, unavailableCellObservations: target.unavailableCells }, attempts: cacheHit ? [] : target.attempts })),
+        nonRandomDefinitions: inv.definitionRecords.filter(d => d.randomIndex === null).length,
+        fixedOnlyDefinitions: inv.definitionRecords.filter(d => d.randomIndex === null && d.rows.some(row => row.mode === 'fixed')).length,
+        fixedOnlyAnchorsExcluded: 0,
+        work: { ...budget.work, scope: 'random_and_fixed_preparation', fixedConnectivitySearches: budget.fixedSearches || 0,
+            directWalkScope: 'strictWalkCalls_includes_local_audits_and_reachable_internal_walks',
+            pathNodeAllowanceKind: 'upper_bound_not_measured_expansions', fixedGlobalStatus: fixed.global,
+            maxRssBytes: budget.maxRssBytes, memberships: proofs.memberships, rememberedPairs: proofs.pairs.size,
+            batches: budget.batches + 1, maxBatchCells: Math.max(budget.maxBatchCells, budget.batchCells),
+            maxBatchLayers: Math.max(budget.maxBatchLayers, budget.batchLayers) },
+        blocker: budget.stopped,
+        enforcedLimits: { ...LIMITS, capacities: CAPACITY, globalWorkBudget: true, deterministicFallback: true, fixedProofCache: true } };
 }
 
 function init(definitions, cacheOptions = {}) {
-    const startedAt = Date.now();
-    const roots = cacheOptions.diagnostics ? [] : null;
-    const work = cacheOptions.diagnostics ? new Map() : null;
-    territories = definitions.filter(item => item.spawns.some(spawn => !spawn.coords.length && spawn.total > 0));
-    reset(roots);
-    const disk = DiskCache.open(territories.map(item => keyFor(item.bounds, item.spawnAnchors)), trusted, POOL_SIZE, cacheOptions);
-    if (disk.cached) {
-        for (const [key, points] of disk.cached.pools) pools.set(key, points);
-        trusted = disk.cached.trusted;
-        trustedKeys = new Set(trusted.map(point => `${point.locX >> 4}:${point.locY >> 4}:${point.locZ}`));
-        utils.infoSuccess('SpawnPlacement', 'loaded disk cache for %d random territories', territories.length);
-    } else {
-        utils.infoSuccess('SpawnPlacement', 'preparing accessible points for %d random territories', territories.length);
-        for (const [index, territory] of territories.entries()) {
-            prepare(territory, work);
-            if ((index + 1) % 128 === 0) utils.infoSuccess('SpawnPlacement', 'prepared %d/%d territories in %d seconds',
-                index + 1, territories.length, Math.round((Date.now() - startedAt) / 1000));
+    const budget = new Budget();
+    pools.clear(); poolStates.clear(); warned = new Set();
+    revision = Number(Geo.navigationRevision || 0);
+    let inv, proofs, disk = null, saved = false;
+    try {
+        budget.poll(true);
+        inv = inventory(definitions, budget);
+        proofs = new Proofs(budget);
+        proofs.collect(definitions);
+        inv.expected.initialTrusted = proofs.trusted.map(xyz);
+        const byKey = new Map(inv.targets.map(target => [target.key, target]));
+        inv.expected.validatePool = (key, values, state) => {
+            const target = byKey.get(key);
+            const points = [];
+            for (let i = 0; i < values.length; i += 3) {
+                const p = { locX: values[i], locY: values[i + 1], locZ: values[i + 2] };
+                if (!target.domain || p.locZ < target.domain.minZ || p.locZ > target.domain.maxZ
+                    || !inside(p.locX, p.locY, target.territory.bounds)) return false;
+                points.push(p);
+            }
+            return adequate({ ...target, points, reason: state.reason }).accepted === state.adequate;
+        };
+        disk = DiskCache.open(inv.expected, proofs.roots, POOL_SIZE, { ...cacheOptions, poll: () => budget.poll(true) });
+        if (disk.cached) {
+            for (const target of inv.targets) {
+                const packed = disk.cached.pools.get(target.key), state = disk.cached.states.get(target.key);
+                for (let i = 0; i < packed.length; i += 3) target.points.push({ locX: packed[i], locY: packed[i + 1], locZ: packed[i + 2] });
+                Object.assign(target, { reason: state.reason, complete: state.complete, scanned: state.scanned, limit: state.limit, eligible: state.eligible, unavailableCells: state.unavailableCells });
+                pools.set(target.key, packed); poolStates.set(target.key, state);
+            }
+            proofs.trusted = disk.cached.trusted;
+            inv.fixed.forEach((record, i) => {
+                const [local, normalized, global, witness, reason, delta, limit] = disk.cached.fixed[i];
+                Object.assign(record, { local, normalized: normalized && { locX: normalized[0], locY: normalized[1], locZ: normalized[2] }, global, witness, reason, delta, limit });
+            });
+        } else {
+            for (const target of inv.targets) proofs.register(target);
+            const fixedTargets = auditFixed(inv, budget, proofs);
+            for (const target of inv.targets) {
+                if (budget.stopped) break;
+                poolAttempt(target, true, budget, proofs);
+                proofs.enqueue(target);
+            }
+            for (const target of fixedTargets) proofs.enqueue(target);
+            // One pending entry per target. Delete processed queue storage in
+            // batches, so repeated relevant wakes cannot retain queue history.
+            let head = 0;
+            while (head < proofs.queue.length && !budget.stopped) {
+                const target = proofs.queue[head++]; target.pending = false;
+                if (!target.stopped && !(target.kind === 'fixed' ? target.proven : adequate(target).accepted)) {
+                    if (target.kind === 'fixed') {
+                        const before = budget.work.pathSearchRequests;
+                        proveFixed(target, budget, proofs);
+                        budget.fixedSearches = (budget.fixedSearches || 0) + budget.work.pathSearchRequests - before;
+                    } else poolAttempt(target, false, budget, proofs);
+                }
+                if (head >= 1024) { proofs.queue.splice(0, head); head = 0; }
+                if (!budget.stopped) budget.poll(true);
+            }
         }
-        utils.infoSuccess('SpawnPlacement', 'retrying territories without accessible points');
-        // A later zone may supply an entry for an earlier one. Cache unresolved
-        // zones too: repeated respawns must not repeat thousands of failed paths.
-        for (const territory of territories) {
-            const key = keyFor(territory.bounds, territory.spawnAnchors);
-            if (!pools.get(key).length) pools.set(key, build(territory, work?.get(key)));
-        }
-        disk.save(pools, trusted);
+    } catch (error) {
+        if (error.code !== 'SPAWN_BUDGET') throw error;
+        budget.stopped ||= error.limit;
+        // Inventory/identity/initial-root failures cannot publish partial cache
+        // coverage or silently certify definitions that were never inspected.
+        utils.infoWarn('SpawnPlacement', '%s', error.message);
     }
-    const unavailable = territories.filter(territory => !prepare(territory).length);
-    utils.infoSuccess('SpawnPlacement', '%d random territories prepared; %d awaiting accessible points; preparation took %d seconds',
-        territories.length - unavailable.length, unavailable.length, Math.round((Date.now() - startedAt) / 1000));
-    for (const territory of unavailable) warn(territory);
-    const fixed = auditFixed(definitions, !!work);
-    const diagnostics = work && describe(definitions, roots, work, fixed);
-    return { cacheHit: !!disk.cached, territories: territories.length, unavailable: unavailable.length,
-        points: [...pools.values()].reduce((total, points) => total + points.length / 3, 0), elapsedMs: Date.now() - startedAt,
-        ...(diagnostics && { diagnostics }) };
-}
-
-function warn(territory) {
-    const key = keyFor(territory.bounds, territory.spawnAnchors);
-    if (warned.has(key)) return;
-    warned.add(key);
-    utils.infoWarn('SpawnPlacement', 'Territory %s has no proven accessible spawn points; spawns deferred. Check geodata/bounds or author spawnAnchors on a reachable floor.',
-        territory.selfId || 'dynamic');
+    if (inv) {
+        for (const target of inv.targets) {
+            if (budget.stopped && !adequate(target).accepted) { target.reason = 'budget_exhausted'; target.limit ||= budget.stopped; }
+            if (!disk?.cached || !pools.has(target.key)) pools.set(target.key, Int32Array.from(target.points.flatMap(xyz)));
+            poolStates.set(target.key, { reason: target.reason, adequate: adequate(target).accepted,
+                scanned: target.scanned, complete: target.complete, limit: target.limit || null, eligible: target.eligible, unavailableCells: target.unavailableCells });
+        }
+        for (const record of inv.fixed) if (budget.stopped && record.global === 'unknown') {
+            record.reason = 'budget_exhausted'; record.limit ||= budget.stopped;
+        }
+        if (disk && !disk.cached && !budget.stopped) {
+            try {
+                saved = disk.save(pools, poolStates, inv.fixed.map(record =>
+                    [record.local, record.normalized && xyz(record.normalized), record.global, record.witness,
+                        record.reason, record.delta ?? null, record.limit || null]), proofs.trusted);
+            } catch (error) {
+                if (error.code !== 'SPAWN_BUDGET') throw error;
+                budget.stopped ||= error.limit;
+            }
+        }
+    }
+    const fixed = inv && fixedSummary(inv, !!cacheOptions.diagnostics);
+    if (fixed && (fixed.invalid || fixed.unknown)) {
+        const examples = inv.fixed.filter(record => record.global !== 'proven').slice(0, 8)
+            .map(record => ({ authored: record.authored, local: record.local, reason: record.reason }));
+        utils.infoWarn('SpawnPlacement', 'fixed coverage incomplete: %d invalid, %d unknown; examples=%s',
+            fixed.invalid, fixed.unknown, JSON.stringify(examples));
+    }
+    const unavailable = inv ? inv.targets.filter(target => !adequate(target).accepted)
+        .reduce((sum, target) => sum + target.definitionIds.length, 0) : null;
+    const result = { inventoryComplete: !!inv, cacheHit: !!disk?.cached, cacheSaved: saved, fingerprint: disk?.fingerprint || null,
+        territories: inv ? inv.definitionRecords.filter(d => d.randomIndex !== null).length : null,
+        unavailable, points: [...pools.values()].reduce((sum, values) => sum + values.length / 3, 0),
+        fixed: fixed && { unique: fixed.unique, proven: fixed.proven, invalid: fixed.invalid, unknown: fixed.unknown },
+        blocker: budget.stopped, elapsedMs: Math.round(performance.now() - budget.started) };
+    utils.infoSuccess('SpawnPlacement', 'preparation: %d unavailable definitions, %d fixed proofs; %d ms; cache hit=%s; blocker=%s',
+        unavailable, fixed?.proven || 0, result.elapsedMs, result.cacheHit, result.blocker || 'none');
+    if (cacheOptions.diagnostics) result.diagnostics = inv && proofs ? describe(inv, proofs, budget, fixed, result.cacheHit) : {
+        version: 2, inventoryComplete: false, definitions: [], pools: [], roots: proofs?.roots || [],
+        fixed: { global: 'incomplete', unique: null, invalid: null, proven: null, unknown: null, records: [] },
+        work: budget.work, blocker: budget.stopped, fixedOnlyAnchorsExcluded: 0,
+        enforcedLimits: { ...LIMITS, capacities: CAPACITY, globalWorkBudget: true, deterministicFallback: true, fixedProofCache: true }
+    };
+    return result;
 }
 
 function randomCoords(definition) {
-    const territory = {
-        selfId: definition.territoryId,
-        bounds: definition.bounds,
-        spawnAnchors: definition.spawnAnchors
-    };
-    const points = prepare(territory);
-    if (!points.length) {
-        warn(territory);
+    const key = keyFor(definition.bounds, definition.spawnAnchors);
+    // Navigation changes invalidate proofs, but never trigger a whole-world
+    // rebuild or path search on a spawn/AI tick. Initialization owns preparation.
+    const points = revision === Number(Geo.navigationRevision || 0) && poolStates.get(key)?.adequate ? pools.get(key) : EMPTY;
+    if (!points?.length) {
+        if (!warned.has(key)) {
+            warned.add(key);
+            utils.infoWarn('SpawnPlacement', 'Territory %s has no adequate proven pool; spawns deferred (%s)',
+                definition.territoryId || 'dynamic', poolStates.get(key)?.reason || 'not_prepared');
+        }
         return null;
     }
-    // Draw without replacement within a pool cycle, so initial population
-    // does not unnecessarily stack several monsters on the same sampled cell.
-    const cursor = cursors.get(points) || 0;
     const count = points.length / 3;
+    const cursor = cursors.get(points) || 0;
     const index = (cursor + Math.floor(Math.random() * (count - cursor))) * 3;
     const offset = cursor * 3;
     for (let axis = 0; axis < 3; axis++) {
-        const value = points[offset + axis];
-        points[offset + axis] = points[index + axis];
-        points[index + axis] = value;
+        const value = points[offset + axis]; points[offset + axis] = points[index + axis]; points[index + axis] = value;
     }
     cursors.set(points, (cursor + 1) % count);
     return { locX: points[offset], locY: points[offset + 1], locZ: points[offset + 2] };
