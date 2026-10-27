@@ -112,10 +112,11 @@ function combatRaidBuffs(session, owner, members, Generics, now) {
         && Restrictions.canCast(s.actor)).map(s => s.actor);
     const recipients = (recovering.length ? recovering : members).map(s => ({ actor: s.actor, leader: s === owner }));
     const action = Support.nextPartyAction(recipients, providers, recovering.length
-        ? recoveryOptions : { musicOnly: true, allowAttackInterrupt: true });
+        ? recoveryOptions : { inRangeOnly: true, allowAttackInterrupt: true });
     if (!action || action.provider !== session.actor) return false;
-    // Battle rebuffs never drag a provider through the encounter to reach an
-    // outlying recipient. Other members keep their native attack cycles.
+    // Refresh ordinary buffs as well as music without moving a provider
+    // through the encounter. Filter remote recipients before selection so
+    // they cannot block reachable rebuffs; recheck range before dispatch.
     if (!invoke('GameServer/Bot/AI/BotSkillIntent').inRange(session.actor, action.target, action.skill)) return false;
     Tactics.stop(session, session.actor);
     standForAction(session, session.actor);

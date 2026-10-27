@@ -841,6 +841,7 @@ function missingRecoveryFamilies(target) {
 }
 
 function actionAllowed(action, options = {}) {
+    if (options.inRangeOnly && !Intent.inRange(action.provider, action.target, action.skill)) return false;
     if (options.musicOnly && !isPartyMusic(action.skill)) return false;
     if (!options.raidRecovery) return true;
     const family = BuffLoadout.family(action.skill.fetchSemantic?.()?.effect);
@@ -879,7 +880,7 @@ function hasPendingAction(members, providers = members.map((member) => member.ac
 function nextAction(caster, members, providers = members.map((member) => member.actor).filter(Boolean), options = {}) {
     const cacheOwner = partyActionCacheOwner(members);
     const preferGroupBuffs = options.preferGroupBuffs ?? raidBuffPreference(members);
-    const cacheKey = `${partyActionCacheKey(members, providers)}|${options.partyMusicLast === true ? 'music_last' : 'default'}|${preferGroupBuffs}|${options.musicOnly === true}|${options.allowAttackInterrupt === true}|${options.raidRecovery === true}`;
+    const cacheKey = `${partyActionCacheKey(members, providers)}|${options.partyMusicLast === true ? 'music_last' : 'default'}|${preferGroupBuffs}|${options.musicOnly === true}|${options.allowAttackInterrupt === true}|${options.raidRecovery === true}|${options.inRangeOnly === true}`;
     const now = Date.now();
     const cached = cacheOwner && partyActionCache.get(cacheOwner);
     let next;
