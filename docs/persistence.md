@@ -39,6 +39,8 @@ After asynchronous boundaries, later actor work requires the same session actor 
 
 Equipment beneficiary rotation runs after a successful ordinary assignment; a full-roster goal already saved inside the service keeps early rotation. Roster-conflict reform still precedes assignment, and an ordinary goal is saved later by its caller. These steps are not one transaction: the change does not roll back conflicting-party reform or a later failed goal save.
 
+`ClanReviewEvents` keeps review invalidations in RAM and drains a batch before `ClanActionService.scheduleReviews` schedules its actions. If scheduling throws, the failing and later batch entries are restored with their original causes before the error propagates. This does not make the batch durable or atomic: already-created database actions remain, and stopping the service clears the in-memory events.
+
 ## Connected-player auto-fight preferences
 
 `Actor/PlayerAutoFight.js` owns live preference state; `Actor/PlayerAutoFightSettings.js` validates the exact durable fields. `Database.fetchAutoFightSettings` and `saveAutoFightSettings` read/write through the main serialized queue with character/account ownership checks. Migration **69** and the fresh SQLite bootstrap define `character_auto_fight_settings`: one `characterId` primary/foreign key with `ON DELETE CASCADE`, plus valid JSON bounded to 8192 UTF-8 bytes. Ordinary character/account deletion and character wipes cascade through the foreign key; there is no bot-lifecycle or observer writer.
