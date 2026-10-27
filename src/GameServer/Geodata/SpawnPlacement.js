@@ -13,7 +13,7 @@ const LIMITS = Object.freeze({ wallMs: 900000, targetMs: 90000, rssBytes: 1536 *
     decodedLayers: 16000000, deterministicCells: 2000000, targetSearches: 24,
     targetNodeAllowance: 300000, targetWalks: 4096, targetTransitions: 1000000,
     targetLayers: 1000000, targetCells: 262144, callTransitions: 8192,
-    batchCells: 4096, batchLayers: 65536, candidateWindow: 4096, fastSearches: 12 });
+    fixedNodeAllowance: 16000000, batchCells: 4096, batchLayers: 65536, candidateWindow: 4096, fastSearches: 12 });
 const CAPACITY = DiskCache.CAPACITY;
 const pools = new Map();
 const poolStates = new Map();
@@ -30,7 +30,7 @@ const distanceSquared = (a, b) => (a.locX - b.locX) ** 2 + (a.locY - b.locY) ** 
 const counters = () => ({ xyDraws: 0, sampledCells: 0, decodedLayers: 0, candidateLayers: 0,
     surfaceUnavailableCells: 0, blockedLayers: 0, outOfRangeLayers: 0,
     deterministicCells: 0, directWalkCalls: 0, strictWalkCalls: 0, localAuditWalkCalls: 0,
-    walkTransitions: 0, pathSearchRequests: 0, pathNodeAllowance: 0 });
+    walkTransitions: 0, pathSearchRequests: 0, pathNodeAllowance: 0, fixedPathNodeAllowance: 0 });
 
 class BudgetStop extends Error {
     constructor(limit, global = false) {
@@ -127,10 +127,15 @@ class Budget {
     }
     search(nodes) {
         this.poll(true);
+        const fixed = this.target?.kind === 'fixed';
+        // Fixed witnesses are diagnostic: authored fixed spawns do not consume
+        // them. Keep unresolved witnesses explicit without starving random pools.
+        if (fixed && this.work.fixedPathNodeAllowance + nodes > LIMITS.fixedNodeAllowance) this.stop('fixed:pathNodeAllowance');
         this.reserve('pathSearchRequests', 1, LIMITS.searches, LIMITS.targetSearches);
         this.reserve('pathNodeAllowance', nodes, LIMITS.nodeAllowance, LIMITS.targetNodeAllowance);
         this.add('pathSearchRequests');
         this.add('pathNodeAllowance', nodes);
+        if (fixed) this.add('fixedPathNodeAllowance', nodes);
     }
     scan() {
         this.tested();
@@ -575,7 +580,7 @@ function poolAttempt(target, initial, budget, proofs) {
         .map(key => [key, target.work[key] - before[key]])), reason: target.reason, limit: target.limit || null });
 }
 
-function auditFixed(inv, budget, proofs) {
+function auditFixed(inv, budget) {
     const groups = new Map();
     for (const record of inv.fixed) {
         try {
@@ -601,7 +606,7 @@ function auditFixed(inv, budget, proofs) {
                 const p = record.normalized;
                 target = { id: inv.targets.length + groups.size, kind: 'fixed', point: p, records: [], work: counters(), activeMs: 0,
                     domain: { minX: p.locX, maxX: p.locX, minY: p.locY, maxY: p.locY }, proofVersion: 0, stopped: false };
-                groups.set(key, target); proofs.register(target); proofs.enqueue(target);
+                groups.set(key, target);
             }
             target.records.push(record);
         } catch (error) {
@@ -720,13 +725,18 @@ function init(definitions, cacheOptions = {}) {
             });
         } else {
             for (const target of inv.targets) proofs.register(target);
-            const fixedTargets = auditFixed(inv, budget, proofs);
+            const fixedTargets = auditFixed(inv, budget);
             for (const target of inv.targets) {
                 if (budget.stopped) break;
                 poolAttempt(target, true, budget, proofs);
                 proofs.enqueue(target);
             }
-            for (const target of fixedTargets) proofs.enqueue(target);
+            // Register fixed targets only after random entry attempts, so their
+            // diagnostic witnesses cannot occupy the front of the retry queue.
+            for (const target of fixedTargets) {
+                proofs.register(target);
+                proofs.enqueue(target);
+            }
             // One pending entry per target. Delete processed queue storage in
             // batches, so repeated relevant wakes cannot retain queue history.
             let head = 0;
