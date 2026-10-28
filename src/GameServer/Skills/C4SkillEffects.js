@@ -63,7 +63,7 @@ function execute(session, actor, target, skill, context = {}) {
             ...semantic,
             ...semantic.selfEffect,
             stats: semantic.selfEffect.stats || {}
-        }, actor);
+        }, actor, result);
         return finish();
     }
 
@@ -104,14 +104,14 @@ function execute(session, actor, target, skill, context = {}) {
         // Battle Roar and Spirit of Ogre raise maximum HP before their percentage heal.
         const effectBeforeHeal = [109, 121].includes(Number(skill.fetchSelfId?.()));
         if (effectBeforeHeal && semantic.effect) {
-            result.effect = applyEffect(session, target, skill, semantic, actor);
+            result.effect = applyEffect(session, target, skill, semantic, actor, result);
         }
         result.heal = applyHealPercent(session, actor, target, skill, semantic, magicSkill, context.attack);
         if (semantic.manaHealPercent) {
             result.mpRestore = applyManaHealPercent(session, actor, target, skill, semantic, magicSkill, context.attack);
         }
         if (semantic.effect && !effectBeforeHeal) {
-            result.effect = applyEffect(session, target, skill, semantic, actor);
+            result.effect = applyEffect(session, target, skill, semantic, actor, result);
         }
         return finish();
     }
@@ -123,18 +123,18 @@ function execute(session, actor, target, skill, context = {}) {
 
     if (semantic.skillType === C4SkillRules.HEAL_HOT) {
         result.heal = applyHeal(session, actor, target, skill, semantic, magicSkill, context.attack);
-        result.effect = applyEffect(session, target, skill, semantic, actor);
+        result.effect = applyEffect(session, target, skill, semantic, actor, result);
         return finish();
     }
 
     if (semantic.skillType === C4SkillRules.HOT) {
-        result.effect = applyEffect(session, target, skill, semantic, actor);
+        result.effect = applyEffect(session, target, skill, semantic, actor, result);
         clearLoadedShot(context.attack || actor.attack, actor, magicSkill);
         return finish();
     }
 
     if (semantic.skillType === C4SkillRules.MANA_HOT) {
-        result.effect = applyEffect(session, target, skill, semantic, actor);
+        result.effect = applyEffect(session, target, skill, semantic, actor, result);
         clearLoadedShot(context.attack || actor.attack, actor, magicSkill);
         return finish();
     }
@@ -209,7 +209,7 @@ function execute(session, actor, target, skill, context = {}) {
                 ...semantic,
                 ...semantic.selfEffect,
                 stats: semantic.selfEffect.stats || {}
-            }, actor);
+            }, actor, result);
         }
         if (!rollBlow(actor, target, semantic, context.attack, rng)) {
             clearLoadedShot(context.attack, actor, magicSkill);
@@ -266,7 +266,7 @@ function execute(session, actor, target, skill, context = {}) {
                 ...semantic,
                 ...semantic.selfEffect,
                 stats: semantic.selfEffect.stats || {}
-            }, actor);
+            }, actor, result);
         }
         clearLoadedShot(context.attack || actor.attack, actor, magicSkill);
         return finish();
@@ -294,7 +294,7 @@ function execute(session, actor, target, skill, context = {}) {
             else {
                 clearNpcAggro(session, target, actor);
             }
-            if (semantic.effect) result.effect = applyEffect(session, target, skill, semantic, actor);
+            if (semantic.effect) result.effect = applyEffect(session, target, skill, semantic, actor, result);
             if (semantic.turnBack && typeof target?.fetchHead === 'function' && typeof target?.setHead === 'function') {
                 const oldHeading = Number(target.fetchHead()) & 0xffff;
                 const heading = Number(actor?.fetchHead?.()) & 0xffff;
@@ -319,7 +319,7 @@ function execute(session, actor, target, skill, context = {}) {
             result.cancelled = semantic.negateStats
                 ? applyNegate(session, effectTarget, semantic)
                 : applyCancel(session, effectTarget, semantic, rng);
-            if (semantic.effect) result.effect = applyEffect(session, effectTarget, skill, semantic, actor);
+            if (semantic.effect) result.effect = applyEffect(session, effectTarget, skill, semantic, actor, result);
         }
         clearLoadedShot(context.attack || actor.attack, actor, magicSkill);
         return finish();
@@ -333,7 +333,7 @@ function execute(session, actor, target, skill, context = {}) {
         result.heal = drain.heal;
         if (semantic.effect) {
             result.effectResisted = effectResisted;
-            if (!effectResisted) result.effect = applyEffect(session, target, skill, semantic, actor);
+            if (!effectResisted) result.effect = applyEffect(session, target, skill, semantic, actor, result);
         }
         return finish();
     }
@@ -374,7 +374,7 @@ function execute(session, actor, target, skill, context = {}) {
                 ? actor
                 : target;
             result.reflected = effectTarget === actor && target !== actor;
-            result.effect = applyEffect(session, effectTarget, skill, semantic, actor);
+            result.effect = applyEffect(session, effectTarget, skill, semantic, actor, result);
             if (semantic.removeTarget === true) clearTargetState(effectTarget?.session || session, effectTarget);
         }
         if (semantic.skillType === C4SkillRules.EFFECT) {
@@ -387,7 +387,7 @@ function execute(session, actor, target, skill, context = {}) {
             ...semantic,
             ...semantic.selfEffect,
             stats: semantic.selfEffect.stats || {}
-        }, actor);
+        }, actor, result);
     }
 
     return finish();
@@ -886,11 +886,35 @@ function applyDrain(session, actor, target, skill, semantic, magicSkill, attack,
     return { damage, heal: Math.max(0, nextHp - currentHp) };
 }
 
-function applyEffect(session, target, skill, semantic, source = session?.actor) {
+function admitRaidEffect(target, effect, result) {
+    const stun = effect.key === 'stun' || effect.category === 'stun' || effect.category === 'shock';
+    const physicalMute = effect.stats.physicalMute === true
+        || effect.key === 'physical_mute' || effect.category === 'physical_mute';
+    if ((!stun && !physicalMute) || !(target?.fetchIsRaidBoss?.() === true
+        || Number(target?.minionBossObjectId) > 0 || Number(target?.minionBossTemplateId) > 0)) return true;
+
+    result.effectResisted = true;
+    const stats = { ...effect.stats };
+    delete stats.physicalMute;
+    if (!Object.keys(stats).length && !effect.conditionalStats.length && !effect.situationalStats.length
+        && !effect.dot && !effect.manaDot && !effect.manaHot && !effect.hot) return false;
+
+    // Impairment and abnormal flags read key/category, not just stats. Keep the
+    // permitted payload and its stack/cleanse identity without leaving a stun
+    // marker or mutating the skill's shared semantic/stat objects.
+    effect.stats = stats;
+    if (effect.key === 'stun' || effect.key === 'physical_mute') effect.key += '_remainder';
+    if (effect.category === 'stun' || effect.category === 'shock' || effect.category === 'physical_mute') {
+        effect.category = 'debuff';
+    }
+    return true;
+}
+
+function applyEffect(session, target, skill, semantic, source = session?.actor, result) {
     const durationMs = Number(semantic.durationMs ?? skill.fetchBuffTime()) || 0;
     if (!durationMs || !semantic.effect) return null;
 
-    const effect = EffectStore.apply(target, {
+    const definition = {
         key: semantic.effect,
         id: skill.fetchSelfId(),
         level: skill.fetchLevel(),
@@ -911,7 +935,9 @@ function applyEffect(session, target, skill, semantic, source = session?.actor) 
         hot: hotFromSkill(skill, semantic),
         confusionMobOnly: semantic.confusionMobOnly,
         durationMs
-    });
+    };
+    if (!admitRaidEffect(target, definition, result)) return null;
+    const effect = EffectStore.apply(target, definition);
 
     // A stronger effect already occupies this C4 stack slot. The rejected cast
     // must not restart its DoT/HoT ticker, refresh its icon, or interrupt the
