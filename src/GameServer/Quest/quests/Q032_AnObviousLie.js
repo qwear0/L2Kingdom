@@ -12,8 +12,8 @@ const SOUND_ACCEPT = "ItemSound.quest_accept";
 const SOUND_ITEMGET = "ItemSound.quest_itemget";
 const SOUND_MIDDLE = "ItemSound.quest_middle";
 const SOUND_FINISH = "ItemSound.quest_finish";
-function service() {
-  return invoke("GameServer/Quest/QuestService");
+function steps() {
+  return invoke("GameServer/Quest/QuestStep");
 }
 function count(state, itemId) {
   return (
@@ -30,6 +30,8 @@ module.exports = {
   npcs: [MAXIMILIAN, GENTLER, MIKI],
   startNpcs: [MAXIMILIAN],
   killNpcs: [ALLIGATOR],
+  questItems: [MAP, HERB],
+  partyKill: { condition: 3, killerWeight: 3, rangeAfterSelection: true },
   eventNpc: (event) =>
     ({
       start: MAXIMILIAN,
@@ -44,67 +46,70 @@ module.exports = {
       rabbit: GENTLER,
     })[event] ?? null,
   async onEvent(state, event) {
-    const Quest = service();
     const actor = state.session.actor;
     if (event === "start" && !state.isStarted() && !state.isCompleted()) {
-      if (Number(actor.fetchLevel()) >= 45) return null;
-      await state.setState("started");
-      await state.set("cond", 1);
+      if (!(Number(actor.fetchLevel()) >= 45)) return null;
+      await steps().apply(state, { variables: { ...state.variables, cond: "1" } });
       state.playSound(SOUND_ACCEPT);
-      return page("Maximilian", "Visit Gentler in Giran.");
+      return page("Maximilian", "Visit Gentler at the magic shop in Giran.");
     }
-    if (event === "map" && state.isStarted() && state.getInt("cond") === 1) {
-      await Quest.giveItem(state.session, MAP, 1);
-      await state.set("cond", 2);
+    if (!state.isStarted()) return null;
+    const cond = state.getInt("cond");
+    if (event === "map" && cond === 1) {
+      await steps().apply(state, {
+        gives: [[MAP, 1]],
+        variables: { ...state.variables, cond: "2" },
+      });
       state.playSound(SOUND_MIDDLE);
-      return page("Gentler", "Take this map to Miki the Cat.");
+      return page("Gentler", "Take this map to Miki the Cat on Alligator Island.");
     }
-    if (event === "miki" && state.isStarted() && state.getInt("cond") === 2) {
-      if (!(await Quest.takeItem(state.session, MAP))) return null;
-      await state.set("cond", 3);
+    if (event === "miki" && cond === 2) {
+      if (count(state, MAP) < 1) return null;
+      await steps().apply(state, {
+        takes: [[MAP, 1]],
+        variables: { ...state.variables, cond: "3" },
+      });
       state.playSound(SOUND_MIDDLE);
-      return page("Miki the Cat", "Gather 20 medicinal herbs from Alligators.");
+      return page("Miki the Cat", "Gather 20 Medicinal Herbs from Alligators and take them to Gentler.");
     }
-    if (event === "herbs" && state.isStarted() && state.getInt("cond") === 4) {
-      if (!(await Quest.takeItem(state.session, HERB, 20))) return null;
-      await state.set("cond", 5);
+    if (event === "herbs" && cond === 4) {
+      if (count(state, HERB) < 20) return null;
+      await steps().apply(state, {
+        takes: [[HERB, 20]],
+        variables: { ...state.variables, cond: "5" },
+      });
       state.playSound(SOUND_MIDDLE);
       return page("Gentler", "Bring me 500 Spirit Ore.");
     }
-    if (event === "ore" && state.isStarted() && state.getInt("cond") === 5) {
+    if (event === "ore" && cond === 5) {
       if (count(state, SPIRIT_ORE) < 500)
         return page("Gentler", "You still need 500 Spirit Ore.");
-      await Quest.takeItem(state.session, SPIRIT_ORE, 500);
-      await state.set("cond", 6);
+      await steps().apply(state, {
+        takes: [[SPIRIT_ORE, 500]],
+        variables: { ...state.variables, cond: "6" },
+      });
       state.playSound(SOUND_MIDDLE);
-      return page("Gentler", "Return to Miki the Cat.");
+      return page("Gentler", "Miki was to pay for the materials. Return to him on Alligator Island.");
     }
-    if (
-      event === "message" &&
-      state.isStarted() &&
-      state.getInt("cond") === 6
-    ) {
-      await state.set("cond", 7);
+    if (event === "message" && cond === 6) {
+      await steps().apply(state, { variables: { ...state.variables, cond: "7" } });
       state.playSound(SOUND_MIDDLE);
-      return page("Miki the Cat", "Take my message back to Gentler.");
+      return page("Miki the Cat", "Gentler promised to make you an accessory. Ask him for it!");
     }
-    if (event === "return" && state.isStarted() && state.getInt("cond") === 7) {
-      await state.set("cond", 8);
+    if (event === "return" && cond === 7) {
+      await steps().apply(state, { variables: { ...state.variables, cond: "8" } });
       state.playSound(SOUND_MIDDLE);
-      return page("Gentler", "Choose the ears you would like made.");
+      return page("Gentler", "Bring 500 Suede and 1,000 Thread, then choose your ears.");
     }
-    if (
-      Object.hasOwn(REWARDS, event) &&
-      state.isStarted() &&
-      state.getInt("cond") === 8
-    ) {
+    if (Object.hasOwn(REWARDS, event) && cond === 8) {
       if (count(state, SUEDE) < 500 || count(state, THREAD) < 1000)
         return page("Gentler", "You need 500 Suede and 1,000 Thread.");
-      await Quest.takeItem(state.session, SUEDE, 500);
-      await Quest.takeItem(state.session, THREAD, 1000);
-      await Quest.giveItem(state.session, REWARDS[event], 1);
+      await steps().apply(state, {
+        takes: [[SUEDE, 500], [THREAD, 1000], ...steps().heldItems(state, [MAP, HERB])],
+        gives: [[REWARDS[event], 1]],
+        status: "completed",
+      });
       state.playSound(SOUND_FINISH);
-      await state.exit(false);
       return page("Gentler", "Your custom ears are ready.");
     }
     return null;
@@ -116,28 +121,28 @@ module.exports = {
       return page("Quest", "You have already completed this quest.");
     if (!state.isStarted())
       return npcId === MAXIMILIAN
-        ? Number(actor.fetchLevel()) < 45
+        ? Number(actor.fetchLevel()) >= 45
           ? page(
               "Maximilian",
               "Will you investigate an obvious lie?",
               '<a action="bypass -h quest 32 start">Accept.</a>',
             )
-          : page("Maximilian", "This task is for adventurers below level 45.")
+          : page("Maximilian", "This task requires level 45 or above.")
         : page("Quest", "You are not on a quest that involves this NPC.");
     const cond = state.getInt("cond");
-    if (npcId === MAXIMILIAN) return page("Maximilian", "Speak with Gentler.");
+    if (npcId === MAXIMILIAN) return page("Maximilian", "Speak with Gentler in Giran.");
     if (npcId === MIKI) {
       if (cond === 2)
         return page(
           "Miki the Cat",
-          "You brought Gentler’s map.",
+          "You brought Gentler's map.",
           '<a action="bypass -h quest 32 miki">Give Miki the map.</a>',
         );
       if (cond === 6)
         return page(
           "Miki the Cat",
           "I have a message for Gentler.",
-          '<a action="bypass -h quest 32 message">Receive Miki’s message.</a>',
+          '<a action="bypass -h quest 32 message">Receive Miki\u2019s message.</a>',
         );
       return page(
         "Miki the Cat",
@@ -149,7 +154,7 @@ module.exports = {
     if (cond === 1)
       return page(
         "Gentler",
-        "Take this map to Miki.",
+        "Take this map to Miki the Cat on Alligator Island.",
         '<a action="bypass -h quest 32 map">Receive the map.</a>',
       );
     if (cond === 4)
@@ -168,23 +173,25 @@ module.exports = {
       return page(
         "Gentler",
         "What did Miki say?",
-        '<a action="bypass -h quest 32 return">Deliver Miki’s message.</a>',
+        '<a action="bypass -h quest 32 return">Deliver Miki\u2019s message.</a>',
       );
     if (cond === 8)
       return page(
         "Gentler",
-        "Which ears would you like?",
-        '<a action="bypass -h quest 32 cat">Cat ears.</a><br><a action="bypass -h quest 32 racoon">Racoon ears.</a><br><a action="bypass -h quest 32 rabbit">Rabbit ears.</a>',
+        "For 500 Suede and 1,000 Thread, which ears would you like?",
+        '<a action="bypass -h quest 32 cat">Cat ears.</a><br><a action="bypass -h quest 32 racoon">Raccoon ears.</a><br><a action="bypass -h quest 32 rabbit">Rabbit ears.</a>',
       );
-    return page("Gentler", "Continue your errand for Miki.");
+    return page("Gentler", "Continue your errand for Miki on Alligator Island.");
   },
   async onKill(state) {
-    if (state.getInt("cond") !== 3) return;
+    if (!state.isStarted() || state.getInt("cond") !== 3) return;
     const current = count(state, HERB);
-    const amount = service().questDropAmount(1, 20, current);
-    if (!amount) return;
-    await service().giveItem(state.session, HERB, amount);
-    state.playSound(current + amount >= 20 ? SOUND_MIDDLE : SOUND_ITEMGET);
-    if (current + amount >= 20) await state.set("cond", 4);
+    const amount = Math.max(0, Math.min(1, 20 - current));
+    const done = current + amount >= 20;
+    await steps().apply(state, {
+      gives: amount ? [[HERB, amount]] : [],
+      variables: { ...state.variables, cond: done ? "4" : "3" },
+    });
+    state.playSound(done ? SOUND_MIDDLE : SOUND_ITEMGET);
   },
 };

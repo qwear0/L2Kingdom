@@ -8,11 +8,17 @@ const ConsoleText = invoke("GameServer/ConsoleText");
 const World = invoke("GameServer/World/World");
 const ClassTransfer = invoke("GameServer/ClassTransfer");
 const QuestRegistry = require("./QuestRegistry");
+const NpcObjectIndex = require("../World/NpcObjectIndex");
 
 const quests = QuestRegistry.activeQuests();
 const byId = new Map(quests.map((quest) => [quest.id, quest]));
 const attackQuests = new Map();
 const skillQuests = new Map();
+const partyKillQuests = new Map();
+for (const quest of quests) if (quest.partyKill) for (const npcId of quest.killNpcs || []) {
+  if (!partyKillQuests.has(npcId)) partyKillQuests.set(npcId, []);
+  partyKillQuests.get(npcId).push(quest);
+}
 for (const quest of quests) for (const npcId of quest.skillNpcs || []) {
   if (!skillQuests.has(npcId)) skillQuests.set(npcId, []);
   skillQuests.get(npcId).push(quest);
@@ -384,28 +390,108 @@ function rewardExpSp(session, exp, sp) {
   ExperienceReward(session, session.actor, baseExp, baseSp);
 }
 
+function killLocation(actor) {
+  return { x: actor.fetchLocX(), y: actor.fetchLocY(), z: actor.fetchLocZ(), radius: actor.fetchRadius() };
+}
+
+function inQuestPartyRange(actor, target, collision = false) {
+  const radius = 1500 + (collision ? actor.fetchRadius() + target.radius : 0);
+  return (actor.fetchLocX() - target.x) ** 2 + (actor.fetchLocY() - target.y) ** 2
+    + (actor.fetchLocZ() - target.z) ** 2 <= radius ** 2;
+}
+
+function currentKillMember(member) {
+  const current = World.registeredActorById(member.actor.fetchId());
+  return member.session.actor === member.actor && current?.session === member.session && current.actor === member.actor;
+}
+
+function partyKillContext(session, npc) {
+  const members = new Set([session]);
+  if (session.hotBackgroundPartyId && !session.partyCompanion) {
+    for (const member of invoke("GameServer/Bot/AI/HotBackgroundParty").roster(session)) members.add(member);
+  } else {
+    const leader = session.partyCompanion ? session.followPlayerSession : session;
+    if (leader) for (const member of World.pvpPartySessionsForKey(leader)) {
+      if (member === leader || (member.partyCompanion && member.followPlayerSession === leader)) members.add(member);
+    }
+  }
+  const actor = session.actor;
+  const targetId = Number(actor.fetchDestId());
+  const target = targetId === npc.fetchId() ? npc
+    : World.registeredActorById(targetId)?.actor || NpcObjectIndex.find(World, targetId) || actor;
+  return {
+    members: [...members].filter(member => member.actor).map(member => ({ session: member, actor: member.actor })),
+    npcLocation: killLocation(npc),
+    targetLocation: killLocation(target),
+    inParty: members.size > 1,
+  };
+}
+
+async function partyKill(session, actor, npc, source, handlers, context) {
+  // Never hold the killer's queue while awaiting another member's queue:
+  // simultaneous kills by opposite members would otherwise deadlock.
+  await Promise.all(context.members.map(member => mutate(member.session, async () => {
+    if (currentKillMember(member)) await ensureLoaded(member.session);
+  })));
+  if (session.actor !== actor) return;
+  for (const quest of handlers) {
+    const { condition, killerWeight, rangeAfterSelection } = quest.partyKill;
+    const eligible = member => {
+      if (!currentKillMember(member)) return false;
+      const state = states(member.session).get(quest.id);
+      return state?.isStarted() && state.getInt("cond") === condition;
+    };
+    const candidates = [];
+    for (const member of context.members) {
+      if (!eligible(member)) continue;
+      if (!rangeAfterSelection && context.inParty && !inQuestPartyRange(member.actor, context.targetLocation)) continue;
+      const weight = member.session === session ? killerWeight : 1;
+      for (let i = 0; i < weight; i++) candidates.push(member);
+    }
+    if (!candidates.length) continue;
+    const selected = candidates[Math.floor(Math.random() * candidates.length)];
+    // Q32's source draws first and checks range afterwards, without rerolling.
+    // Q35 instead filters around the killer's selected target before drawing.
+    if (rangeAfterSelection && !inQuestPartyRange(selected.actor, context.npcLocation, true)) continue;
+    await mutate(selected.session, async () => {
+      if (session.actor !== actor || !eligible(selected)) return;
+      const ownerId = Number(npc.questSpawn?.ownerId) || 0;
+      if (ownerId && ownerId !== Number(selected.actor.fetchId())) return;
+      const before = activeQuestSnapshot(selected.session);
+      await quest.onKill(states(selected.session).get(quest.id), npc, source);
+      if (before !== activeQuestSnapshot(selected.session)) syncActiveQuests(selected.session);
+    });
+  }
+}
+
 async function onKill(session, npc, source = session?.actor) {
   // Work queued for one character is dropped once the connection selected another.
   const actor = session.actor;
-  return mutate(session, async () => {
-    if (session.actor !== actor) return;
+  const spawnedQuestId = Number(npc.questSpawn?.questId) || 0;
+  const registered = partyKillQuests.get(Number(npc.fetchSelfId()));
+  const handlers = spawnedQuestId ? registered?.filter(quest => spawnedQuestId === quest.id) : registered;
+  const context = handlers?.length ? partyKillContext(session, npc) : null;
+  const accepted = await mutate(session, async () => {
+    if (session.actor !== actor) return false;
     await ensureLoaded(session);
-    if (session.actor !== actor) return;
+    if (session.actor !== actor) return false;
     await invoke("GameServer/Clan/ClanAllianceService").onKill(session, npc);
-    if (session.actor !== actor) return;
+    if (session.actor !== actor) return false;
     const ownerId = Number(npc.questSpawn?.ownerId) || 0;
-    if (ownerId && ownerId !== Number(session.actor.fetchId())) return;
-    const spawnedQuestId = Number(npc.questSpawn?.questId) || 0;
+    if (ownerId && ownerId !== Number(session.actor.fetchId())) return false;
     const before = activeQuestSnapshot(session);
     const npcId = Number(npc.fetchSelfId());
     for (const quest of quests) {
+      if (quest.partyKill) continue;
       if (spawnedQuestId && spawnedQuestId !== quest.id) continue;
       if (!quest.killNpcs?.includes(npcId)) continue;
       const state = states(session).get(quest.id);
       if (state?.isStarted()) await quest.onKill(state, npc, source);
     }
     if (before !== activeQuestSnapshot(session)) syncActiveQuests(session);
+    return true;
   });
+  if (accepted && context) await partyKill(session, actor, npc, source, handlers, context);
 }
 
 function onAttack(session, npc, source, damage) {

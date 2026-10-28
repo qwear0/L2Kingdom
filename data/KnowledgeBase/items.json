@@ -637393,6 +637393,31 @@
   },
   {
     "grade": "none",
+    "id": 7077,
+    "kind": "Other.None",
+    "name": "Jewel Box",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": false,
+        "stackable": true
+      },
+      "selfId": 7077,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 0,
+        "name": "Jewel Box",
+        "price": 0
+      }
+    }
+  },
+  {
+    "grade": "none",
     "id": 7078,
     "kind": "Other.Quest",
     "name": "Sewing kit",
@@ -637437,6 +637462,31 @@
         "kind": "Other.None",
         "mass": 0,
         "name": "Fragment of Dimension",
+        "price": 0
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 7113,
+    "kind": "Other.None",
+    "name": "Dress Shoe Box",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": false,
+        "stackable": true
+      },
+      "selfId": 7113,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 0,
+        "name": "Dress Shoe Box",
         "price": 0
       }
     }
@@ -637893,6 +637943,56 @@
   },
   {
     "grade": "none",
+    "id": 7159,
+    "kind": "Other.Quest",
+    "name": "Box of Cookies",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": false,
+        "stackable": true
+      },
+      "selfId": 7159,
+      "template": {
+        "class1": 4,
+        "class2": 3,
+        "kind": "Other.Quest",
+        "mass": 0,
+        "name": "Box of Cookies",
+        "price": 0
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 7160,
+    "kind": "Other.Quest",
+    "name": "Luxury Wine",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": false,
+        "stackable": true
+      },
+      "selfId": 7160,
+      "template": {
+        "class1": 4,
+        "class2": 3,
+        "kind": "Other.Quest",
+        "mass": 0,
+        "name": "Luxury Wine",
+        "price": 0
+      }
+    }
+  },
+  {
+    "grade": "none",
     "id": 7161,
     "kind": "Other.Quest",
     "name": "Skein of Yarn",
@@ -637918,6 +638018,31 @@
   },
   {
     "grade": "none",
+    "id": 7162,
+    "kind": "Other.Quest",
+    "name": "Rough Jewel",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": false,
+        "stackable": true
+      },
+      "selfId": 7162,
+      "template": {
+        "class1": 4,
+        "class2": 3,
+        "kind": "Other.Quest",
+        "mass": 0,
+        "name": "Rough Jewel",
+        "price": 0
+      }
+    }
+  },
+  {
+    "grade": "none",
     "id": 7163,
     "kind": "Other.Quest",
     "name": "Piece of Reinforced Steel",
@@ -637937,6 +638062,81 @@
         "kind": "Other.Quest",
         "mass": 0,
         "name": "Piece of Reinforced Steel",
+        "price": 0
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 7164,
+    "kind": "Other.Quest",
+    "name": "Signet Ring",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": false,
+        "stackable": true
+      },
+      "selfId": 7164,
+      "template": {
+        "class1": 4,
+        "class2": 3,
+        "kind": "Other.Quest",
+        "mass": 0,
+        "name": "Signet Ring",
+        "price": 0
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 7165,
+    "kind": "Other.Quest",
+    "name": "Map",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": false,
+        "stackable": true
+      },
+      "selfId": 7165,
+      "template": {
+        "class1": 4,
+        "class2": 3,
+        "kind": "Other.Quest",
+        "mass": 0,
+        "name": "Map",
+        "price": 0
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 7166,
+    "kind": "Other.Quest",
+    "name": "Medicinal Herb",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": false,
+        "stackable": true
+      },
+      "selfId": 7166,
+      "template": {
+        "class1": 4,
+        "class2": 3,
+        "kind": "Other.Quest",
+        "mass": 0,
+        "name": "Medicinal Herb",
         "price": 0
       }
     }

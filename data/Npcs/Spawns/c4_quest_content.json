@@ -941,6 +941,46 @@
                 "total": 1,
                 "respawn": 60,
                 "bias": 0
+            },
+            {
+                "selfId": 8706,
+                "name": "Miki the Cat",
+                "coords": [
+                    { "locX": 44208, "locY": 206560, "locZ": -3760, "head": 26000 }
+                ],
+                "total": 1,
+                "respawn": 60,
+                "bias": 0
+            },
+            {
+                "selfId": 8520,
+                "name": "Leikar",
+                "coords": [
+                    { "locX": 146336, "locY": 27088, "locZ": -2208, "head": 0 }
+                ],
+                "total": 1,
+                "respawn": 60,
+                "bias": 0
+            },
+            {
+                "selfId": 8521,
+                "name": "Jeremy",
+                "coords": [
+                    { "locX": 149520, "locY": -112704, "locZ": -2065, "head": 10000 }
+                ],
+                "total": 1,
+                "respawn": 60,
+                "bias": 0
+            },
+            {
+                "selfId": 8627,
+                "name": "Mist",
+                "coords": [
+                    { "locX": 145232, "locY": -104736, "locZ": -3681, "head": 0 }
+                ],
+                "total": 1,
+                "respawn": 60,
+                "bias": 0
             }
         ]
     }
