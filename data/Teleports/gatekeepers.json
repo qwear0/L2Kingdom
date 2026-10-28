@@ -1,0 +1,350 @@
+{
+    "destinations": [
+        { "id": 30, "locX": 48736, "locY": 248463, "locZ": -6162, "price": 0 },
+        { "id": 131, "locX": 43799, "locY": -47727, "locZ": -798, "price": 150 },
+        { "id": 59, "locX": 83400, "locY": 147943, "locZ": -3404, "price": 9200 },
+        { "id": 60, "locX": 47942, "locY": 186764, "locZ": -3485, "price": 8500 },
+        { "id": 65, "locX": 15670, "locY": 142983, "locZ": -2705, "price": 9800 },
+        { "id": 66, "locX": 82684, "locY": 183551, "locZ": -3597, "price": 2400 },
+        { "id": 67, "locX": 91186, "locY": 217104, "locZ": -3649, "price": 2400 },
+        { "id": 68, "locX": 126450, "locY": 174774, "locZ": -3079, "price": 3500 },
+        { "id": 1, "locX": -80826, "locY": 149775, "locZ": -3043, "price": 6400 },
+        { "id": 2, "locX": -12672, "locY": 122776, "locZ": -3116, "price": 3700 },
+        { "id": 3, "locX": 46934, "locY": 51467, "locZ": -2977, "price": 3700 },
+        { "id": 4, "locX": 9745, "locY": 15606, "locZ": -4574, "price": 3700 },
+        { "id": 5, "locX": -80826, "locY": 149775, "locZ": -3043, "price": 2900 },
+        { "id": 6, "locX": 15670, "locY": 142983, "locZ": -2705, "price": 4100 },
+        { "id": 7, "locX": -44836, "locY": -112524, "locZ": -235, "price": 6000 },
+        { "id": 8, "locX": 115113, "locY": -178212, "locZ": -901, "price": 6000 },
+        { "id": 9, "locX": -84318, "locY": 244579, "locZ": -3730, "price": 18000 },
+        { "id": 10, "locX": 46934, "locY": 51467, "locZ": -2977, "price": 6400 },
+        { "id": 11, "locX": 9745, "locY": 15606, "locZ": -4574, "price": 6400 },
+        { "id": 12, "locX": -12672, "locY": 122776, "locZ": -3116, "price": 2900 },
+        { "id": 13, "locX": -16730, "locY": 209417, "locZ": -3664, "price": 2400 },
+        { "id": 15, "locX": -80826, "locY": 149775, "locZ": -3043, "price": 18000 },
+        { "id": 16, "locX": -80826, "locY": 149775, "locZ": -3043, "price": 3000 },
+        { "id": 17, "locX": 169008, "locY": -208272, "locZ": -3504, "price": 700 },
+        { "id": 18, "locX": -12672, "locY": 122776, "locZ": -3116, "price": 4100 },
+        { "id": 19, "locX": 83400, "locY": 147943, "locZ": -3404, "price": 8100 },
+        { "id": 20, "locX": 47942, "locY": 186764, "locZ": -3485, "price": 6500 },
+        { "id": 25, "locX": 15670, "locY": 142983, "locZ": -2705, "price": 8100 },
+        { "id": 26, "locX": 82956, "locY": 53162, "locZ": -1495, "price": 11000 },
+        { "id": 27, "locX": 117088, "locY": 76931, "locZ": -2696, "price": 9400 },
+        { "id": 28, "locX": 105918, "locY": 109759, "locZ": -3207, "price": 5300 },
+        { "id": 32, "locX": 85399, "locY": 16197, "locZ": -3679, "price": 0 },
+        { "id": 33, "locX": 85399, "locY": 16197, "locZ": -2809, "price": 0 },
+        { "id": 34, "locX": 85399, "locY": 16197, "locZ": -2293, "price": 0 },
+        { "id": 35, "locX": 85399, "locY": 16197, "locZ": -1776, "price": 0 },
+        { "id": 47, "locX": 83400, "locY": 147943, "locZ": -3404, "price": 11000 },
+        { "id": 48, "locX": 85348, "locY": 16142, "locZ": -3699, "price": 4400 },
+        { "id": 49, "locX": 117088, "locY": 76931, "locZ": -2696, "price": 4900 },
+        { "id": 50, "locX": 105918, "locY": 109759, "locZ": -3207, "price": 7300 },
+        { "id": 51, "locX": 146783, "locY": 25808, "locZ": -2008, "price": 13000 },
+        { "id": 39, "locX": 85348, "locY": 16142, "locZ": -3699, "price": 12000 },
+        { "id": 40, "locX": 82956, "locY": 53162, "locZ": -1495, "price": 13000 },
+        { "id": 41, "locX": 117088, "locY": 76931, "locZ": -2696, "price": 11000 },
+        { "id": 76, "locX": 146440, "locY": 46723, "locZ": -3432, "price": 4100 },
+        { "id": 77, "locX": -25472, "locY": 77728, "locZ": -3440, "price": 35000 },
+        { "id": 78, "locX": -55385, "locY": 78667, "locZ": -3012, "price": 41000 },
+        { "id": 79, "locX": 79296, "locY": 209584, "locZ": -3704, "price": 39000 },
+        { "id": 80, "locX": -23165, "locY": 13827, "locZ": -3172, "price": 33000 },
+        { "id": 81, "locX": 159455, "locY": -12931, "locZ": -2872, "price": 1400 },
+        { "id": 82, "locX": 185319, "locY": 20218, "locZ": -3264, "price": 1400 },
+        { "id": 83, "locX": 163341, "locY": 91374, "locZ": -3320, "price": 2400 },
+        { "id": 84, "locX": 167285, "locY": 37109, "locZ": -4008, "price": 840 },
+        { "id": 134, "locX": 43799, "locY": -47727, "locZ": -798, "price": 25000 },
+        { "id": 135, "locX": 147928, "locY": -55273, "locZ": -2734, "price": 16000 },
+        { "id": 42, "locX": 83400, "locY": 147943, "locZ": -3404, "price": 9400 },
+        { "id": 43, "locX": 82956, "locY": 53162, "locZ": -1495, "price": 4900 },
+        { "id": 44, "locX": 85348, "locY": 16142, "locZ": -3699, "price": 8200 },
+        { "id": 45, "locX": 105918, "locY": 109759, "locZ": -3207, "price": 4100 },
+        { "id": 46, "locX": 146783, "locY": 25808, "locZ": -2008, "price": 11000 },
+        { "id": 99, "locX": 104426, "locY": 33746, "locZ": -3800, "price": 3700 },
+        { "id": 100, "locX": 124904, "locY": 61992, "locZ": -3920, "price": 1400 },
+        { "id": 101, "locX": 142065, "locY": 81300, "locZ": -3000, "price": 2100 },
+        { "id": 108, "locX": 43799, "locY": -47727, "locZ": -798, "price": 20000 },
+        { "id": 109, "locX": 125543, "locY": -40953, "locZ": -3724, "price": 950 },
+        { "id": 110, "locX": 146954, "locY": -67390, "locZ": -3660, "price": 420 },
+        { "id": 111, "locX": 169178, "locY": -116244, "locZ": -2421, "price": 2300 },
+        { "id": 112, "locX": 115358, "locY": 132811, "locZ": -3103, "price": 38000 },
+        { "id": 113, "locX": 137480, "locY": 79641, "locZ": -3701, "price": 27000 },
+        { "id": 114, "locX": -55385, "locY": 78667, "locZ": -3012, "price": 48000 },
+        { "id": 115, "locX": 110399, "locY": 84041, "locZ": -4813, "price": 29000 },
+        { "id": 116, "locX": 79296, "locY": 209584, "locZ": -3704, "price": 54000 },
+        { "id": 117, "locX": -23165, "locY": 13827, "locZ": -3172, "price": 36000 },
+        { "id": 118, "locX": 168882, "locY": -18057, "locZ": -3173, "price": 8500 },
+        { "id": 119, "locX": 147928, "locY": -55273, "locZ": -2734, "price": 12000 },
+        { "id": 120, "locX": 83400, "locY": 147943, "locZ": -3404, "price": 23000 },
+        { "id": 121, "locX": 146783, "locY": 25808, "locZ": -2008, "price": 15000 },
+        { "id": 122, "locX": 38320, "locY": -48092, "locZ": -1153, "price": 150 },
+        { "id": 123, "locX": 38275, "locY": -48065, "locZ": 896, "price": 150 },
+        { "id": 124, "locX": 52112, "locY": -53939, "locZ": -3159, "price": 290 },
+        { "id": 125, "locX": 70006, "locY": -49902, "locZ": -3251, "price": 710 },
+        { "id": 126, "locX": 74379, "locY": 78887, "locZ": -3397, "price": 25000 },
+        { "id": 127, "locX": -25472, "locY": 77728, "locZ": -3440, "price": 28000 },
+        { "id": 128, "locX": 115358, "locY": 132811, "locZ": -3103, "price": 38000 },
+        { "id": 129, "locX": 137480, "locY": 79641, "locZ": -3701, "price": 31000 },
+        { "id": 130, "locX": -55385, "locY": 78667, "locZ": -3012, "price": 32000 },
+        { "id": 132, "locX": 146783, "locY": 25808, "locZ": -2008, "price": 16000 },
+        { "id": 69, "locX": 122881, "locY": 110792, "locZ": -3722, "price": 6400 },
+        { "id": 70, "locX": 111409, "locY": 219364, "locZ": -3545, "price": 9200 },
+        { "id": 71, "locX": -25472, "locY": 77728, "locZ": -3440, "price": 15500 },
+        { "id": 72, "locX": -55385, "locY": 78667, "locZ": -3012, "price": 18600 },
+        { "id": 73, "locX": 79296, "locY": 209584, "locZ": -3704, "price": 9800 },
+        { "id": 74, "locX": -23165, "locY": 13827, "locZ": -3172, "price": 20400 },
+        { "id": 85, "locX": 111409, "locY": 219364, "locZ": -3545, "price": 9800 },
+        { "id": 86, "locX": 46467, "locY": 126885, "locZ": -3720, "price": 1900 },
+        { "id": 87, "locX": 20505, "locY": 189036, "locZ": -3344, "price": 2500 },
+        { "id": 88, "locX": -23789, "locY": 169683, "locZ": -3424, "price": 1000 },
+        { "id": 89, "locX": -16730, "locY": 209417, "locZ": -3664, "price": 2400 },
+        { "id": 90, "locX": -46932, "locY": 140883, "locZ": -2936, "price": 900 },
+        { "id": 91, "locX": -70387, "locY": 115501, "locZ": -3472, "price": 1000 },
+        { "id": 92, "locX": -45210, "locY": 202654, "locZ": -3592, "price": 1700 },
+        { "id": 93, "locX": -8804, "locY": -114748, "locZ": -3088, "price": 410 },
+        { "id": 94, "locX": -17870, "locY": -90980, "locZ": -2528, "price": 620 },
+        { "id": 96, "locX": 7603, "locY": -138871, "locZ": -920, "price": 720 },
+        { "id": 97, "locX": 87252, "locY": 85514, "locZ": -3056, "price": 2700 },
+        { "id": 98, "locX": 64328, "locY": 26803, "locZ": -3768, "price": 2700 },
+        { "id": 418, "locX": 155535, "locY": -173560, "locZ": 2495, "price": 290 },
+        { "id": 419, "locX": 179039, "locY": -184080, "locZ": -319, "price": 680 },
+        { "id": 464, "locX": -22224, "locY": 14168, "locZ": -3232, "price": 380 },
+        { "id": 465, "locX": -56532, "locY": 78321, "locZ": -2960, "price": 1800 },
+        { "id": 466, "locX": -30777, "locY": 49750, "locZ": -3552, "price": 480 },
+        { "id": 467, "locX": -23520, "locY": 68688, "locZ": -3640, "price": 760 },
+        { "id": 468, "locX": 21362, "locY": 51122, "locZ": -3688, "price": 300 },
+        { "id": 469, "locX": -10612, "locY": 75881, "locZ": -3592, "price": 740 },
+        { "id": 470, "locX": 29294, "locY": 74968, "locZ": -3776, "price": 2500 },
+        { "id": 471, "locX": 9340, "locY": -112509, "locZ": -2536, "price": 650 },
+        { "id": 462, "locX": 49315, "locY": 248452, "locZ": -5960, "price": 2500 },
+        { "id": 1001, "locX": -99678, "locY": 237562, "locZ": -3567, "price": 200 },
+        { "id": 1002, "locX": -101294, "locY": 212553, "locZ": -3093, "price": 3000 },
+        { "id": 1003, "locX": -113329, "locY": 235327, "locZ": -3653, "price": 2500 },
+        { "id": 1004, "locX": -107456, "locY": 242669, "locZ": -3493, "price": 2300 },
+        { "id": 136, "locX": 47942, "locY": 186764, "locZ": -3485, "price": 6300 }
+    ],
+    "gatekeepers": [
+        {
+            "npcId": 7427,
+            "routes": [
+                { "destinationId": 30, "label": "Teleport into the ruins" }
+            ]
+        },
+        {
+            "npcId": 8698,
+            "routes": [
+                { "destinationId": 131, "label": "Rune Castle Town Store" },
+                { "destinationId": 122, "label": "Rune Castle Town Guild" }
+            ]
+        },
+        {
+            "npcId": 8699,
+            "routes": [
+                { "destinationId": 131, "label": "Rune Castle Town Store" },
+                { "destinationId": 123, "label": "Rune Castle Town Temple" }
+            ]
+        },
+        {
+            "npcId": 7899,
+            "routes": [
+                { "destinationId": 59, "label": "The Town of Giran" },
+                { "destinationId": 60, "label": "Giran Harbor" },
+                { "destinationId": 65, "label": "The Town of Dion" },
+                { "destinationId": 66, "label": "Field of Silence" },
+                { "destinationId": 67, "label": "Field of Whispers" },
+                { "destinationId": 68, "label": "Entrance to Alligator Island" }
+            ]
+        },
+        {
+            "npcId": 7006,
+            "routes": [
+                { "destinationId": 15, "label": "The Village of Gludin" },
+                { "destinationId": 1001, "label": "Obelisk of Victory" },
+                { "destinationId": 1002, "label": "Western Territory of Talking Island" },
+                { "destinationId": 462, "label": "Elven Ruins" },
+                { "destinationId": 1004, "label": "Singing Waterfall" }
+            ]
+        },
+        {
+            "npcId": 7059,
+            "routes": [
+                { "destinationId": 18, "label": "The Town of Gludio" },
+                { "destinationId": 19, "label": "The Town of Giran" },
+                { "destinationId": 20, "label": "Giran Harbor" },
+                { "destinationId": 85, "label": "Heine" },
+                { "destinationId": 86, "label": "Partisan Hideaway" },
+                { "destinationId": 87, "label": "Bee Hive" }
+            ]
+        },
+        {
+            "npcId": 7080,
+            "routes": [
+                { "destinationId": 25, "label": "The Town of Dion" },
+                { "destinationId": 26, "label": "Oren Castle Town" },
+                { "destinationId": 27, "label": "Hunter's Village" },
+                { "destinationId": 136, "label": "Giran Harbor" },
+                { "destinationId": 69, "label": "Dragon Valley" },
+                { "destinationId": 28, "label": "Hardin's Private Academy" },
+                { "destinationId": 70, "label": "Heine" },
+                { "destinationId": 71, "label": "Patriots Necropolis" },
+                { "destinationId": 72, "label": "Ascetics Necropolis" },
+                { "destinationId": 73, "label": "Saints Necropolis" },
+                { "destinationId": 74, "label": "Catacomb of Dark Omens" }
+            ]
+        },
+        {
+            "npcId": 7134,
+            "routes": [
+                { "destinationId": 1, "label": "The Village of Gludin" },
+                { "destinationId": 2, "label": "The Town of Gludio" },
+                { "destinationId": 464, "label": "Dark Forest" },
+                { "destinationId": 465, "label": "Spider Nest" },
+                { "destinationId": 466, "label": "Swampland" },
+                { "destinationId": 467, "label": "Neutral Zone" }
+            ]
+        },
+        {
+            "npcId": 7146,
+            "routes": [
+                { "destinationId": 1, "label": "The Village of Gludin" },
+                { "destinationId": 2, "label": "The Town of Gludio" },
+                { "destinationId": 468, "label": "Elven Forest" },
+                { "destinationId": 469, "label": "Neutral Zone" },
+                { "destinationId": 470, "label": "Elven Fortress" }
+            ]
+        },
+        {
+            "npcId": 7162,
+            "routes": [
+                { "destinationId": 32, "label": "Ground Floor Lobby" },
+                { "destinationId": 33, "label": "1st Floor Human Wizard Guild" },
+                { "destinationId": 34, "label": "2nd Floor Elven Wizard Guild" },
+                { "destinationId": 35, "label": "3rd Floor Dark Wizard Guild" }
+            ]
+        },
+        {
+            "npcId": 7177,
+            "routes": [
+                { "destinationId": 47, "label": "The Town of Giran" },
+                { "destinationId": 48, "label": "Ivory Tower" },
+                { "destinationId": 49, "label": "Hunter's Village" },
+                { "destinationId": 50, "label": "Hardin's Private Academy" },
+                { "destinationId": 51, "label": "Aden Castle Town" },
+                { "destinationId": 97, "label": "Plains of the Lizardmen" },
+                { "destinationId": 98, "label": "Sea of Spores" }
+            ]
+        },
+        {
+            "npcId": 7233,
+            "routes": [
+                { "destinationId": 42, "label": "The Town of Giran" },
+                { "destinationId": 43, "label": "Oren Castle Town" },
+                { "destinationId": 44, "label": "Ivory Tower" },
+                { "destinationId": 45, "label": "Hardin's Private Academy" },
+                { "destinationId": 46, "label": "Aden Castle Town" },
+                { "destinationId": 99, "label": "Northern Pathway of the Enchanted Valley" },
+                { "destinationId": 100, "label": "Southern Pathway of the Enchanted Valley" },
+                { "destinationId": 101, "label": "Entrance to the Forest of Mirrors" }
+            ]
+        },
+        {
+            "npcId": 7848,
+            "routes": [
+                { "destinationId": 41, "label": "Hunter's Village" },
+                { "destinationId": 40, "label": "Oren Castle Town" },
+                { "destinationId": 134, "label": "Rune Castle Town" },
+                { "destinationId": 135, "label": "Goddard Castle Town" },
+                { "destinationId": 39, "label": "Ivory Tower" },
+                { "destinationId": 76, "label": "Coliseum" },
+                { "destinationId": 84, "label": "Forsaken Plains" },
+                { "destinationId": 82, "label": "The Forbidden Gateway" },
+                { "destinationId": 81, "label": "Blazing Swamp" },
+                { "destinationId": 83, "label": "The Front of Anghell Waterfall" },
+                { "destinationId": 77, "label": "Patriots Necropolis" },
+                { "destinationId": 78, "label": "Ascetics Necropolis" },
+                { "destinationId": 79, "label": "Saints Necropolis" },
+                { "destinationId": 80, "label": "Catacomb of Dark Omens" }
+            ]
+        },
+        {
+            "npcId": 8275,
+            "routes": [
+                { "destinationId": 132, "label": "Aden Castle Town" },
+                { "destinationId": 108, "label": "Rune Castle Town" },
+                { "destinationId": 109, "label": "Varka Silenos Stronghold" },
+                { "destinationId": 110, "label": "Ketra Orc Outpost" },
+                { "destinationId": 111, "label": "Entrance to the Forge of the Gods" },
+                { "destinationId": 112, "label": "Martyrs Necropolis" },
+                { "destinationId": 113, "label": "Catacomb of the Witch" },
+                { "destinationId": 114, "label": "Ascetics Necropolis" },
+                { "destinationId": 115, "label": "Catacomb of the Forbidden Path" },
+                { "destinationId": 116, "label": "Saints Necropolis" },
+                { "destinationId": 117, "label": "Catacomb of Dark Omens" },
+                { "destinationId": 118, "label": "Disciples Necropolis" }
+            ]
+        },
+        {
+            "npcId": 8320,
+            "routes": [
+                { "destinationId": 119, "label": "Goddard Castle Town" },
+                { "destinationId": 120, "label": "The Town of Giran" },
+                { "destinationId": 121, "label": "Aden Castle Town" },
+                { "destinationId": 122, "label": "Rune Castle Town Guild" },
+                { "destinationId": 123, "label": "Rune Castle Town Temple" },
+                { "destinationId": 124, "label": "Entrance to the Forest of the Dead" },
+                { "destinationId": 125, "label": "Western Entrance to the Swamp of Screams" },
+                { "destinationId": 126, "label": "Catacomb of the Apostate" },
+                { "destinationId": 127, "label": "Patriots Necropolis" },
+                { "destinationId": 128, "label": "Martyrs Necropolis" },
+                { "destinationId": 129, "label": "Catacomb of the Witch" },
+                { "destinationId": 130, "label": "Ascetics Necropolis" }
+            ]
+        },
+        {
+            "npcId": 7256,
+            "routes": [
+                { "destinationId": 3, "label": "The Elven Village" },
+                { "destinationId": 4, "label": "The Dark Elven Village" },
+                { "destinationId": 5, "label": "The Village of Gludin" },
+                { "destinationId": 6, "label": "The Town of Dion" },
+                { "destinationId": 7, "label": "Orc Village" },
+                { "destinationId": 8, "label": "Dwarven Village" },
+                { "destinationId": 88, "label": "Windawood Manor" },
+                { "destinationId": 89, "label": "Southern Pathway to the Wasteland" }
+            ]
+        },
+        {
+            "npcId": 7320,
+            "routes": [
+                { "destinationId": 9, "label": "Talking Island Village" },
+                { "destinationId": 10, "label": "The Elven Village" },
+                { "destinationId": 11, "label": "The Dark Elven Village" },
+                { "destinationId": 12, "label": "The Town of Gludio" },
+                { "destinationId": 7, "label": "Orc Village" },
+                { "destinationId": 8, "label": "Dwarven Village" },
+                { "destinationId": 13, "label": "The Southern Entrance of the Wastelands" },
+                { "destinationId": 90, "label": "Abandoned Camp" },
+                { "destinationId": 91, "label": "Fellmere Harvest Grounds" },
+                { "destinationId": 92, "label": "Langk Lizardman Dwelling" }
+            ]
+        },
+        {
+            "npcId": 7540,
+            "routes": [
+                { "destinationId": 16, "label": "The Village of Gludin" },
+                { "destinationId": 17, "label": "The Northeast Coast" },
+                { "destinationId": 418, "label": "Entrance to the Abandoned Coal Mines" },
+                { "destinationId": 419, "label": "Entrance to the Mithril Mines" }
+            ]
+        },
+        {
+            "npcId": 7576,
+            "routes": [
+                { "destinationId": 16, "label": "The Village of Gludin" },
+                { "destinationId": 93, "label": "Immortal Plateau, Northern Region" },
+                { "destinationId": 94, "label": "Immortal Plateau, Southern Region" },
+                { "destinationId": 96, "label": "Frozen Waterfall" },
+                { "destinationId": 471, "label": "Entrance to the Cave of Trials" }
+            ]
+        }
+    ]
+}
