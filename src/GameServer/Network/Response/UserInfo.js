@@ -49,13 +49,13 @@ function userInfo(actor) {
             packet.writeD(paperdollId(i));
         }
         packet.writeD(weaponId) // C4 repeats the right-hand weapon here
-            .writeD(0x00); // Hair equipment is not modelled locally
+            .writeD(paperdollId(16)); // Hair accessory
 
         for (let i = 0; i < 14; i++) {
             packet.writeD(paperdollSelfId(i));
         }
         packet.writeD(weaponSelfId) // C4 repeats the right-hand weapon here
-            .writeD(0x00); // Hair equipment is not modelled locally
+            .writeD(paperdollSelfId(16)); // Hair accessory
 
     packet
         .writeD(actor.fetchCollectivePAtk())

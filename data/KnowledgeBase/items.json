@@ -621565,6 +621565,38 @@
   },
   {
     "grade": "none",
+    "id": 6408,
+    "kind": "Armor.Chain",
+    "name": "Formal Wear",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "cristals": 0,
+        "rank": "none",
+        "slot": 17
+      },
+      "selfId": 6408,
+      "stats": {
+        "evasion": 0,
+        "mDef": 0,
+        "maxMp": 0,
+        "pDef": 0
+      },
+      "template": {
+        "class1": 1,
+        "class2": 1,
+        "kind": "Armor.Chain",
+        "mass": 1000,
+        "name": "Formal Wear",
+        "price": 5000000
+      }
+    }
+  },
+  {
+    "grade": "none",
     "id": 6569,
     "kind": "Other",
     "name": "Blessed Scroll: Enchant Weapon (A)",
@@ -635468,6 +635500,38 @@
   },
   {
     "grade": "none",
+    "id": 6843,
+    "kind": "Armor.Wear",
+    "name": "Cat Ear",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "cristals": 0,
+        "rank": "none",
+        "slot": 16
+      },
+      "selfId": 6843,
+      "stats": {
+        "evasion": 0,
+        "mDef": 0,
+        "maxMp": 0,
+        "pDef": 0
+      },
+      "template": {
+        "class1": 1,
+        "class2": 1,
+        "kind": "Armor.Wear",
+        "mass": 10,
+        "name": "Cat Ear",
+        "price": 500000
+      }
+    }
+  },
+  {
+    "grade": "none",
     "id": 6847,
     "kind": "Other.Recipe",
     "name": "Recipe: Sealed Tateossian Earring (70%)",
@@ -641384,6 +641448,70 @@
         "mass": 120,
         "name": "Amulet - Seal of Despair",
         "price": 11600
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 7680,
+    "kind": "Armor.Wear",
+    "name": "Raccoon Ear",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "cristals": 0,
+        "rank": "none",
+        "slot": 16
+      },
+      "selfId": 7680,
+      "stats": {
+        "evasion": 0,
+        "mDef": 0,
+        "maxMp": 0,
+        "pDef": 0
+      },
+      "template": {
+        "class1": 1,
+        "class2": 1,
+        "kind": "Armor.Wear",
+        "mass": 10,
+        "name": "Raccoon Ear",
+        "price": 500000
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 7683,
+    "kind": "Armor.Wear",
+    "name": "Rabbit Ear",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "cristals": 0,
+        "rank": "none",
+        "slot": 16
+      },
+      "selfId": 7683,
+      "stats": {
+        "evasion": 0,
+        "mDef": 0,
+        "maxMp": 0,
+        "pDef": 0
+      },
+      "template": {
+        "class1": 1,
+        "class2": 1,
+        "kind": "Armor.Wear",
+        "mass": 10,
+        "name": "Rabbit Ear",
+        "price": 500000
       }
     }
   },

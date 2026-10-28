@@ -47,13 +47,13 @@ function charSelectInfo(characters) {
             packet.writeD(paperdollId(i));
         }
         packet.writeD(weaponId)
-            .writeD(0x00);
+            .writeD(paperdollId(16));
 
         for (let i = 0; i < 14; i++) {
             packet.writeD(paperdollSelfId(i));
         }
         packet.writeD(weaponSelfId)
-            .writeD(0x00);
+            .writeD(paperdollSelfId(16));
 
         packet
             .writeD(character.hair)

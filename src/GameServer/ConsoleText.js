@@ -20,6 +20,8 @@ const ConsoleText = {
         earnedItem        :  54,
         earnedExpAndSp    :  95,
         levelUp           :  96,
+        equipmentWhileCasting: 104,
+        formalWearCastRestricted: 1604,
         incorrectDest     : 144,
         magicResisted     : 159,
         waitForResponse   : 164,

@@ -1,4 +1,5 @@
 const EnchantRules = invoke('GameServer/Items/C4EnchantRules');
+const FORMAL_WEAR_CONFLICT_SLOTS = Object.freeze([6, 7, 8, 9, 10, 11, 12, 14, 15]);
 
 function armorStat(item, method, fallback) {
     if (!item) return fallback;
@@ -8,7 +9,49 @@ function armorStat(item, method, fallback) {
 class BackpackModel {
     constructor(data) {
         this.items = [];
-        this.paperdoll = data;
+        this.paperdoll = BackpackModel.projectEquipment([], data).paperdoll;
+    }
+
+    static formalWearConflictSlots = FORMAL_WEAR_CONFLICT_SLOTS;
+
+    // Physical rows are authoritative when supplied; old appearance-only snapshots
+    // still need padding. This projection is pure: only Shared may persist repairs,
+    // never virtual shops/duel copies. Numeric IDs break malformed-save ties, not time.
+    static projectEquipment(rows, appearance = []) {
+        const paperdoll = Array.from({ length: 18 }, (_, slot) => ({ ...appearance?.[slot] }));
+        const repaired = new Set();
+        if (!rows.length) return { paperdoll, repaired };
+
+        const equipped = new Map();
+        const remove = (row) => {
+            repaired.add(row);
+            equipped.delete(row.slot);
+        };
+        for (const row of rows) {
+            if (!row.equipped) continue;
+            const current = equipped.get(row.slot);
+            if (!current || Number(row.id) > Number(current.id)) {
+                if (current) remove(current);
+                equipped.set(row.slot, row);
+            } else repaired.add(row);
+        }
+        if (!equipped.size) return { paperdoll, repaired };
+        for (let slot = 0; slot < paperdoll.length; slot++) paperdoll[slot] = {};
+        if (equipped.has(14) && equipped.has(8)) remove(equipped.get(8));
+
+        const dress = equipped.get(17);
+        if (dress) {
+            const conflicts = FORMAL_WEAR_CONFLICT_SLOTS.map(slot => equipped.get(slot)).filter(Boolean);
+            if (conflicts.some(row => Number(row.id) >= Number(dress.id))) remove(dress);
+            else conflicts.forEach(remove);
+        }
+        for (const row of equipped.values()) {
+            const entry = { id: row.id, selfId: row.selfId };
+            paperdoll[row.slot] = entry;
+            if (row.slot === 15) paperdoll[10] = entry;
+        }
+        if (equipped.has(17)) paperdoll[10] = paperdoll[17];
+        return { paperdoll, repaired };
     }
 
     // Enum
@@ -29,6 +72,8 @@ class BackpackModel {
          cloak: 13,
           dual: 14,
          armor: 15,
+          hair: 16,
+    formalWear: 17,
     }
 
     // Set
@@ -40,8 +85,8 @@ class BackpackModel {
     equipPaperdoll(slot, id, selfId) {
         const equip = this.equipment;
 
-        if (slot === equip.armor) { // FB Armor, stupid implementation
-            this.paperdoll[equip.chest] = { id: id, selfId: selfId };
+        if (slot === equip.armor || slot === equip.formalWear) {
+            this.paperdoll[equip.chest] = { id, selfId };
         }
 
         this.paperdoll[slot] = { id: id, selfId: selfId };
@@ -52,7 +97,8 @@ class BackpackModel {
     unequipPaperdoll(slot) {
         const equip = this.equipment;
 
-        if (slot === equip.armor) { // FB Armor, stupid implementation
+        if ((slot === equip.armor || slot === equip.formalWear)
+            && this.paperdoll[equip.chest].id === this.paperdoll[slot].id) {
             this.paperdoll[equip.chest] = {};
         }
 
@@ -88,10 +134,16 @@ class BackpackModel {
         return this.paperdoll[slot].selfId;
     }
 
+    isWearingFormalWear() {
+        return Boolean(this.paperdoll[this.equipment.formalWear].id);
+    }
+
     // Abstract
 
     fetchEquippedArmor(slot) {
-        return this.fetchItems().find(ob => ob.isArmor () && ob.fetchEquipped() && ob.fetchSlot() === slot);
+        const physicalSlot = slot === this.equipment.chest && this.isWearingFormalWear()
+            ? this.equipment.formalWear : slot;
+        return this.fetchItems().find(ob => ob.isArmor () && ob.fetchEquipped() && ob.fetchSlot() === physicalSlot);
     }
 
     fetchEquippedArmors() {

@@ -357,6 +357,16 @@ class Attack {
             return;
         }
 
+        if (actor.backpack?.isWearingFormalWear?.()) {
+            owner?.nativeEvent?.('native_rejected', { reason: 'formal_wear' });
+            invoke('GameServer/Bot/AI/BotActionFeedback').record(session, actor, creature, skill, 'rejected', 'formal_wear');
+            ConsoleText.transmit(session, ConsoleText.caption.formalWearCastRestricted);
+            session.dataSendToMe?.(ServerResponse.actionFailed());
+            invoke('GameServer/Bot/AI/BotSupportPlanner').cancelPendingSupportCast(session, actor, creature, skill, 'formal_wear');
+            invoke('GameServer/Bot/AI/BotPartyChat').cancelExpectedSkillResult(session, actor, creature, skill);
+            return;
+        }
+
         if (actor.canUseSkill?.(skill) === false) {
             owner?.nativeEvent?.('native_rejected', { reason: 'reuse' });
             invoke('GameServer/Bot/AI/BotActionFeedback').record(session, actor, creature, skill, 'rejected', 'reuse');

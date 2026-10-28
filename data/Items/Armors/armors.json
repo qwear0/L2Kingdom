@@ -3418,4 +3418,24 @@
     "template": { "kind": "Armor.Wear", "name": "Ubiquitous Boots", "class1": 1, "class2": 1, "mass": 1310, "price": 12300 },
     "stats": { "pDef": 17, "mDef": 0, "evasion": 0, "maxMp": 0 },
     "etc": { "slot": 12, "rank": "none", "cristals": 0 }
+},{
+    "selfId": 6408,
+    "template": { "kind": "Armor.Chain", "name": "Formal Wear", "class1": 1, "class2": 1, "mass": 1000, "price": 5000000 },
+    "stats": { "pDef": 0, "mDef": 0, "evasion": 0, "maxMp": 0 },
+    "etc": { "slot": 17, "rank": "none", "cristals": 0 }
+},{
+    "selfId": 6843,
+    "template": { "kind": "Armor.Wear", "name": "Cat Ear", "class1": 1, "class2": 1, "mass": 10, "price": 500000 },
+    "stats": { "pDef": 0, "mDef": 0, "evasion": 0, "maxMp": 0 },
+    "etc": { "slot": 16, "rank": "none", "cristals": 0 }
+},{
+    "selfId": 7680,
+    "template": { "kind": "Armor.Wear", "name": "Raccoon Ear", "class1": 1, "class2": 1, "mass": 10, "price": 500000 },
+    "stats": { "pDef": 0, "mDef": 0, "evasion": 0, "maxMp": 0 },
+    "etc": { "slot": 16, "rank": "none", "cristals": 0 }
+},{
+    "selfId": 7683,
+    "template": { "kind": "Armor.Wear", "name": "Rabbit Ear", "class1": 1, "class2": 1, "mass": 10, "price": 500000 },
+    "stats": { "pDef": 0, "mDef": 0, "evasion": 0, "maxMp": 0 },
+    "etc": { "slot": 16, "rank": "none", "cristals": 0 }
 }]

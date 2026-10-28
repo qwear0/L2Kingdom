@@ -20,7 +20,7 @@ function canAttack(actor) {
 }
 
 function canCast(actor) {
-    if (actor?.fakeDeath) return false;
+    if (actor?.fakeDeath || actor?.backpack?.isWearingFormalWear?.()) return false;
     const impairments = EffectStore.impairments(actor);
     return !(impairments.disabled || impairments.silenced || impairments.magicMuted);
 }

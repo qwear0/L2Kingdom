@@ -56,6 +56,12 @@ Automatic hunting requests carry explicit run/action ownership, not a fake bot a
 
 `World/ActorVisibility.js` tracks actual game-client recipients and emits `CharInfo`, movement information and `DeleteObject` as visibility changes. A character appearing in a [WorldObserver](world-observer.md) map or persisted search does not establish native client visibility, reachability or successful entry.
 
+## Equipment appearance
+
+`UserInfo` and `CharSelectInfo` populate their existing final hair object-ID/template-ID fields from native slot 16; `CharInfo` populates its existing final hair display field. Repeated right-hand fields and the reserved appearance field after class stay unchanged. Formal Wear uses the chest-10 display alias, not an appended packet field. No opcode, packet length or old slot number is changed.
+
+UseItem/UnequipItem publish UserInfo to self and CharInfo to existing visible recipients, retaining inventory refresh. Explicit MCP equip/unequip publishes the same appearance after an actual successful change; authority, receipt meanings and queued-persistence status are unchanged. Existing bot-upgrade/Lord publication remains separate and is not duplicated in intermediate Backpack removals. Character selection and live reconstruction share the [equipment projection](economy.md#equipment-and-style-restoration); observer projections are not native appearance acceptance. Race/sex rendering, another client's view and reconnect/selection behavior still require separately authorized C4-client checks.
+
 ## Update together and open checks
 
 - Packet changes: opcode table → request export/parser → gameplay validation → response export/layout → framing/session assumptions.

@@ -25,7 +25,12 @@ function skillRequest(session, actor, data) {
     }
 
     if (!EffectRestrictions.canCast(actor)) {
-        data.actionOwner?.nativeEvent?.('native_rejected', { reason: 'cast_restricted' });
+        const dressed = actor.backpack.isWearingFormalWear();
+        data.actionOwner?.nativeEvent?.('native_rejected', { reason: dressed ? 'formal_wear' : 'cast_restricted' });
+        if (dressed) {
+            const ConsoleText = invoke('GameServer/ConsoleText');
+            ConsoleText.transmit(session, ConsoleText.caption.formalWearCastRestricted);
+        }
         EffectRestrictions.reject(session);
         return;
     }

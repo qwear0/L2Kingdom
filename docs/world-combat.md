@@ -71,6 +71,14 @@ Raid-boss deaths produce an English combat-log summary for human reward recipien
 
 `Npc.setLocXYZ` updates the NPC spatial index only when an already published actor changes cells. Late movement cannot republish a removed NPC. Local threat/target queries therefore follow moving NPCs rather than their original spawn sectors. Bot escape and defensive reassessment are described in [bot execution](bot-runtime.md#npc-escape-and-defensive-reassessment).
 
+## Formal Wear and casting
+
+`Model/Backpack.isWearingFormalWear` is an O(1) equipped-slot predicate. `EffectRestrictions.canCast` uses it for ordinary native/auto-fight/bot admission; SkillRequest reports the clothing-specific message/reason, and `Actor/Attack.remoteHit` rechecks before cast, reuse or MP side effects. `Actor.canUseSkill(skill, now)` keeps its cooldown contract. Dress does not block movement, basic punches, incoming effects or independent pet/summon skills. Native active-toggle cancellation remains possible (including Fake Death); new activation is refused, deliberately preserving the native cancellation order rather than the pinned source's earlier dress check.
+
+`Actor/Backpack.useItem` checks the physical item before dispatching its skill. The private source-derived classification in `Items/C4ItemSkills.js` distinguishes 336 ordinary-cast descriptors (refused before side effects), 49 immediate/static-or-simultaneous exceptions and 43 direct-handler descriptors. Cast time, static skill type or potion identity alone is not the exemption. Native potions 725/727/1062 remain usable as explicit local compatibility exceptions because their pinned source rows have no handler. Existing bindings/effects/cost/reuse, including local 65/726/728 behavior, are unchanged; no source custom mana skills or double-consumption are imported. Shots, pet food, summon items and fish shots keep their direct routes; earlier special handlers are not globally prohibited.
+
+These checks add no per-bot scans, timers, database reads or new planner. Native messages use existing C4 IDs 104 (equipment during casting) and 1604 (Formal Wear casting); equipment transitions are guarded at the [mutation owner](economy.md#equipment-and-style-restoration). Source/syntax/catalogue checks do not establish live cast/item, toggle or client behavior.
+
 ## Connected-player auto-fight
 
 - Entrypoint: `.autofight` or `.menu` → `World/Generics/NpcBypasses/PlayerAutoFight.js`. Compact Hunt, Skills and Settings pages use stock HTML/HtmlKit, actor-bound epochs and consumed page revisions; no client patch or native-menu negotiation is required. Skills show paged native icons/names and immediate ON/OFF links, without an Apply step. Closing HTML does not stop a run; reopen it for Stop/status. There is no periodic forced popup.

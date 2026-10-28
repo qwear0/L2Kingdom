@@ -11,6 +11,14 @@ Read this before moving items/Adena, changing custody or reusing a transaction A
 
 A service must distinguish pending live state, committed durable state and response/UI publication. A response failure after commit does not justify issuing the economic operation again without its replay contract.
 
+## Equipment and style restoration
+
+`Model/Backpack.js::projectEquipment` is a pure projection of raw equipped rows into an 18-entry paperdoll, reused by character selection (`Network/Shared.js`) and live Backpack construction. It preserves appearance-only legacy snapshots, reconstructs physical hair 16 / Formal Wear 17 even when an intermediate builder supplied only 16 slots, and aliases full-body 15 or dress 17 to chest 10 without duplicating an item. Lord rewards, arena copies and AFK appearances retain their own ownership; virtual reconstruction performs no SQL.
+
+Same-slot conflicts retain the highest numeric object ID; two-hand 14 excludes shield 8. If a malformed snapshot contains dress plus incompatible gear, dress survives only when its ID is greater than every incompatible row's ID; otherwise dress is cleared. This is deterministic recovery, not last-equip-time evidence. Shared applies physical repair flags through its existing persistence owner. Valid old outfits are not migrated/reset, and removing a dress clears chest only if it still owns that alias.
+
+`Actor/Backpack.js` owns live exclusivity: dressing removes chest/full-body, legs, both weapon hands, head, gloves and feet, preserving hair/jewelry/underwear/cloak. Weapon/shield/two-hand or chest/full-body replacement removes dress; head/gloves/feet/legs requests while dressed are rejected before mutation. Hair/dress transitions, or gear changes while currently dressed, are refused during an active cast. Intermediate removals retain each physical row's persistence/notification, with one final stat calculation and toggle synchronization. These buffered multi-row writes are **not one atomic equipment transaction**; restore repair remains necessary. Dress supplies the physical chest defense lookup without becoming full-body armor or suppressing the ordinary empty-leg fallback.
+
 ## Ground pickup and award outcomes
 
 `World/Generics/NpcRewards.js` scatters drops only along a walkable continuation of the corpse's floor, using at most six candidates in the existing 50-unit radius. If none is usable, the drop remains at the corpse. Nearest height alone is not admission: it can select an adjacent roof. Bot loot movement follows the [native movement safeguards](world-combat.md#movement-and-asynchronous-paths), rather than interpolating directly through an obstruction.

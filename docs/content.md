@@ -110,6 +110,12 @@ NPC IDs, quest registration, state transitions, item templates, events and HTML 
 - `World/Generics/NpcTalk.js` preserves the personal/clan warehouse main menu for warehouse-shaped quest NPCs, including Donal and Daisy, and exposes its existing Quest link. `NpcTalkResponse` routes that branch to the same stateful quest service; storage authorization and merchant service maps are unchanged. Native client actions and permitted manual bot control use the shared route, without autonomous vassal quest planning.
 - Registry/data/catalogue checks are source-readiness evidence only. Client appearance, floor accessibility, complete playthrough and reconnect/reward acceptance remain separate runtime checks; this slice does not activate the six other disabled quests or the Forest of the Dead chain.
 
+## Hair accessories and Formal Wear
+
+The CQ-B0 prerequisite adapts the selected item/equipment rules from Mobius C4 snapshot `a4c31517cd0c428783650e008e199f2ac42a8434`. `data/Items/Armors/armors.json` owns Cat Ear `6843`, Raccoon Ear `7680`, Rabbit Ear `7683` (native hair slot 16) and Formal Wear `6408` (native slot 17, displayed through chest 10). Existing slots 0–15 retain their meanings: full-body armor 15 is not Formal Wear or the source's hair paperdoll index.
+
+These are nonstackable, no-grade, zero-stat wearables: accessories use `Armor.Wear`, weight 10 / price 500,000; Formal Wear uses source-heavy `Armor.Chain`, weight 1,000 / price 5,000,000. It is not a full heavy-armor set and adds no fabricated combat bonuses. Native [equipment/custody](economy.md#equipment-and-style-restoration), [appearance packets](protocol.md#equipment-appearance) and [casting restrictions](world-combat.md#formal-wear-and-casting) must stay coherent. No database migration, NPC/spawn import or quest activation is part of this prerequisite: Q32/Q33/Q35/Q37 and Q38/Q39 remain disabled. Catalogue/source readiness does not establish C4-client rendering or gameplay acceptance.
+
 ## Progression and service boundaries
 
 - `ClassProgression.js` owns lineage/third-template expansion.

@@ -292,6 +292,11 @@ function start(run) {
             if (item.fetchEquipped() !== command.equipped) {
                 if (command.equipped) actor.backpack.useItem(session, command.itemId);
                 else actor.backpack.unequipGear(session, item.fetchSlot());
+                if (item.fetchEquipped() === command.equipped) {
+                    const Response = invoke('GameServer/Network/Response');
+                    session.dataSendToMe(Response.userInfo(actor));
+                    session.dataSendToOthers(Response.charInfo(actor), actor);
+                }
             }
             receipt.evidence.equipment = { itemId: command.itemId, equipped: item.fetchEquipped() };
             receipt.executionOutcome = item.fetchEquipped() === command.equipped ? 'applied' : 'not_applied';

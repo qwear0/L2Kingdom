@@ -66,8 +66,10 @@ class Backpack extends BackpackModel {
         // Parent inheritance
         super(data.paperdoll);
 
+        const projection = BackpackModel.projectEquipment(data.items, data.paperdoll);
+        this.paperdoll = projection.paperdoll;
         data.items.forEach((item) => {
-            this.insertItem(item.id, item.selfId, item);
+            this.insertItem(item.id, item.selfId, projection.repaired.has(item) ? { ...item, equipped: 0 } : item);
         });
     }
 
@@ -286,6 +288,12 @@ class Backpack extends BackpackModel {
                 }
 
                 const itemSkill = C4ItemSkills.resolve(item.fetchSelfId());
+                if (itemSkill && this.isWearingFormalWear() && !C4ItemSkills.canUseInFormalWear(item.fetchSelfId())) {
+                    actionOwner?.nativeEvent?.('native_rejected', { reason: 'formal_wear' });
+                    ConsoleText.transmit(session, ConsoleText.caption.formalWearCastRestricted);
+                    session.dataSendToMe(ServerResponse.actionFailed());
+                    return;
+                }
                 if (itemSkill && this.useSkillItem(session, id, itemSkill, onSkillResult, actionOwner)) {
                     return;
                 }
@@ -1499,23 +1507,41 @@ class Backpack extends BackpackModel {
 
         const slot  = item.fetchSlot();
         const equip = this.equipment;
+        const dressed = this.isWearingFormalWear();
+        if (session.actor.state.fetchCasts() && (dressed || slot === equip.hair || slot === equip.formalWear)) {
+            ConsoleText.transmit(session, ConsoleText.caption.equipmentWhileCasting);
+            return false;
+        }
+        if (dressed && [equip.head, equip.hands, equip.pants, equip.feet].includes(slot)) {
+            session.dataSendToMe(ServerResponse.actionFailed());
+            return false;
+        }
+
+        // Intermediate removals still persist/notify each physical item, but stats
+        // and equipment-dependent toggles must see only the final outfit.
+        const batch = { recalculate: false, syncToggles: false };
+        if (slot === equip.formalWear) {
+            for (const conflict of BackpackModel.formalWearConflictSlots) this.unequipGear(session, conflict, batch);
+        } else if (dressed && [equip.weapon, equip.shield, equip.dual, equip.chest, equip.armor].includes(slot)) {
+            this.unequipGear(session, equip.formalWear, batch);
+        }
 
         if (slot === equip.weapon || slot === equip.shield) {
-            this.unequipGear(session, equip.dual, { syncToggles: false });
+            this.unequipGear(session, equip.dual, batch);
         }
         else // Unequip both hands
         if (slot === equip.dual) {
-            this.unequipGear(session, equip.weapon, { syncToggles: false });
-            this.unequipGear(session, equip.shield, { syncToggles: false });
+            this.unequipGear(session, equip.weapon, batch);
+            this.unequipGear(session, equip.shield, batch);
         }
         else // Unequip one-piece armor
         if (slot === equip.chest || slot === equip.pants) {
-            this.unequipGear(session, equip.armor, { syncToggles: false });
+            this.unequipGear(session, equip.armor, batch);
         }
         else // Unequip top and bottom armor
         if (slot === equip.armor) {
-            this.unequipGear(session, equip.chest, { syncToggles: false });
-            this.unequipGear(session, equip.pants, { syncToggles: false });
+            this.unequipGear(session, equip.chest, batch);
+            this.unequipGear(session, equip.pants, batch);
         }
         else // Check if ear place is taken
         if (slot === equip.earr || slot === equip.earl) {
@@ -1533,7 +1559,7 @@ class Backpack extends BackpackModel {
         }
 
         const newSlot = item.fetchSlot();
-        this.unequipGear(session, newSlot, { syncToggles: false });
+        this.unequipGear(session, newSlot, batch);
         this.equipPaperdoll(newSlot, item.fetchId(), item.fetchSelfId());
         item.setEquipped(true);
 
@@ -1551,11 +1577,18 @@ class Backpack extends BackpackModel {
         invoke(path.actor).calculateStats(session, session.actor);
         ToggleSkills.syncEquipment(session, session.actor);
         recordEquipmentEvent(session, item, 'equip');
+        return true;
     }
 
     unequipGear(session, slot, options = {}) {
         if (session.actor.isDead()) {
             return;
+        }
+
+        if (session.actor.state.fetchCasts() && (this.isWearingFormalWear()
+            || slot === this.equipment.hair || slot === this.equipment.formalWear)) {
+            ConsoleText.transmit(session, ConsoleText.caption.equipmentWhileCasting);
+            return false;
         }
 
         // Old saves can contain more than one equipped item in a single slot.
@@ -1587,9 +1620,10 @@ class Backpack extends BackpackModel {
         ];
 
         // Recalculate once for the complete slot change.
-        invoke(path.actor).calculateStats(session, session.actor);
+        if (options.recalculate !== false) invoke(path.actor).calculateStats(session, session.actor);
         if (options.syncToggles !== false) ToggleSkills.syncEquipment(session, session.actor);
         equippedItems.forEach((item) => recordEquipmentEvent(session, item, 'unequip'));
+        return true;
     }
 
     updateDatabaseTimer(characterId, changedItems = this.items.filter((ob) => ob.isWearable())) {

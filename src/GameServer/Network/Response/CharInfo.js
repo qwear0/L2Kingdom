@@ -65,7 +65,7 @@ function charInfo(actor) {
         .writeD(actor.fetchRace())
         .writeD(actor.fetchSex())
         .writeD(actor.fetchClassId())
-        .writeD(0x00)  // Hair all
+        .writeD(0x00)  // Reserved C4 appearance field
         .writeD(actor.backpack.fetchPaperdollSelfId( 6)) // Head
         .writeD(weaponDisplayId) // Weapon
         .writeD(actor.backpack.fetchPaperdollSelfId( 8)) // Shield
@@ -75,7 +75,7 @@ function charInfo(actor) {
         .writeD(actor.backpack.fetchPaperdollSelfId(12)) // Feet
         .writeD(0x00)  // Back
         .writeD(weaponDisplayId) // Two-hand weapon display
-        .writeD(0x00)  // Hair
+        .writeD(actor.backpack.fetchPaperdollSelfId(16)) // Hair accessory
         .writeD(pvpFlag)  // Purple = 0x01
         .writeD(karma)
         .writeD(actor.fetchCollectiveCastSpd())

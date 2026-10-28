@@ -432,11 +432,31 @@ const ITEM_SKILLS = {
     7619: { skillId: 2213, level: 21, consume: true, teleport: 'skillCoords' }
 };
 
+// Mobius C4 a4c31517: ItemSkillsTemplate's immediate/static or simultaneous
+// route bypasses ordinary Player.useMagic. Cast time/isMagic alone is not enough.
+// Keep native 725/727/1062 potions usable too; their source rows have no handler.
+const FORMAL_WEAR_IMMEDIATE_ITEMS = new Set([
+    65, 726, 728, 734, 735, 1060, 1061, 1073, 1374, 1375, 1539, 1540,
+    1831, 1832, 1833, 1834, 3889, 4411, 4412, 4413, 4414, 4415, 4416, 4417,
+    5010, 5234, 5283, 5560, 5561, 5562, 5563, 5564, 5565, 5566,
+    5583, 5584, 5585, 5586, 5587, 5589, 5591, 5592, 6035, 6036,
+    6406, 6407, 6903, 7061, 7062, 725, 727, 1062
+]);
+const FORMAL_WEAR_DIRECT_HANDLERS = new Set([
+    'SoulShots', 'SpiritShot', 'BlessedSpiritShot', 'SummonItems', 'PetFood', 'FishShots'
+]);
+
 function resolve(selfId) {
     return ITEM_SKILLS[Number(selfId)] || null;
 }
 
+function canUseInFormalWear(selfId) {
+    return FORMAL_WEAR_IMMEDIATE_ITEMS.has(Number(selfId))
+        || FORMAL_WEAR_DIRECT_HANDLERS.has(resolve(selfId)?.handler);
+}
+
 module.exports = {
     ITEM_SKILLS,
-    resolve
+    resolve,
+    canUseInFormalWear
 };
