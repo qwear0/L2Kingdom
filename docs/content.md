@@ -91,6 +91,25 @@ The optional [MCP adapters](bot-mcp.md#issued-choices-and-native-service-outcome
 
 NPC IDs, quest registration, state transitions, item templates, events and HTML actions must change together. Follow the source-adjacent [HTML UI kit](../src/GameServer/World/Generics/HTML_UI_KIT.md): custom native windows use compact/paginated content and existing client textures, not arbitrary browser HTML.
 
+**CQ-A quests (Q13–Q19 and Q31):** these eight one-time quests are active, adapting the selected scripts/dialogs and dependencies from the same pinned Mobius C4 snapshot. They retain their native quest IDs and started-condition meanings. Minimum levels apply to new acceptance, not compatible already-started characters; no migration or historical reward compensation is performed. These quests do not require one another's completion merely because they share NPCs.
+
+| Quest | New-start minimum level | Base reward (0 SP) |
+| --- | --- | --- |
+| Q13 Parcel Delivery | 74 | 82,656 Adena |
+| Q14 Whereabouts of the Archaeologist | 74 | 113,228 Adena |
+| Q15 Sweet Whispers | 60 | 60,217 EXP |
+| Q16 The Coming Darkness | 62 | 221,958 EXP |
+| Q17 Light and Darkness | 61 | 105,527 EXP |
+| Q18 Meeting with the Golden Ram | 66 | 15,000 Adena + 50,000 EXP |
+| Q19 Go to the Pastureland! | 63 | 30,000 Adena |
+| Q31 Secret Buried in the Swamp | 66 | 40,000 Adena + 130,000 EXP |
+
+- The eight handlers use `QuestStep.apply` for state, quest-item issuance/consumption and final reward/completion. Adena follows the existing `questAdena` floor convention once; the helper scales raw EXP/SP. Hand-ins require the carried, unequipped quest item, and terminal transactions remove its remaining held surplus as registered-item cleanup. A completed quest cannot pay again.
+- Q16 visits five Evil Altars in order to break seals; Q17 visits four Altars of Saints in order to sprinkle blood. Returning to Hierarch at the terminal condition completes the quest even though the final ritual item has been spent. Returning during an unfinished ritual after losing all its remaining items instead abandons that quest without a reward through `QuestStep.abandon`; a subsequent new acceptance obeys the level gate. This is player-triggered quest behavior, not a bulk saved-state reset.
+- The existing regional Fundin, Liesel, Vladimir, Donal and Daisy templates/placements remain unchanged. `data/Npcs/c4_quest_content.json` and `data/Npcs/Spawns/c4_quest_content.json` own 20 added noncombat template identities and 24 source-fixed placements for the quest contacts, nine altars, four monuments and corpse. Hierarch has **five** distinct fixed placements, not a random coordinate choice. The corpse is an interactable static NPC, not an attackable/decaying monster. The seven new stackable quest items (`7167`, `7168`, `7245`, `7252`, `7253`, `7263`, `7547`) belong to the existing `data/Items/Others/others.json` owner.
+- `World/Generics/NpcTalk.js` preserves the personal/clan warehouse main menu for warehouse-shaped quest NPCs, including Donal and Daisy, and exposes its existing Quest link. `NpcTalkResponse` routes that branch to the same stateful quest service; storage authorization and merchant service maps are unchanged. Native client actions and permitted manual bot control use the shared route, without autonomous vassal quest planning.
+- Registry/data/catalogue checks are source-readiness evidence only. Client appearance, floor accessibility, complete playthrough and reconnect/reward acceptance remain separate runtime checks; this slice does not activate the six other disabled quests or the Forest of the Dead chain.
+
 ## Progression and service boundaries
 
 - `ClassProgression.js` owns lineage/third-template expansion.

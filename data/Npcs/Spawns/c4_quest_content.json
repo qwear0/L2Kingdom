@@ -581,6 +581,366 @@
                 "total": 1,
                 "respawn": 60,
                 "bias": 0
+            },
+            {
+                "selfId": 8508,
+                "name": "Altar of Saints",
+                "coords": [
+                    {
+                        "locX": 76656,
+                        "locY": -76416,
+                        "locZ": -3602,
+                        "head": 30000
+                    }
+                ],
+                "total": 1,
+                "respawn": 60,
+                "bias": 0
+            },
+            {
+                "selfId": 8509,
+                "name": "Altar of Saints",
+                "coords": [
+                    {
+                        "locX": 97264,
+                        "locY": -90784,
+                        "locZ": -2786,
+                        "head": 23000
+                    }
+                ],
+                "total": 1,
+                "respawn": 60,
+                "bias": 0
+            },
+            {
+                "selfId": 8510,
+                "name": "Altar of Saints",
+                "coords": [
+                    {
+                        "locX": 72767,
+                        "locY": -89068,
+                        "locZ": -3127,
+                        "head": 9000
+                    }
+                ],
+                "total": 1,
+                "respawn": 60,
+                "bias": 0
+            },
+            {
+                "selfId": 8511,
+                "name": "Altar of Saints",
+                "coords": [
+                    {
+                        "locX": 91744,
+                        "locY": -75824,
+                        "locZ": -3634,
+                        "head": 33000
+                    }
+                ],
+                "total": 1,
+                "respawn": 60,
+                "bias": 0
+            },
+            {
+                "selfId": 8512,
+                "name": "Evil Altar",
+                "coords": [
+                    {
+                        "locX": 72656,
+                        "locY": -72480,
+                        "locZ": -4478,
+                        "head": 49000
+                    }
+                ],
+                "total": 1,
+                "respawn": 60,
+                "bias": 0
+            },
+            {
+                "selfId": 8513,
+                "name": "Evil Altar",
+                "coords": [
+                    {
+                        "locX": 95516,
+                        "locY": -87328,
+                        "locZ": -3813,
+                        "head": 12000
+                    }
+                ],
+                "total": 1,
+                "respawn": 60,
+                "bias": 0
+            },
+            {
+                "selfId": 8514,
+                "name": "Evil Altar",
+                "coords": [
+                    {
+                        "locX": 69904,
+                        "locY": -83904,
+                        "locZ": -4320,
+                        "head": 49000
+                    }
+                ],
+                "total": 1,
+                "respawn": 60,
+                "bias": 0
+            },
+            {
+                "selfId": 8515,
+                "name": "Evil Altar",
+                "coords": [
+                    {
+                        "locX": 78416,
+                        "locY": -75808,
+                        "locZ": -4485,
+                        "head": 0
+                    }
+                ],
+                "total": 1,
+                "respawn": 60,
+                "bias": 0
+            },
+            {
+                "selfId": 8516,
+                "name": "Evil Altar",
+                "coords": [
+                    {
+                        "locX": 89236,
+                        "locY": -92684,
+                        "locZ": -3800,
+                        "head": 9000
+                    }
+                ],
+                "total": 1,
+                "respawn": 60,
+                "bias": 0
+            },
+            {
+                "selfId": 8517,
+                "name": "Hierarch",
+                "coords": [
+                    {
+                        "locX": 72704,
+                        "locY": -72480,
+                        "locZ": -4478,
+                        "head": 49000
+                    }
+                ],
+                "total": 1,
+                "respawn": 60,
+                "bias": 0
+            },
+            {
+                "selfId": 8517,
+                "name": "Hierarch",
+                "coords": [
+                    {
+                        "locX": 78416,
+                        "locY": -75760,
+                        "locZ": -4485,
+                        "head": 0
+                    }
+                ],
+                "total": 1,
+                "respawn": 60,
+                "bias": 0
+            },
+            {
+                "selfId": 8517,
+                "name": "Hierarch",
+                "coords": [
+                    {
+                        "locX": 69952,
+                        "locY": -83904,
+                        "locZ": -4320,
+                        "head": 49000
+                    }
+                ],
+                "total": 1,
+                "respawn": 60,
+                "bias": 0
+            },
+            {
+                "selfId": 8517,
+                "name": "Hierarch",
+                "coords": [
+                    {
+                        "locX": 89204,
+                        "locY": -92656,
+                        "locZ": -3800,
+                        "head": 9000
+                    }
+                ],
+                "total": 1,
+                "respawn": 60,
+                "bias": 0
+            },
+            {
+                "selfId": 8517,
+                "name": "Hierarch",
+                "coords": [
+                    {
+                        "locX": 95476,
+                        "locY": -87316,
+                        "locZ": -3813,
+                        "head": 12000
+                    }
+                ],
+                "total": 1,
+                "respawn": 60,
+                "bias": 0
+            },
+            {
+                "selfId": 8518,
+                "name": "Mysterious Necromancer",
+                "coords": [
+                    {
+                        "locX": 68064,
+                        "locY": -71712,
+                        "locZ": -3712,
+                        "head": 30000
+                    }
+                ],
+                "total": 1,
+                "respawn": 60,
+                "bias": 0
+            },
+            {
+                "selfId": 8537,
+                "name": "Tunatun",
+                "coords": [
+                    {
+                        "locX": 53751,
+                        "locY": -83888,
+                        "locZ": -2720,
+                        "head": 24000
+                    }
+                ],
+                "total": 1,
+                "respawn": 60,
+                "bias": 0
+            },
+            {
+                "selfId": 8538,
+                "name": "Ghost of Adventurer",
+                "coords": [
+                    {
+                        "locX": 181611,
+                        "locY": -75293,
+                        "locZ": -2728,
+                        "head": -26000
+                    }
+                ],
+                "total": 1,
+                "respawn": 60,
+                "bias": 0
+            },
+            {
+                "selfId": 8539,
+                "name": "Vulcan",
+                "coords": [
+                    {
+                        "locX": 180352,
+                        "locY": -111888,
+                        "locZ": -5826,
+                        "head": 24000
+                    }
+                ],
+                "total": 1,
+                "respawn": 60,
+                "bias": 0
+            },
+            {
+                "selfId": 8555,
+                "name": "Abercrombie",
+                "coords": [
+                    {
+                        "locX": 69348,
+                        "locY": -50408,
+                        "locZ": -3288,
+                        "head": 10000
+                    }
+                ],
+                "total": 1,
+                "respawn": 60,
+                "bias": 0
+            },
+            {
+                "selfId": 8661,
+                "name": "Forgotten Monument",
+                "coords": [
+                    {
+                        "locX": 71994,
+                        "locY": -55705,
+                        "locZ": -3142,
+                        "head": 38569
+                    }
+                ],
+                "total": 1,
+                "respawn": 60,
+                "bias": 0
+            },
+            {
+                "selfId": 8662,
+                "name": "Forgotten Monument",
+                "coords": [
+                    {
+                        "locX": 77184,
+                        "locY": -44064,
+                        "locZ": -3264,
+                        "head": 0
+                    }
+                ],
+                "total": 1,
+                "respawn": 60,
+                "bias": 0
+            },
+            {
+                "selfId": 8663,
+                "name": "Forgotten Monument",
+                "coords": [
+                    {
+                        "locX": 78832,
+                        "locY": -61536,
+                        "locZ": -2308,
+                        "head": 0
+                    }
+                ],
+                "total": 1,
+                "respawn": 60,
+                "bias": 0
+            },
+            {
+                "selfId": 8664,
+                "name": "Forgotten Monument",
+                "coords": [
+                    {
+                        "locX": 91840,
+                        "locY": -52471,
+                        "locZ": -2620,
+                        "head": 53787
+                    }
+                ],
+                "total": 1,
+                "respawn": 60,
+                "bias": 0
+            },
+            {
+                "selfId": 8665,
+                "name": "Corpse of Dwarf",
+                "coords": [
+                    {
+                        "locX": 83168,
+                        "locY": -54320,
+                        "locZ": -2328,
+                        "head": 0
+                    }
+                ],
+                "total": 1,
+                "respawn": 60,
+                "bias": 0
             }
         ]
     }

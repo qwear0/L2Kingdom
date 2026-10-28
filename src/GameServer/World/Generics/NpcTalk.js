@@ -97,9 +97,12 @@ function npcTalk(session, npc, options = {}) {
     // the merchant pattern; any quest branch stays reachable through a
     // Quest link routed via NpcTalkResponse.
     const templePriest = invoke('GameServer/World/C4TemplePriests').handles(npc.fetchSelfId());
-    if (!QuestService.handlesNpc(npc) || hasNpcShop || templePriest) {
+    // Quest registration must not hide personal/clan storage. The default
+    // warehouse menu already exposes its quest branch when requested.
+    const warehouse = /^Warehouse (Keeper|Chief|Freightman)$/i.test(title);
+    if (!QuestService.handlesNpc(npc) || hasNpcShop || templePriest || warehouse) {
         showDefaultTalk(session, npc, {
-            questLink: (hasNpcShop || templePriest) && QuestService.handlesNpc(npc)
+            questLink: (hasNpcShop || templePriest || warehouse) && QuestService.handlesNpc(npc)
         });
         return;
     }

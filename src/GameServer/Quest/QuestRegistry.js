@@ -1,12 +1,4 @@
 const disabledReasons = new Map([
-  [13, "Required NPC templates are absent: 8274, 8539"],
-  [14, "Required NPC templates are absent: 8263, 8538"],
-  [15, "Required NPC templates are absent: 8302, 8517, 8518"],
-  [16, "Required NPC templates are absent: 8517, 8512-8516"],
-  [17, "Required NPC templates are absent: 8517, 8508-8511"],
-  [18, "Required NPC templates are absent: 8314, 8315, 8555"],
-  [19, "Required NPC templates are absent: 8302, 8537"],
-  [31, "Required NPC templates are absent: 8555, 8661-8665"],
   [32, "Required NPC template 8706 is absent and kill target 135 has no world spawn"],
   [33, "Required NPC template 8520 is absent"],
   [35, "Required kill target 135 has no world spawn"],

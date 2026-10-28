@@ -14409,5 +14409,33 @@
     "selfId": 7232,
     "template": { "kind": "Other.Quest", "name": "Munitions Box", "class1": 4, "class2": 3, "mass": 0, "price": 0 },
     "etc": { "stackable": true, "consumable": false }
+},{
+    "selfId": 7167,
+    "template": { "kind": "Other.Quest", "name": "Crystal of Seal", "class1": 4, "class2": 3, "mass": 0, "price": 0 },
+    "etc": { "stackable": true, "consumable": false }
+},{
+    "selfId": 7168,
+    "template": { "kind": "Other.Quest", "name": "Blood of Saint", "class1": 4, "class2": 3, "mass": 0, "price": 0 },
+    "etc": { "stackable": true, "consumable": false }
+},{
+    "selfId": 7245,
+    "template": { "kind": "Other.Quest", "name": "Supply Box", "class1": 4, "class2": 3, "mass": 0, "price": 0 },
+    "etc": { "stackable": true, "consumable": false }
+},{
+    "selfId": 7252,
+    "template": { "kind": "Other.Quest", "name": "Krorin's Journal", "class1": 4, "class2": 3, "mass": 0, "price": 0 },
+    "etc": { "stackable": true, "consumable": false }
+},{
+    "selfId": 7253,
+    "template": { "kind": "Other.Quest", "name": "Letter to Archaeologist", "class1": 4, "class2": 3, "mass": 0, "price": 0 },
+    "etc": { "stackable": true, "consumable": false }
+},{
+    "selfId": 7263,
+    "template": { "kind": "Other.Quest", "name": "Package to Vulcan", "class1": 4, "class2": 3, "mass": 0, "price": 0 },
+    "etc": { "stackable": true, "consumable": false }
+},{
+    "selfId": 7547,
+    "template": { "kind": "Other.Quest", "name": "Young Wild Beast Meat", "class1": 4, "class2": 3, "mass": 0, "price": 0 },
+    "etc": { "stackable": true, "consumable": false }
 }
 ]

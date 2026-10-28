@@ -40,7 +40,7 @@
   },
   "counts": {
     "dropEntries": 14948,
-    "items": 5719,
+    "items": 5726,
     "knownReachableMobs": 1814,
     "knownReachableSourcedItems": 1720,
     "mobs": 2214,
@@ -113,9 +113,9 @@
   },
   "schemaVersion": 1,
   "sha256": {
-    "items.json": "21779f6f4f87840f4af8df24cd1933616f7868991bf0f8899eacb74f426378c8",
+    "items.json": "1a1079d15e6b4cb0610a6edd6ef1a9058db505b7e2ffe99c2420f16cef9d2a65",
     "mobs.json": "62ebd26cf99fcf6c47cabbd0aee54e05ec911c30ef5cdfabc549878e87609cc6",
-    "skills.json": "406403a6b80d5583d5e8eec3887e462346b1a2127b1cde9e8fe8efe66480074e",
+    "skills.json": "7a86a8d2ca79f1d3b614917a5692da86a331b27155bd16fc54be84321eb814b3",
     "spawns.json": "0ae7b50f88e0b4a6f4217bace869544671046ef0c2c1663448f547c3916f9fdb"
   }
 }

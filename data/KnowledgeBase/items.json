@@ -637879,6 +637879,56 @@
   },
   {
     "grade": "none",
+    "id": 7167,
+    "kind": "Other.Quest",
+    "name": "Crystal of Seal",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": false,
+        "stackable": true
+      },
+      "selfId": 7167,
+      "template": {
+        "class1": 4,
+        "class2": 3,
+        "kind": "Other.Quest",
+        "mass": 0,
+        "name": "Crystal of Seal",
+        "price": 0
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 7168,
+    "kind": "Other.Quest",
+    "name": "Blood of Saint",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": false,
+        "stackable": true
+      },
+      "selfId": 7168,
+      "template": {
+        "class1": 4,
+        "class2": 3,
+        "kind": "Other.Quest",
+        "mass": 0,
+        "name": "Blood of Saint",
+        "price": 0
+      }
+    }
+  },
+  {
+    "grade": "none",
     "id": 7182,
     "kind": "Other.Quest",
     "name": "Patrol's Report",
@@ -638004,6 +638054,106 @@
   },
   {
     "grade": "none",
+    "id": 7245,
+    "kind": "Other.Quest",
+    "name": "Supply Box",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": false,
+        "stackable": true
+      },
+      "selfId": 7245,
+      "template": {
+        "class1": 4,
+        "class2": 3,
+        "kind": "Other.Quest",
+        "mass": 0,
+        "name": "Supply Box",
+        "price": 0
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 7252,
+    "kind": "Other.Quest",
+    "name": "Krorin's Journal",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": false,
+        "stackable": true
+      },
+      "selfId": 7252,
+      "template": {
+        "class1": 4,
+        "class2": 3,
+        "kind": "Other.Quest",
+        "mass": 0,
+        "name": "Krorin's Journal",
+        "price": 0
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 7253,
+    "kind": "Other.Quest",
+    "name": "Letter to Archaeologist",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": false,
+        "stackable": true
+      },
+      "selfId": 7253,
+      "template": {
+        "class1": 4,
+        "class2": 3,
+        "kind": "Other.Quest",
+        "mass": 0,
+        "name": "Letter to Archaeologist",
+        "price": 0
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 7263,
+    "kind": "Other.Quest",
+    "name": "Package to Vulcan",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": false,
+        "stackable": true
+      },
+      "selfId": 7263,
+      "template": {
+        "class1": 4,
+        "class2": 3,
+        "kind": "Other.Quest",
+        "mass": 0,
+        "name": "Package to Vulcan",
+        "price": 0
+      }
+    }
+  },
+  {
+    "grade": "none",
     "id": 7528,
     "kind": "Other.Quest",
     "name": "Spinneret",
@@ -638023,6 +638173,31 @@
         "kind": "Other.Quest",
         "mass": 0,
         "name": "Spinneret",
+        "price": 0
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 7547,
+    "kind": "Other.Quest",
+    "name": "Young Wild Beast Meat",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": false,
+        "stackable": true
+      },
+      "selfId": 7547,
+      "template": {
+        "class1": 4,
+        "class2": 3,
+        "kind": "Other.Quest",
+        "mass": 0,
+        "name": "Young Wild Beast Meat",
         "price": 0
       }
     }

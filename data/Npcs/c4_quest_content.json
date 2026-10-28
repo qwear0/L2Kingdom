@@ -1800,5 +1800,1226 @@
             "race": "humanoid",
             "undead": false
         }
+    },
+    {
+        "selfId": 8508,
+        "template": {
+            "kind": "Citizen",
+            "name": "Altar of Saints",
+            "title": "",
+            "level": 70,
+            "hostile": false
+        },
+        "base": {
+            "str": 40,
+            "dex": 30,
+            "con": 43,
+            "int": 21,
+            "wit": 20,
+            "men": 10
+        },
+        "stats": {
+            "pAtk": 688.86373,
+            "pAtkRnd": 30,
+            "pDef": 295.91597,
+            "mAtk": 470.40463,
+            "mDef": 216.53847,
+            "accur": 5,
+            "atkSpd": 253,
+            "castSpd": 333,
+            "atkRadius": 40
+        },
+        "speed": {
+            "walk": 50,
+            "run": 120
+        },
+        "vitals": {
+            "maxHp": 2444.46819,
+            "maxMp": 1345.8,
+            "revHp": 7.5,
+            "revMp": 2.7,
+            "corpseTime": 7000
+        },
+        "collision": {
+            "radius": 14,
+            "size": 45.5
+        },
+        "equipment": {
+            "weapon": 0,
+            "shield": 0,
+            "reuseTime": 0
+        },
+        "clan": {
+            "clanName": "",
+            "helpRadius": 300
+        },
+        "rewards": {
+            "exp": 0,
+            "sp": 0
+        },
+        "traits": {
+            "race": "construct",
+            "undead": false
+        }
+    },
+    {
+        "selfId": 8509,
+        "template": {
+            "kind": "Citizen",
+            "name": "Altar of Saints",
+            "title": "",
+            "level": 70,
+            "hostile": false
+        },
+        "base": {
+            "str": 40,
+            "dex": 30,
+            "con": 43,
+            "int": 21,
+            "wit": 20,
+            "men": 10
+        },
+        "stats": {
+            "pAtk": 688.86373,
+            "pAtkRnd": 30,
+            "pDef": 295.91597,
+            "mAtk": 470.40463,
+            "mDef": 216.53847,
+            "accur": 5,
+            "atkSpd": 253,
+            "castSpd": 333,
+            "atkRadius": 40
+        },
+        "speed": {
+            "walk": 50,
+            "run": 120
+        },
+        "vitals": {
+            "maxHp": 2444.46819,
+            "maxMp": 1345.8,
+            "revHp": 7.5,
+            "revMp": 2.7,
+            "corpseTime": 7000
+        },
+        "collision": {
+            "radius": 14,
+            "size": 45.5
+        },
+        "equipment": {
+            "weapon": 0,
+            "shield": 0,
+            "reuseTime": 0
+        },
+        "clan": {
+            "clanName": "",
+            "helpRadius": 300
+        },
+        "rewards": {
+            "exp": 0,
+            "sp": 0
+        },
+        "traits": {
+            "race": "construct",
+            "undead": false
+        }
+    },
+    {
+        "selfId": 8510,
+        "template": {
+            "kind": "Citizen",
+            "name": "Altar of Saints",
+            "title": "",
+            "level": 70,
+            "hostile": false
+        },
+        "base": {
+            "str": 40,
+            "dex": 30,
+            "con": 43,
+            "int": 21,
+            "wit": 20,
+            "men": 10
+        },
+        "stats": {
+            "pAtk": 688.86373,
+            "pAtkRnd": 30,
+            "pDef": 295.91597,
+            "mAtk": 470.40463,
+            "mDef": 216.53847,
+            "accur": 5,
+            "atkSpd": 253,
+            "castSpd": 333,
+            "atkRadius": 40
+        },
+        "speed": {
+            "walk": 50,
+            "run": 120
+        },
+        "vitals": {
+            "maxHp": 2444.46819,
+            "maxMp": 1345.8,
+            "revHp": 7.5,
+            "revMp": 2.7,
+            "corpseTime": 7000
+        },
+        "collision": {
+            "radius": 14,
+            "size": 45.5
+        },
+        "equipment": {
+            "weapon": 0,
+            "shield": 0,
+            "reuseTime": 0
+        },
+        "clan": {
+            "clanName": "",
+            "helpRadius": 300
+        },
+        "rewards": {
+            "exp": 0,
+            "sp": 0
+        },
+        "traits": {
+            "race": "construct",
+            "undead": false
+        }
+    },
+    {
+        "selfId": 8511,
+        "template": {
+            "kind": "Citizen",
+            "name": "Altar of Saints",
+            "title": "",
+            "level": 70,
+            "hostile": false
+        },
+        "base": {
+            "str": 40,
+            "dex": 30,
+            "con": 43,
+            "int": 21,
+            "wit": 20,
+            "men": 10
+        },
+        "stats": {
+            "pAtk": 688.86373,
+            "pAtkRnd": 30,
+            "pDef": 295.91597,
+            "mAtk": 470.40463,
+            "mDef": 216.53847,
+            "accur": 5,
+            "atkSpd": 253,
+            "castSpd": 333,
+            "atkRadius": 40
+        },
+        "speed": {
+            "walk": 50,
+            "run": 120
+        },
+        "vitals": {
+            "maxHp": 2444.46819,
+            "maxMp": 1345.8,
+            "revHp": 7.5,
+            "revMp": 2.7,
+            "corpseTime": 7000
+        },
+        "collision": {
+            "radius": 14,
+            "size": 45.5
+        },
+        "equipment": {
+            "weapon": 0,
+            "shield": 0,
+            "reuseTime": 0
+        },
+        "clan": {
+            "clanName": "",
+            "helpRadius": 300
+        },
+        "rewards": {
+            "exp": 0,
+            "sp": 0
+        },
+        "traits": {
+            "race": "construct",
+            "undead": false
+        }
+    },
+    {
+        "selfId": 8512,
+        "template": {
+            "kind": "Citizen",
+            "name": "Evil Altar",
+            "title": "",
+            "level": 70,
+            "hostile": false
+        },
+        "base": {
+            "str": 40,
+            "dex": 30,
+            "con": 43,
+            "int": 21,
+            "wit": 20,
+            "men": 10
+        },
+        "stats": {
+            "pAtk": 688.86373,
+            "pAtkRnd": 30,
+            "pDef": 295.91597,
+            "mAtk": 470.40463,
+            "mDef": 216.53847,
+            "accur": 5,
+            "atkSpd": 253,
+            "castSpd": 333,
+            "atkRadius": 40
+        },
+        "speed": {
+            "walk": 50,
+            "run": 120
+        },
+        "vitals": {
+            "maxHp": 2444.46819,
+            "maxMp": 1345.8,
+            "revHp": 7.5,
+            "revMp": 2.7,
+            "corpseTime": 7000
+        },
+        "collision": {
+            "radius": 11,
+            "size": 45
+        },
+        "equipment": {
+            "weapon": 0,
+            "shield": 0,
+            "reuseTime": 0
+        },
+        "clan": {
+            "clanName": "",
+            "helpRadius": 300
+        },
+        "rewards": {
+            "exp": 0,
+            "sp": 0
+        },
+        "traits": {
+            "race": "construct",
+            "undead": false
+        }
+    },
+    {
+        "selfId": 8513,
+        "template": {
+            "kind": "Citizen",
+            "name": "Evil Altar",
+            "title": "",
+            "level": 70,
+            "hostile": false
+        },
+        "base": {
+            "str": 40,
+            "dex": 30,
+            "con": 43,
+            "int": 21,
+            "wit": 20,
+            "men": 10
+        },
+        "stats": {
+            "pAtk": 688.86373,
+            "pAtkRnd": 30,
+            "pDef": 295.91597,
+            "mAtk": 470.40463,
+            "mDef": 216.53847,
+            "accur": 5,
+            "atkSpd": 253,
+            "castSpd": 333,
+            "atkRadius": 40
+        },
+        "speed": {
+            "walk": 50,
+            "run": 120
+        },
+        "vitals": {
+            "maxHp": 2444.46819,
+            "maxMp": 1345.8,
+            "revHp": 7.5,
+            "revMp": 2.7,
+            "corpseTime": 7000
+        },
+        "collision": {
+            "radius": 11,
+            "size": 45
+        },
+        "equipment": {
+            "weapon": 0,
+            "shield": 0,
+            "reuseTime": 0
+        },
+        "clan": {
+            "clanName": "",
+            "helpRadius": 300
+        },
+        "rewards": {
+            "exp": 0,
+            "sp": 0
+        },
+        "traits": {
+            "race": "construct",
+            "undead": false
+        }
+    },
+    {
+        "selfId": 8514,
+        "template": {
+            "kind": "Citizen",
+            "name": "Evil Altar",
+            "title": "",
+            "level": 70,
+            "hostile": false
+        },
+        "base": {
+            "str": 40,
+            "dex": 30,
+            "con": 43,
+            "int": 21,
+            "wit": 20,
+            "men": 10
+        },
+        "stats": {
+            "pAtk": 688.86373,
+            "pAtkRnd": 30,
+            "pDef": 295.91597,
+            "mAtk": 470.40463,
+            "mDef": 216.53847,
+            "accur": 5,
+            "atkSpd": 253,
+            "castSpd": 333,
+            "atkRadius": 40
+        },
+        "speed": {
+            "walk": 50,
+            "run": 120
+        },
+        "vitals": {
+            "maxHp": 2444.46819,
+            "maxMp": 1345.8,
+            "revHp": 7.5,
+            "revMp": 2.7,
+            "corpseTime": 7000
+        },
+        "collision": {
+            "radius": 11,
+            "size": 45
+        },
+        "equipment": {
+            "weapon": 0,
+            "shield": 0,
+            "reuseTime": 0
+        },
+        "clan": {
+            "clanName": "",
+            "helpRadius": 300
+        },
+        "rewards": {
+            "exp": 0,
+            "sp": 0
+        },
+        "traits": {
+            "race": "construct",
+            "undead": false
+        }
+    },
+    {
+        "selfId": 8515,
+        "template": {
+            "kind": "Citizen",
+            "name": "Evil Altar",
+            "title": "",
+            "level": 70,
+            "hostile": false
+        },
+        "base": {
+            "str": 40,
+            "dex": 30,
+            "con": 43,
+            "int": 21,
+            "wit": 20,
+            "men": 10
+        },
+        "stats": {
+            "pAtk": 688.86373,
+            "pAtkRnd": 30,
+            "pDef": 295.91597,
+            "mAtk": 470.40463,
+            "mDef": 216.53847,
+            "accur": 5,
+            "atkSpd": 253,
+            "castSpd": 333,
+            "atkRadius": 40
+        },
+        "speed": {
+            "walk": 50,
+            "run": 120
+        },
+        "vitals": {
+            "maxHp": 2444.46819,
+            "maxMp": 1345.8,
+            "revHp": 7.5,
+            "revMp": 2.7,
+            "corpseTime": 7000
+        },
+        "collision": {
+            "radius": 11,
+            "size": 45
+        },
+        "equipment": {
+            "weapon": 0,
+            "shield": 0,
+            "reuseTime": 0
+        },
+        "clan": {
+            "clanName": "",
+            "helpRadius": 300
+        },
+        "rewards": {
+            "exp": 0,
+            "sp": 0
+        },
+        "traits": {
+            "race": "construct",
+            "undead": false
+        }
+    },
+    {
+        "selfId": 8516,
+        "template": {
+            "kind": "Citizen",
+            "name": "Evil Altar",
+            "title": "",
+            "level": 70,
+            "hostile": false
+        },
+        "base": {
+            "str": 40,
+            "dex": 30,
+            "con": 43,
+            "int": 21,
+            "wit": 20,
+            "men": 10
+        },
+        "stats": {
+            "pAtk": 688.86373,
+            "pAtkRnd": 30,
+            "pDef": 295.91597,
+            "mAtk": 470.40463,
+            "mDef": 216.53847,
+            "accur": 5,
+            "atkSpd": 253,
+            "castSpd": 333,
+            "atkRadius": 40
+        },
+        "speed": {
+            "walk": 50,
+            "run": 120
+        },
+        "vitals": {
+            "maxHp": 2444.46819,
+            "maxMp": 1345.8,
+            "revHp": 7.5,
+            "revMp": 2.7,
+            "corpseTime": 7000
+        },
+        "collision": {
+            "radius": 11,
+            "size": 45
+        },
+        "equipment": {
+            "weapon": 0,
+            "shield": 0,
+            "reuseTime": 0
+        },
+        "clan": {
+            "clanName": "",
+            "helpRadius": 300
+        },
+        "rewards": {
+            "exp": 0,
+            "sp": 0
+        },
+        "traits": {
+            "race": "construct",
+            "undead": false
+        }
+    },
+    {
+        "selfId": 8517,
+        "template": {
+            "kind": "Citizen",
+            "name": "Hierarch",
+            "title": "",
+            "level": 70,
+            "hostile": false
+        },
+        "base": {
+            "str": 40,
+            "dex": 30,
+            "con": 43,
+            "int": 21,
+            "wit": 20,
+            "men": 10
+        },
+        "stats": {
+            "pAtk": 688.86373,
+            "pAtkRnd": 30,
+            "pDef": 295.91597,
+            "mAtk": 470.40463,
+            "mDef": 216.53847,
+            "accur": 5,
+            "atkSpd": 253,
+            "castSpd": 333,
+            "atkRadius": 40
+        },
+        "speed": {
+            "walk": 50,
+            "run": 120
+        },
+        "vitals": {
+            "maxHp": 2444.46819,
+            "maxMp": 1345.8,
+            "revHp": 7.5,
+            "revMp": 2.7,
+            "corpseTime": 7000
+        },
+        "collision": {
+            "radius": 8,
+            "size": 22.5
+        },
+        "equipment": {
+            "weapon": 0,
+            "shield": 0,
+            "reuseTime": 0
+        },
+        "clan": {
+            "clanName": "",
+            "helpRadius": 300
+        },
+        "rewards": {
+            "exp": 0,
+            "sp": 0
+        },
+        "traits": {
+            "race": "humanoid",
+            "undead": false
+        }
+    },
+    {
+        "selfId": 8518,
+        "template": {
+            "kind": "Citizen",
+            "name": "Mysterious Necromancer",
+            "title": "",
+            "level": 70,
+            "hostile": false
+        },
+        "base": {
+            "str": 40,
+            "dex": 30,
+            "con": 43,
+            "int": 21,
+            "wit": 20,
+            "men": 10
+        },
+        "stats": {
+            "pAtk": 688.86373,
+            "pAtkRnd": 30,
+            "pDef": 295.91597,
+            "mAtk": 470.40463,
+            "mDef": 216.53847,
+            "accur": 5,
+            "atkSpd": 253,
+            "castSpd": 333,
+            "atkRadius": 40
+        },
+        "speed": {
+            "walk": 50,
+            "run": 120
+        },
+        "vitals": {
+            "maxHp": 2444.46819,
+            "maxMp": 1345.8,
+            "revHp": 7.5,
+            "revMp": 2.7,
+            "corpseTime": 7000
+        },
+        "collision": {
+            "radius": 8,
+            "size": 23
+        },
+        "equipment": {
+            "weapon": 0,
+            "shield": 0,
+            "reuseTime": 0
+        },
+        "clan": {
+            "clanName": "",
+            "helpRadius": 300
+        },
+        "rewards": {
+            "exp": 0,
+            "sp": 0
+        },
+        "traits": {
+            "race": "humanoid",
+            "undead": false
+        }
+    },
+    {
+        "selfId": 8537,
+        "template": {
+            "kind": "Citizen",
+            "name": "Tunatun",
+            "title": "Beast Herder",
+            "level": 70,
+            "hostile": false
+        },
+        "base": {
+            "str": 40,
+            "dex": 30,
+            "con": 43,
+            "int": 21,
+            "wit": 20,
+            "men": 10
+        },
+        "stats": {
+            "pAtk": 688.86373,
+            "pAtkRnd": 30,
+            "pDef": 295.91597,
+            "mAtk": 470.40463,
+            "mDef": 216.53847,
+            "accur": 5,
+            "atkSpd": 253,
+            "castSpd": 333,
+            "atkRadius": 40
+        },
+        "speed": {
+            "walk": 50,
+            "run": 120
+        },
+        "vitals": {
+            "maxHp": 2444.46819,
+            "maxMp": 1345.8,
+            "revHp": 7.5,
+            "revMp": 2.7,
+            "corpseTime": 7000
+        },
+        "collision": {
+            "radius": 10,
+            "size": 24
+        },
+        "equipment": {
+            "weapon": 0,
+            "shield": 0,
+            "reuseTime": 0
+        },
+        "clan": {
+            "clanName": "",
+            "helpRadius": 300
+        },
+        "rewards": {
+            "exp": 0,
+            "sp": 0
+        },
+        "traits": {
+            "race": "humanoid",
+            "undead": false
+        }
+    },
+    {
+        "selfId": 8538,
+        "template": {
+            "kind": "Citizen",
+            "name": "Ghost of Adventurer",
+            "title": "",
+            "level": 70,
+            "hostile": false
+        },
+        "base": {
+            "str": 40,
+            "dex": 30,
+            "con": 43,
+            "int": 21,
+            "wit": 20,
+            "men": 10
+        },
+        "stats": {
+            "pAtk": 688.86373,
+            "pAtkRnd": 30,
+            "pDef": 295.91597,
+            "mAtk": 470.40463,
+            "mDef": 216.53847,
+            "accur": 5,
+            "atkSpd": 253,
+            "castSpd": 333,
+            "atkRadius": 40
+        },
+        "speed": {
+            "walk": 50,
+            "run": 120
+        },
+        "vitals": {
+            "maxHp": 2444.46819,
+            "maxMp": 1345.8,
+            "revHp": 7.5,
+            "revMp": 2.7,
+            "corpseTime": 7000
+        },
+        "collision": {
+            "radius": 10,
+            "size": 24
+        },
+        "equipment": {
+            "weapon": 0,
+            "shield": 0,
+            "reuseTime": 0
+        },
+        "clan": {
+            "clanName": "",
+            "helpRadius": 300
+        },
+        "rewards": {
+            "exp": 0,
+            "sp": 0
+        },
+        "traits": {
+            "race": "undead",
+            "undead": true
+        }
+    },
+    {
+        "selfId": 8539,
+        "template": {
+            "kind": "Citizen",
+            "name": "Vulcan",
+            "title": "Blacksmith of Flame",
+            "level": 70,
+            "hostile": false
+        },
+        "base": {
+            "str": 40,
+            "dex": 30,
+            "con": 43,
+            "int": 21,
+            "wit": 20,
+            "men": 10
+        },
+        "stats": {
+            "pAtk": 688.86373,
+            "pAtkRnd": 30,
+            "pDef": 295.91597,
+            "mAtk": 470.40463,
+            "mDef": 216.53847,
+            "accur": 5,
+            "atkSpd": 253,
+            "castSpd": 333,
+            "atkRadius": 40
+        },
+        "speed": {
+            "walk": 50,
+            "run": 120
+        },
+        "vitals": {
+            "maxHp": 2444.46819,
+            "maxMp": 1345.8,
+            "revHp": 7.5,
+            "revMp": 2.7,
+            "corpseTime": 7000
+        },
+        "collision": {
+            "radius": 7,
+            "size": 16.5
+        },
+        "equipment": {
+            "weapon": 89,
+            "shield": 0,
+            "reuseTime": 0
+        },
+        "clan": {
+            "clanName": "",
+            "helpRadius": 300
+        },
+        "rewards": {
+            "exp": 0,
+            "sp": 0
+        },
+        "traits": {
+            "race": "humanoid",
+            "undead": false
+        }
+    },
+    {
+        "selfId": 8555,
+        "template": {
+            "kind": "Citizen",
+            "name": "Abercrombie",
+            "title": "Mercenary Supplier",
+            "level": 70,
+            "hostile": false
+        },
+        "base": {
+            "str": 40,
+            "dex": 30,
+            "con": 43,
+            "int": 21,
+            "wit": 20,
+            "men": 10
+        },
+        "stats": {
+            "pAtk": 688.86373,
+            "pAtkRnd": 30,
+            "pDef": 295.91597,
+            "mAtk": 470.40463,
+            "mDef": 216.53847,
+            "accur": 5,
+            "atkSpd": 253,
+            "castSpd": 333,
+            "atkRadius": 40
+        },
+        "speed": {
+            "walk": 50,
+            "run": 120
+        },
+        "vitals": {
+            "maxHp": 2444.46819,
+            "maxMp": 1345.8,
+            "revHp": 7.5,
+            "revMp": 2.7,
+            "corpseTime": 7000
+        },
+        "collision": {
+            "radius": 8,
+            "size": 17.5
+        },
+        "equipment": {
+            "weapon": 0,
+            "shield": 0,
+            "reuseTime": 0
+        },
+        "clan": {
+            "clanName": "",
+            "helpRadius": 300
+        },
+        "rewards": {
+            "exp": 0,
+            "sp": 0
+        },
+        "traits": {
+            "race": "humanoid",
+            "undead": false
+        }
+    },
+    {
+        "selfId": 8661,
+        "template": {
+            "kind": "Citizen",
+            "name": "Forgotten Monument",
+            "title": "",
+            "level": 70,
+            "hostile": false
+        },
+        "base": {
+            "str": 40,
+            "dex": 30,
+            "con": 43,
+            "int": 21,
+            "wit": 20,
+            "men": 10
+        },
+        "stats": {
+            "pAtk": 688.86373,
+            "pAtkRnd": 30,
+            "pDef": 295.91597,
+            "mAtk": 470.40463,
+            "mDef": 216.53847,
+            "accur": 5,
+            "atkSpd": 253,
+            "castSpd": 333,
+            "atkRadius": 40
+        },
+        "speed": {
+            "walk": 50,
+            "run": 120
+        },
+        "vitals": {
+            "maxHp": 2444.46819,
+            "maxMp": 1345.8,
+            "revHp": 7.5,
+            "revMp": 2.7,
+            "corpseTime": 7000
+        },
+        "collision": {
+            "radius": 32,
+            "size": 46.5
+        },
+        "equipment": {
+            "weapon": 0,
+            "shield": 0,
+            "reuseTime": 0
+        },
+        "clan": {
+            "clanName": "",
+            "helpRadius": 300
+        },
+        "rewards": {
+            "exp": 0,
+            "sp": 0
+        },
+        "traits": {
+            "race": "construct",
+            "undead": false
+        }
+    },
+    {
+        "selfId": 8662,
+        "template": {
+            "kind": "Citizen",
+            "name": "Forgotten Monument",
+            "title": "",
+            "level": 70,
+            "hostile": false
+        },
+        "base": {
+            "str": 40,
+            "dex": 30,
+            "con": 43,
+            "int": 21,
+            "wit": 20,
+            "men": 10
+        },
+        "stats": {
+            "pAtk": 688.86373,
+            "pAtkRnd": 30,
+            "pDef": 295.91597,
+            "mAtk": 470.40463,
+            "mDef": 216.53847,
+            "accur": 5,
+            "atkSpd": 253,
+            "castSpd": 333,
+            "atkRadius": 40
+        },
+        "speed": {
+            "walk": 50,
+            "run": 120
+        },
+        "vitals": {
+            "maxHp": 2444.46819,
+            "maxMp": 1345.8,
+            "revHp": 7.5,
+            "revMp": 2.7,
+            "corpseTime": 7000
+        },
+        "collision": {
+            "radius": 32,
+            "size": 46.5
+        },
+        "equipment": {
+            "weapon": 0,
+            "shield": 0,
+            "reuseTime": 0
+        },
+        "clan": {
+            "clanName": "",
+            "helpRadius": 300
+        },
+        "rewards": {
+            "exp": 0,
+            "sp": 0
+        },
+        "traits": {
+            "race": "construct",
+            "undead": false
+        }
+    },
+    {
+        "selfId": 8663,
+        "template": {
+            "kind": "Citizen",
+            "name": "Forgotten Monument",
+            "title": "",
+            "level": 70,
+            "hostile": false
+        },
+        "base": {
+            "str": 40,
+            "dex": 30,
+            "con": 43,
+            "int": 21,
+            "wit": 20,
+            "men": 10
+        },
+        "stats": {
+            "pAtk": 688.86373,
+            "pAtkRnd": 30,
+            "pDef": 295.91597,
+            "mAtk": 470.40463,
+            "mDef": 216.53847,
+            "accur": 5,
+            "atkSpd": 253,
+            "castSpd": 333,
+            "atkRadius": 40
+        },
+        "speed": {
+            "walk": 50,
+            "run": 120
+        },
+        "vitals": {
+            "maxHp": 2444.46819,
+            "maxMp": 1345.8,
+            "revHp": 7.5,
+            "revMp": 2.7,
+            "corpseTime": 7000
+        },
+        "collision": {
+            "radius": 32,
+            "size": 46.5
+        },
+        "equipment": {
+            "weapon": 0,
+            "shield": 0,
+            "reuseTime": 0
+        },
+        "clan": {
+            "clanName": "",
+            "helpRadius": 300
+        },
+        "rewards": {
+            "exp": 0,
+            "sp": 0
+        },
+        "traits": {
+            "race": "construct",
+            "undead": false
+        }
+    },
+    {
+        "selfId": 8664,
+        "template": {
+            "kind": "Citizen",
+            "name": "Forgotten Monument",
+            "title": "",
+            "level": 70,
+            "hostile": false
+        },
+        "base": {
+            "str": 40,
+            "dex": 30,
+            "con": 43,
+            "int": 21,
+            "wit": 20,
+            "men": 10
+        },
+        "stats": {
+            "pAtk": 688.86373,
+            "pAtkRnd": 30,
+            "pDef": 295.91597,
+            "mAtk": 470.40463,
+            "mDef": 216.53847,
+            "accur": 5,
+            "atkSpd": 253,
+            "castSpd": 333,
+            "atkRadius": 40
+        },
+        "speed": {
+            "walk": 50,
+            "run": 120
+        },
+        "vitals": {
+            "maxHp": 2444.46819,
+            "maxMp": 1345.8,
+            "revHp": 7.5,
+            "revMp": 2.7,
+            "corpseTime": 7000
+        },
+        "collision": {
+            "radius": 32,
+            "size": 46.5
+        },
+        "equipment": {
+            "weapon": 0,
+            "shield": 0,
+            "reuseTime": 0
+        },
+        "clan": {
+            "clanName": "",
+            "helpRadius": 300
+        },
+        "rewards": {
+            "exp": 0,
+            "sp": 0
+        },
+        "traits": {
+            "race": "construct",
+            "undead": false
+        }
+    },
+    {
+        "selfId": 8665,
+        "template": {
+            "kind": "Citizen",
+            "name": "Corpse of Dwarf",
+            "title": "",
+            "level": 70,
+            "hostile": false,
+            "ai": "CORPSE"
+        },
+        "base": {
+            "str": 40,
+            "dex": 30,
+            "con": 43,
+            "int": 21,
+            "wit": 20,
+            "men": 10
+        },
+        "stats": {
+            "pAtk": 688.86373,
+            "pAtkRnd": 30,
+            "pDef": 295.91597,
+            "mAtk": 470.40463,
+            "mDef": 216.53847,
+            "accur": 5,
+            "atkSpd": 253,
+            "castSpd": 333,
+            "atkRadius": 40
+        },
+        "speed": {
+            "walk": 50,
+            "run": 120
+        },
+        "vitals": {
+            "maxHp": 2444.46819,
+            "maxMp": 1345.8,
+            "revHp": 7.5,
+            "revMp": 2.7,
+            "corpseTime": 7000
+        },
+        "collision": {
+            "radius": 13,
+            "size": 19
+        },
+        "equipment": {
+            "weapon": 0,
+            "shield": 0,
+            "reuseTime": 0
+        },
+        "clan": {
+            "clanName": "",
+            "helpRadius": 300
+        },
+        "rewards": {
+            "exp": 0,
+            "sp": 0
+        },
+        "traits": {
+            "race": "humanoid",
+            "undead": false
+        }
     }
 ]

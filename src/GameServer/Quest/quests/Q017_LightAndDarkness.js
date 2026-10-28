@@ -4,8 +4,8 @@ const BLOOD = 7168;
 const SOUND_ACCEPT = "ItemSound.quest_accept";
 const SOUND_MIDDLE = "ItemSound.quest_middle";
 const SOUND_FINISH = "ItemSound.quest_finish";
-function service() {
-  return invoke("GameServer/Quest/QuestService");
+function steps() {
+  return invoke("GameServer/Quest/QuestStep");
 }
 function page(title, text, action = "") {
   return `<html><body>${title}:<br>${text}<br><br>${action}</body></html>`;
@@ -26,12 +26,13 @@ module.exports = {
   async onEvent(state, event) {
     const actor = state.session.actor;
     if (event === "start" && !state.isStarted() && !state.isCompleted()) {
-      if (Number(actor.fetchLevel()) >= 61) return null;
-      await state.setState("started");
-      await state.set("cond", 1);
-      await service().giveItem(state.session, BLOOD, 4);
+      if (!(Number(actor.fetchLevel()) >= 61)) return null;
+      await steps().apply(state, {
+        gives: [[BLOOD, 4]],
+        variables: { ...state.variables, cond: "1" },
+      });
       state.playSound(SOUND_ACCEPT);
-      return page("Hierarch", "Consecrate the four Saint Altars in order.");
+      return page("Hierarch", "Prove your faith by sprinkling this Blood of Saint on the four Altars of Saints in order. Begin by the path at the entrance to the Valley of Saints, then return to me.");
     }
     const step = Number(String(event).replace("altar", ""));
     if (
@@ -41,10 +42,14 @@ module.exports = {
       state.isStarted() &&
       state.getInt("cond") === step
     ) {
-      if (!(await service().takeItem(state.session, BLOOD))) return null;
-      await state.set("cond", step + 1);
+      if (!steps().heldItems(state, [BLOOD]).length)
+        return page(`Saint Altar ${step}`, "You need the Blood of Saint. Return to Hierarch if you have lost it.");
+      await steps().apply(state, {
+        takes: [[BLOOD, 1]],
+        variables: { ...state.variables, cond: String(step + 1) },
+      });
       state.playSound(SOUND_MIDDLE);
-      return page(`Saint Altar ${step}`, "The altar has been consecrated.");
+      return page(`Saint Altar ${step}`, "You sprinkle the Blood of Saint on the altar.");
     }
     return null;
   },
@@ -55,35 +60,47 @@ module.exports = {
       return page("Quest", "You have already completed this quest.");
     if (!state.isStarted())
       return npcId === HIERARCH
-        ? Number(actor.fetchLevel()) < 61
+        ? Number(actor.fetchLevel()) >= 61
           ? page(
               "Hierarch",
-              "Will you bring light to the Saint Altars?",
+              "Are you ready to prove your faith in our work? Sprinkle the Blood of Saint on the Altars of Saints and return to me.",
               '<a action="bypass -h quest 17 start">Accept.</a>',
             )
-          : page("Hierarch", "This task is for adventurers below level 61.")
+          : page("Hierarch", "This quest requires level 61 or above.")
         : page("Quest", "You are not on a quest that involves this NPC.");
     const cond = state.getInt("cond");
     if (npcId === HIERARCH) {
-      if (cond !== 5)
-        return page("Hierarch", "Continue to the next Saint Altar.");
-      service().rewardExpSp(state.session, 105527, 0);
-      state.playSound(SOUND_FINISH);
-      await state.exit(false);
-      return page("Hierarch", "The Saint Altars shine again.");
+      // All blood is normally spent by the last altar, so the terminal
+      // stage must win over the unfinished ritual's lost-item reset.
+      if (cond === 5) {
+        await steps().apply(state, {
+          takes: steps().heldItems(state, [BLOOD]),
+          status: "completed",
+          exp: 105527,
+        });
+        state.playSound(SOUND_FINISH);
+        return page("Hierarch", "Well done! Our trust in you has proven well placed. Someday you may truly be one of us. Accept your reward.");
+      }
+      if (!steps().heldItems(state, [BLOOD]).length) {
+        await steps().abandon(state, [BLOOD]);
+        return page("Hierarch", "You lost the Blood of Saint and betrayed our trust! You are no longer our brother. This mission has ended without a reward.");
+      }
+      return page("Hierarch", "Continue to the next Altar of Saints.");
     }
     const step = ALTARS.indexOf(npcId) + 1;
+    if (cond === step && !steps().heldItems(state, [BLOOD]).length)
+      return page(`Saint Altar ${step}`, "You need the Blood of Saint. Return to Hierarch if you have lost it.");
     if (cond === step)
       return page(
         `Saint Altar ${step}`,
         "Offer the Blood of a Saint.",
-        `<a action="bypass -h quest 17 altar${step}">Consecrate the altar.</a>`,
+        `<a action="bypass -h quest 17 altar${step}">Sprinkle the blood.</a>`,
       );
     return page(
       `Saint Altar ${step}`,
       cond > step
-        ? "This altar is already consecrated."
-        : "Consecrate the previous altar first.",
+        ? "You have already sprinkled blood on this altar."
+        : "Sprinkle blood on the previous altar first.",
     );
   },
 };
