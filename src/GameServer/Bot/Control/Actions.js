@@ -66,7 +66,7 @@ function createRun(input, lease, key, fingerprint) {
     const state = lease.state, { actor, session } = state, now = Date.now();
     const receipt = { actionId: randomUUID(), requestId: input.requestId, sequence: input.sequence,
         runtimeEpoch: input.runtimeEpoch, actorRef: state.actorRef, controlGeneration: lease.generation,
-        kind: input.command.kind, status: 'accepted', phase: 'dispatch', startedAt: now, updatedAt: now,
+        kind: input.command.kind, command: input.command, status: 'accepted', phase: 'dispatch', startedAt: now, updatedAt: now,
         executionOutcome: 'not_applied', gameplayOutcome: 'not_measured', publicationState: 'not_applicable',
         reasonCode: null, reasonSource: null, evidence: {}, sideEffects: {},
         completionCondition: input.command.until || input.command.kind, cancellable: true, eventCursor: null };
@@ -88,6 +88,12 @@ function createRun(input, lease, key, fingerprint) {
             if (actor.storedSpell?.actionOwner === run.owner) actor.storedSpell = null;
             Object.assign(receipt, { status, reasonCode: reason, reasonSource: source, phase: 'terminal', updatedAt: Date.now(), cancellable: false });
             receipt.evidence.finalPosition = position(actor);
+            receipt.evidence.afterSelf = { hp: actor.fetchHp(), mp: actor.fetchMp(), cp: actor.fetchCp(), targetId: actor.fetchDestId() || null };
+            if (session.mcpObservation) {
+                session.mcpObservation.emit('action_terminal', 'mcp_native_adapter', { status, reason, executionOutcome: receipt.executionOutcome,
+                    gameplayOutcome: receipt.gameplayOutcome }, receipt.actionId);
+                receipt.eventCursor = require('./Journal').cursor(session.mcpObservation);
+            }
             pending.delete(key);
             if (state.foreground === run) state.foreground = null;
             Results.remember(key, { sessionId: input.sessionId, fingerprint, receipt });
@@ -109,6 +115,7 @@ function createRun(input, lease, key, fingerprint) {
         event(event, details = {}) {
             if (run.done || event === 'native_cancelled' && !run.nativePending) return;
             receipt.updatedAt = Date.now();
+            if (session.mcpObservation) session.mcpObservation.emit(event, 'concrete_native_action_owner', details, receipt.actionId);
             if (['swing_started', 'cast_started', 'summon_started'].includes(event)) {
                 run.nativePending = run.nativeStarted = true;
                 receipt.status = 'running'; receipt.phase = 'native_execution';
@@ -199,6 +206,11 @@ function createRun(input, lease, key, fingerprint) {
             }
         } };
     run.owner = nativeOwner(run);
+    if (session.mcpObservation) {
+        session.mcpObservation.emit('command_received', 'mcp', { requestId: input.requestId, command: input.command }, receipt.actionId);
+        receipt.eventCursor = require('./Journal').cursor(session.mcpObservation);
+    }
+    receipt.evidence.beforeSelf = { hp: actor.fetchHp(), mp: actor.fetchMp(), cp: actor.fetchCp(), targetId: actor.fetchDestId() || null };
     receipt.evidence.from = position(actor);
     return run;
 }

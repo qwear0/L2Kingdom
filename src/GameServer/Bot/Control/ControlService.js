@@ -8,6 +8,9 @@ const Observation = require('./Observation');
 const Authority = require('./Authority');
 const Actions = require('./Actions');
 const Results = require('./Results');
+const Journal = require('./Journal');
+const Queries = require('./Queries');
+const Waiters = require('./Waiters');
 const runtimeEpoch = randomUUID();
 const sessions = new Map(), attachments = new Map(), observed = new Map(), receipts = Results.entries;
 const incarnations = new WeakMap();
@@ -29,6 +32,7 @@ function dropAttachment(id) {
     const attachment = attachments.get(id);
     if (!attachment) return false;
     Authority.closeAttachment(id);
+    Waiters.close(id); Queries.close(id); Journal.unsubscribe(attachment.record, id);
     attachments.delete(id);
     sessions.get(attachment.sessionId)?.attachments.delete(id);
     const subscribers = observed.get(attachment.characterId);
@@ -47,7 +51,7 @@ function prune() {
     const now = Date.now();
     for (const [id, session] of sessions) if (now - session.lastSeen >= limits.attachmentTtlMs) dropSession(id);
     for (const [id, attachment] of attachments) if (!matches(attachment)) dropAttachment(id);
-    Results.prune(now);
+    Results.prune(now); Queries.prune();
     if (!sessions.size && cleanupTimer) { clearInterval(cleanupTimer); cleanupTimer = null; }
 }
 function startCleanup() {
@@ -65,6 +69,7 @@ function subscribe() {
         const ids = observed.get(event.record.id);
         if (ids) for (const id of [...ids]) {
             const attachment = attachments.get(id);
+            if (attachment && matches(attachment)) Journal.sample(attachment.record.session);
             if (attachment && !matches(attachment)) dropAttachment(id);
         }
     });
@@ -107,10 +112,14 @@ function mutate(action, input, operation) {
     // Reserve correlation before touching subscription state. Terminal eviction
     // never lowers the namespace high-water mark or permits executing old work.
     const entry = remember(key, value);
+    const observedAttachment = attachments.get(input.attachmentId);
+    const journal = observedAttachment?.sessionId === input.sessionId ? observedAttachment.record.session.mcpObservation : null;
+    if (journal) journal.emit('control_request_received', 'control', { kind: action, mode: input.mode, requestId: input.requestId });
     try { value.result = operation(session); value.status = 'succeeded'; }
     catch (error) {
         value.status = error.statusCode ? 'rejected' : 'unknown';
         value.error = { code: error.statusCode ? error.code : 'control_request_unknown', ...(error.statusCode ? error.details : {}) };
+        if (journal?.subscribers.size) journal.emit('control_request_rejected', 'control', { kind: action, requestId: input.requestId, code: value.error.code });
         if (!error.statusCode) throw error;
     } finally { remember(key, value); }
     return publicReceipt(entry);
@@ -120,14 +129,15 @@ function publicReceipt(entry) {
     return value;
 }
 function status() {
-    return { runtimeEpoch, phase: 'running', capabilities: { phase: 'P2', readOnlyAttachment: true,
-        discovery: true, selfObservation: true, localScene: false, semanticEvents: false,
+    return { runtimeEpoch, phase: 'running', capabilities: { phase: 'P3', readOnlyAttachment: true,
+        discovery: true, selfObservation: true, localScene: true, semanticEvents: true,
+        detailPages: true, boundedWait: true, diagnostics: true,
         manualControl: true, gameplayActions: true,
         supported: ['move', 'approach', 'stop', 'target', 'attack:first_swing/target_dead/bounded', 'cast:learned_native',
             'state:seated/walking', 'item:shots/instant_self', 'equip', 'pickup:in_native_range', 'summon:follow/stop/one_swing'],
-        notImplemented: ['local_scene', 'detail_pages', 'events', 'wait', 'npc_services', 'quests', 'social', 'travel',
+        notImplemented: ['npc_service_actions', 'quest_actions', 'dialogue_choices', 'social_actions', 'travel',
             'corpse_and_utility_skills', 'timed_or_handler_items', 'summon_skills/unsummon/mount', 'pvp_attack'] }, limits,
-        usage: { sessions: sessions.size, attachments: attachments.size, observedBots: observed.size, ...Authority.usage(), pendingActions: Actions.pendingCount() } };
+        usage: { sessions: sessions.size, attachments: attachments.size, observedBots: observed.size, ...Authority.usage(), pendingActions: Actions.pendingCount(), ...Journal.usage(), ...Queries.usage(), ...Waiters.usage() } };
 }
 function dispatch(action, raw) {
     const input = parse(action, raw);
@@ -171,9 +181,26 @@ function dispatch(action, raw) {
         return { runtimeEpoch, expiresInMs: limits.attachmentTtlMs, nextRequestId: session.highWater + 1,
             attachmentIds: [...session.attachments] };
     }
-    if (action === 'observe') {
+    if (['observe', 'inspect', 'events', 'diagnose', 'wait'].includes(action)) {
         const attachment = lookup(input.sessionId, input.attachmentId);
-        return Observation.snapshot(attachment.record, { runtimeEpoch, actorRef: ref(attachment.record), attachmentId: attachment.id });
+        Journal.sample(attachment.record.session);
+        const identity = { runtimeEpoch, actorRef: ref(attachment.record), attachmentId: attachment.id };
+        const bounded = result => {
+            const value = { ...identity, ...result };
+            if (Buffer.byteLength(JSON.stringify(value)) > limits.observationBytes) throw fault('observation_response_budget', 413);
+            return value;
+        };
+        if (action === 'wait') return Waiters.wait(input, () => lookup(input.sessionId, input.attachmentId)).then(bounded);
+        if (action === 'events') return bounded(Journal.read(attachment.record.session.mcpObservation, input));
+        if (action === 'inspect') return bounded(input.section === 'self' ? Observation.snapshot(attachment.record, identity) : Queries.inspect(attachment, input));
+        if (action === 'diagnose') return bounded(require('./Diagnostics').diagnose(attachment, input));
+        const snapshot = Observation.snapshot(attachment.record, identity);
+        if (input.view === 'perception') { snapshot.view = 'perception'; snapshot.control = { mode: Authority.view(attachment.record.session).mode }; }
+        snapshot.scene = Queries.page(attachment, input);
+        snapshot.completeness.localScene = !snapshot.scene.incomplete;
+        snapshot.completeness.sceneCoverage = snapshot.scene.incomplete ? 'partial' : 'exhausted_live_iterator_not_snapshot';
+        snapshot.completeness.omitted = snapshot.completeness.omitted.filter(name => name !== 'nearby');
+        return bounded(snapshot);
     }
     if (action === 'attach') return mutate(action, input, session => {
         const record = live(input.actorRef.characterId);
@@ -188,6 +215,7 @@ function dispatch(action, raw) {
         const id = randomUUID();
         attachments.set(id, { id, sessionId: input.sessionId, characterId: record.id, record });
         session.attachments.add(id);
+        Journal.subscribe(record, id);
         if (!observed.has(record.id)) observed.set(record.id, new Set());
         observed.get(record.id).add(id); subscribe();
         return { attachmentId: id, actorRef: ref(record), mode: 'read_only' };

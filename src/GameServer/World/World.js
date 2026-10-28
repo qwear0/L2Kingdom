@@ -357,6 +357,7 @@ const World = {
         RaidEntityIndex.reset(this);
         this.npc.raidBossState = await RaidBossState.load();
         this.items = { spawns   : [], nextId: GROUND_ITEM_ID_START };
+        require('./GroundItemIndex').reset(this);
 
         World.spawnNpcs();
         RaidBossMinionManager.start(this);
@@ -485,6 +486,19 @@ const World = {
         const runtime = currentUserLocationIndex(this.user);
         const record = runtime?.index.getSource(Number(id), 'actor');
         return runtime && currentActorRecord(runtime, record) ? record : null;
+    },
+
+    actorPartyEntries(session) {
+        const runtime = currentUserLocationIndex(this.user);
+        if (!runtime) throw new Error('actor_index_unavailable');
+        const keys = PvpPartyMembershipKeys(session);
+        return runtime.index.groupSources(keys[keys.length - 1]);
+    },
+
+    actorQuerySteps(loc, radius) {
+        const runtime = currentUserLocationIndex(this.user);
+        if (!runtime) throw new Error('actor_index_unavailable');
+        return runtime.index.actorQuerySteps(loc, radius);
     },
 
     actorSessionsNear(loc, radius, accept = null) {

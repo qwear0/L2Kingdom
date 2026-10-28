@@ -40,6 +40,7 @@ const ConsoleText = {
     },
 
     transmit(session, textId, params = []) {
+        if (session.mcpObservation) session.mcpObservation.emit('self_message', 'native_console_text', { textId, params });
         session.dataSendToMe(
             ServerResponse.consoleText(textId, params)
         );

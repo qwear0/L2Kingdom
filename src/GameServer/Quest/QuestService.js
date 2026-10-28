@@ -108,6 +108,7 @@ function render(session, npc, html) {
   if (invoke('GameServer/SecondProfession').handles(npcId) && !html.includes('bypass -h second-profession')) {
     html = html.replace(/<\/body>/i, '<br><a action="bypass -h second-profession">Second profession trials</a><br></body>');
   }
+  if (session.mcpObservation) require('../Bot/Control/Journal').dialogue(session, npc.fetchId(), html, 'native_quest_render');
   session.dataSendToMe(ServerResponse.npcHtml(npc.fetchId(), html));
   session.dataSendToMe(ServerResponse.actionFailed());
 }

@@ -59,7 +59,7 @@ function remove(sourceSession, item) {
 function removeMissing(world, session, id) {
     if (!isViewer(session) || !Number.isSafeInteger(id)
         || id < GROUND_ITEM_ID_START || id >= world.items.nextId
-        || world.items.spawns.some(item => item.fetchId() === id)) return false;
+        || require('./GroundItemIndex').find(world, id)) return false;
     // Only issued, absent ground IDs qualify. This also handles a stale click
     // after a successful send: socket delivery is not a client acknowledgement.
     hide(session, id, true);

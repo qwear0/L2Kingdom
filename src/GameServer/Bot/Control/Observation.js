@@ -24,9 +24,14 @@ function snapshot(record, identity) {
             cp: actor.fetchCp(), maxCp: actor.fetchMaxCp(), dead: actor.state.fetchDead(),
             seated: actor.state.fetchSeated(), moving: Boolean(actor.state.fetchTowards()),
             attacking: Boolean(actor.state.fetchHits()), casting: Boolean(actor.state.fetchCasts()),
-            targetId: actor.fetchDestId() || null },
-        completeness: { self: true, localScene: false, semanticEvents: false,
+            targetId: actor.fetchDestId() || null,
+            inventory: { slots: actor.backpack.fetchItems().length, load: actor.fetchLoad?.() ?? null, maxLoad: actor.fetchMaxLoad(), revision: null },
+            equippedWeapon: actor.backpack.paperdoll?.[actor.backpack.equipment.weapon] || actor.backpack.paperdoll?.[actor.backpack.equipment.dual] || null,
+            equipmentRevision: Number.isSafeInteger(actor.backpack.equipmentRevision) ? actor.backpack.equipmentRevision : null,
+            floor: null, floorSource: 'use movement diagnostics for current native geodata layer',
+            summonId: actor.summon?.fetchId?.() || actor.pet?.fetchId?.() || null },
+        completeness: { self: true, localScene: false, semanticEvents: Boolean(session.mcpObservation),
             omitted: ['nearby', 'inventory', 'effects', 'skills', 'quests', 'dialogue', 'party', 'summon', 'actionReceipts'],
-            inventoryRevision: null, eventCursor: null } };
+            inventoryRevision: null, eventCursor: session.mcpObservation ? require('./Journal').cursor(session.mcpObservation) : null } };
 }
 module.exports = { busyReasons, snapshot };

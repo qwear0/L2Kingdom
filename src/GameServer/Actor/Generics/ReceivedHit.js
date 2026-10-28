@@ -130,6 +130,10 @@ function receivedHit(session, actor, hit, options = {}) {
         Knowledge.recordActor(actor, source); Knowledge.recordActor(source, actor);
     }
     actor.setHp(Math.max(0, hpBefore - hpDamage)); // HP bar would disappear if less than zero
+    if (victimSession?.mcpObservation) victimSession.mcpObservation.emit('damage_received', 'native_received_hit', {
+        sourceId: source?.fetchId?.() || null, hpDamage: hpBefore - actor.fetchHp(), hp: actor.fetchHp() });
+    const observer = source?.session?.mcpObservation || source?.ownerSession?.mcpObservation;
+    if (observer) observer.emit('damage_dealt', 'native_received_hit', { targetId: actor.fetchId(), hpDamage: hpBefore - actor.fetchHp() });
     invoke('GameServer/Social/CombatHelpMemory').recordDamage(source, actor, hpBefore - actor.fetchHp());
     actor.statusUpdateVitals(actor);
 

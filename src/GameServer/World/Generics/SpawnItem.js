@@ -7,7 +7,9 @@ function spawnItem(session, selfId, amount, coords, onSpawn) {
         const item = new Item(this.items.nextId++, { ...utils.crushOb(itemDetails), ...coords });
         item.setAmount(amount);
         this.items.spawns.push(item);
+        require('../GroundItemIndex').add(this, item);
         GroundItemVisibility.publish(this, session, item);
+        if (session?.mcpObservation) session.mcpObservation.emit('drop_spawned', 'native_spawn_item', { objectId: item.fetchId(), templateId: selfId, amount });
         onSpawn?.(item);
     });
 }

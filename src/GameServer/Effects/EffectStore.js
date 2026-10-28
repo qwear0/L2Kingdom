@@ -106,6 +106,8 @@ function removeStored(actor, key, clearTimer = true) {
             invoke('GameServer/Effects/EffectTicker').clear(actor, key);
         } catch (_) {}
     }
+    const observer = actor.session?.mcpObservation || actor.ownerSession?.mcpObservation;
+    if (observer) observer.emit('effect_removed', 'native_effect_store', { targetId: actor.fetchId(), skillId: actor.effects[key].id });
     delete actor.effects[key];
     clearLegacyMarker(actor, key);
     return true;
@@ -118,6 +120,8 @@ function prune(actor) {
     Object.keys(store).forEach((key) => {
         const effect = store[key];
         if (effect?.expiresAt && effect.expiresAt <= current) {
+            const observer = actor.session?.mcpObservation || actor.ownerSession?.mcpObservation;
+            if (observer) observer.emit('effect_expired', 'native_effect_store', { targetId: actor.fetchId(), skillId: effect.id });
             delete store[key];
             clearLegacyMarker(actor, key);
         }
@@ -161,6 +165,8 @@ function apply(actor, effect) {
     }
 
     store[normalized.key] = normalized;
+    const observer = actor.session?.mcpObservation || actor.ownerSession?.mcpObservation;
+    if (observer) observer.emit('effect_applied', 'native_effect_store', { targetId: actor.fetchId(), skillId: normalized.id, level: normalized.level });
     removedEffects.push(...enforceSlotLimits(actor));
     Object.defineProperty(normalized, 'removedEffects', {
         value: removedEffects,

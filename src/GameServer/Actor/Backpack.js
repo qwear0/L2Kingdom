@@ -43,6 +43,8 @@ const FISHING_ROD_GRADES = {
 };
 
 function recordEquipmentEvent(session, item, action) {
+    if (session?.mcpObservation && item) session.mcpObservation.emit('equipment_changed', 'native_backpack', {
+        action, itemId: item.fetchId(), templateId: item.fetchSelfId(), slot: item.fetchSlot() });
     const Events = require('../Clan/ClanReviewEvents'), clanId = session?.actor?.fetchClanId?.();
     if (Events.tracks(clanId, item?.fetchSelfId?.())) Events.changed(clanId, 'member_gear');
     if (!session?.accountId?.startsWith?.('bot_') || !item) return;

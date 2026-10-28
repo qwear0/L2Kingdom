@@ -372,6 +372,13 @@ class CharacterLocationIndex {
         return this.nearSources(loc, radius, { view: 'actor', kind });
     }
 
+    actorQuerySteps(loc, radius) {
+        const read = actorRead(this, 'actor'), point = pointOf(loc, read);
+        const iterator = require('./BoundedCellQuery').steps(point, radius, this.cellSize,
+            key => this.cells.get(key)?.actor?.all, entry => entry.record);
+        return readIterator(read, iterator);
+    }
+
     nearSources(loc, radius, { view = 'actor', kind = 'all', accept = null, allowUnsafeCellBounds = false } = {}) {
         validateView(view);
         if (!KINDS.has(kind)) throw new RangeError('invalid_character_query_kind');

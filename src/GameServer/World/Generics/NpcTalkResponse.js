@@ -1,6 +1,7 @@
 const ServerResponse = invoke('GameServer/Network/Response');
 
 function npcTalkResponse(session, data) {
+    if (session.mcpObservation) session.mcpObservation.dialogue = null;
     let parts = data.link.split(' ') ?? [];
     if (invoke('GameServer/Bot/Population/PopulationConfig').developerDiagnostics === true) console.log("npcTalkResponse link:", data.link, "parts:", parts);
     if (parts.length === 0 || !parts[0]) return;

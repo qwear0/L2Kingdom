@@ -20,6 +20,7 @@ function record(session, actor, target, skill, status, detail, now = Date.now())
     } else state.failures.delete(id);
     session.lastSkillOutcome = { skillId: skill?.fetchSelfId?.(), targetId: target?.fetchId?.(), status, detail, at: now };
     session.combatOutcomeCounts = { ...state.counts };
+    if (session.mcpObservation) session.mcpObservation.emit('skill_outcome', 'native_skill_feedback', session.lastSkillOutcome);
 }
 function blocked(actor, target, skill, now = Date.now()) {
     return (actors.get(actor)?.failures.get(key(actor, target, skill)) || 0) > now;

@@ -23,7 +23,8 @@ async function claim(session, actor, item, canContinue) {
     const eligible = () => session?.actor === actor && actor?.backpack && !actor.isDead?.()
         && actor.fetchIsOnline?.() !== false && canContinue() && PartyCompanionService.canPickupLoot(session);
     if (!eligible()) return { status: 'ineligible' };
-    const canonical = this.items.spawns.find(spawn => spawn === item);
+    const canonical = require('../GroundItemIndex').find(this, item?.fetchId?.());
+    if (canonical !== item) return { status: 'missing' };
     if (!canonical) return { status: 'missing' };
     const selfId = canonical.fetchSelfId(), amount = canonical.fetchAmount();
     if (!Number.isSafeInteger(amount) || amount <= 0) return { status: 'rejected', reason: 'amount' };
@@ -46,7 +47,9 @@ async function claim(session, actor, item, canContinue) {
             if (admission.status !== 'admitted') return { ...admission, recipientId: entry.actor.fetchId() };
         }
         this.items.spawns.splice(index, 1);
+        require('../GroundItemIndex').remove(this, canonical);
         GroundItemVisibility.remove(session, canonical);
+        if (session.mcpObservation) session.mcpObservation.emit('drop_claimed', 'native_pickup_claim', { objectId: canonical.fetchId(), templateId: selfId, amount });
         reservation.commit?.();
         const results = [];
         // This is not a multi-recipient database transaction. Keep partial

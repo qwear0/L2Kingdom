@@ -16,6 +16,10 @@ function npcTalk(session, npc) {
         name: npc.fetchName(),
         title
     };
+    if (session.mcpObservation) {
+        session.mcpObservation.dialogue = null;
+        session.mcpObservation.emit('npc_contact', 'native_npc_talk', session.activeNpcTalk);
+    }
 
     if (Number(npc.fetchSelfId()) === require('../../Lord/CastellanAccess').npcId) {
         return invoke('GameServer/World/Generics/NpcBypasses/Castellan')(session, ['castellan']);
@@ -151,6 +155,7 @@ function showDefaultTalk(session, npc, options = {}) {
         html = html.replace(/<\/body>/i, '<br><a action="bypass -h pet-exchange">Exchange a Pet Ticket</a><br></body>');
     }
 
+    if (session.mcpObservation) require('../../Bot/Control/Journal').dialogue(session, npc.fetchId(), html, 'native_default_talk');
     session.dataSendToMe(ServerResponse.npcHtml(npc.fetchId(), html));
     // C4 keeps the interaction pending until the response is terminated.
     // Without this, closing the HTML leaves movement blocked while the NPC

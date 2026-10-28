@@ -54,6 +54,7 @@ function revoke(state, reason = 'explicit_revoke') {
     state.lease = null;
     state.session.mcpControlGeneration = Number(state.session.mcpControlGeneration || 0) + 1;
     state.reason = reason;
+    if (state.session.mcpObservation) state.session.mcpObservation.emit('lease_revoked', 'control', { reason, generation: state.session.mcpControlGeneration });
     stopFuture(state);
     state.foreground?.cancel(reason);
     queueMicrotask(() => resume(state));
@@ -127,6 +128,7 @@ function acquire(attachment, actorRef) {
     const now = Date.now();
     const lease = state.lease = { id: randomUUID(), state, generation: session.mcpControlGeneration,
         highWater: 0, aliveUntil: now + limits.leaseTtlMs, idleUntil: now + limits.manualIdleMs };
+    if (session.mcpObservation) session.mcpObservation.emit('lease_granted', 'control', { generation: lease.generation });
     return grant(lease);
 }
 function grant(lease) {

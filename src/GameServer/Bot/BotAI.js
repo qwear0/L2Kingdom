@@ -203,6 +203,7 @@ const BotAI = {
                 if (!session.actor || !session.aiActive || Number(session.aiScheduleGeneration || 0) !== generation) return;
                 try {
                     this.tick(session);
+                    if (session.mcpObservation) require('./Control/Journal').sample(session);
                 } catch (err) {
                     console.error("Bot AI Tick Error:", err);
                 }

@@ -1,6 +1,6 @@
 function fetchItem(id) {
     return new Promise((success, fail) => {
-        let item = this.items.spawns.find(ob => ob.fetchId() === id);
+        let item = require('../GroundItemIndex').find(this, id);
         return item ? success(item) : fail();
     });
 }

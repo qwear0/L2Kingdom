@@ -48,7 +48,10 @@ function receivedHit(session, actor, npc, hit, options = {}) {
     }
     // Immortal town staff keep taking hits, but their HP floor stops at 1 so
     // the death pipeline below can only run for killable templates.
+    const observer = actor.ownerSession?.mcpObservation || actor.session?.mcpObservation;
+    const observedHp = observer ? npc.fetchHp() : 0;
     npc.setHp(Math.max(npc.fetchImmortalMinHp?.() ?? 0, npc.fetchHp() - hit)); // HP bar would disappear if less than zero
+    if (observer) observer.emit('damage_dealt', 'native_npc_received_hit', { targetId: npc.fetchId(), hpDamage: observedHp - npc.fetchHp(), hp: npc.fetchHp() });
     npc.broadcastVitals();
 
     if (npc.fetchHp() <= 0) {

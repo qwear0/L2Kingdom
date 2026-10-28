@@ -95,10 +95,10 @@ function proxy(request, response, url, controller) {
 }
 function gameRoute(request, response, url) {
     if (!url.pathname.startsWith(BASE)) return false;
-    void handle(request, response, url, options.default, (action, payload) => {
+    void handle(request, response, url, options.default, async (action, payload) => {
         if (stopping) throw fault('server_unavailable', 503, { phase: 'stopping' });
         service ||= invoke('GameServer/Bot/Control/ControlService');
-        sendJson(response, service.dispatch(action, payload));
+        sendJson(response, await service.dispatch(action, payload));
     });
     return true;
 }
