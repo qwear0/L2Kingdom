@@ -18,6 +18,7 @@
         async user() {
             const response = await originalFetch(`${API}session`);
             if (response.status === 401) { signIn(); return null; }
+            if (response.status === 404) throw new Error('Sign-in unavailable. Restart the management process.');
             if (!response.ok) throw new Error('Session could not load.');
             return (await response.json()).user;
         }
@@ -28,9 +29,12 @@
         event.preventDefault();
         const button = form.querySelector('button'), input = form.elements.key;
         const message = document.getElementById('loginMessage');
-        button.disabled = true; message.textContent = 'Signing in…';
+        if (button.disabled) return;
+        button.disabled = true; input.readOnly = true; message.textContent = '';
+        form.setAttribute('aria-busy', 'true');
         try {
             const response = await originalFetch(`${API}login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: input.value.trim() }) });
+            if (response.status === 404) throw new Error('Sign-in unavailable. Restart the management process.');
             const data = await response.json();
             if (!response.ok) throw new Error(data.error || 'Sign in failed.');
             input.value = '';
@@ -38,6 +42,6 @@
             const target = new URL(next, location.origin);
             location.replace(target.origin === location.origin && target.pathname.startsWith('/observer/') && !/^\/observer\/login\/?$/.test(target.pathname) ? target.href : '/observer/');
         } catch (error) { message.textContent = error.message; }
-        finally { button.disabled = false; }
+        finally { button.disabled = false; input.readOnly = false; form.removeAttribute('aria-busy'); }
     });
 })(window);

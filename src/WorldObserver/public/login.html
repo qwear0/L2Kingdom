@@ -3,25 +3,24 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Sign in · World Observer</title>
+    <title>Welcome to L2Kingdom</title>
     <script src="/observer/appearance.js"></script>
     <link rel="icon" type="image/png" href="/observer/world-observer-logo.png">
     <link rel="stylesheet" href="/observer/login.css">
     <script src="/observer/auth.js" defer></script>
 </head>
 <body>
-    <main class="login-card">
-        <img src="/observer/world-observer-logo.png" width="64" height="64" alt="">
-        <p class="login-kicker">LINEAGE II · C4</p>
-        <h1>World Observer</h1>
-        <p>Sign in with your personal administrator key.</p>
+    <main class="login-card" aria-labelledby="welcomeTitle">
+        <h1 id="welcomeTitle">Welcome to L2Kingdom</h1>
         <form id="observerLogin">
-            <label for="personalKey">Personal key</label>
-            <input id="personalKey" name="key" type="password" autocomplete="current-password" autocapitalize="none" spellcheck="false" maxlength="46" required autofocus>
-            <button type="submit">Sign in</button>
+            <div class="key-field">
+                <input id="personalKey" name="key" type="password" aria-label="Personal key" aria-describedby="loginMessage" placeholder="Enter your key.." autocomplete="current-password" autocapitalize="none" spellcheck="false" maxlength="46" required autofocus>
+                <button type="submit" aria-label="Sign in">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg>
+                </button>
+            </div>
             <p id="loginMessage" role="status" aria-live="polite"></p>
         </form>
-        <small>Keys are issued by the server administrator. No user name is required to sign in.</small>
     </main>
 </body>
 </html>
