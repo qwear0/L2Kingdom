@@ -652,6 +652,11 @@ class Backpack extends BackpackModel {
                 actionOwner?.nativeEvent?.('native_cancelled'); return;
             }
             try {
+                const applySelf = () => {
+                    const outcome = this.applySelfItemSkill(session, skill, actionOwner);
+                    if (outcome.recalled) actionOwner?.nativeEvent?.('item_teleport_started', { consumed: itemSkill.consume ? 1 : 0 });
+                    onSkillResult?.(outcome);
+                };
                 if (itemSkill.teleport === 'skillCoords') {
                     const coords = this.resolveItemTeleportCoords(actor, itemSkill, skill);
                     if (!coords) { actionOwner?.nativeEvent?.('native_failed', { reason: 'native_item_destination_unavailable' }); return; }
@@ -663,14 +668,8 @@ class Backpack extends BackpackModel {
                         if (!accepted) actionOwner?.nativeEvent?.('native_settlement_failed', { reason: 'item_teleport_refused_after_consumption' });
                     }, 'item_skill');
                 } else if (itemSkill.consume) {
-                    this.deleteItem(session, id, 1, () => {
-                        const outcome = this.applySelfItemSkill(session, skill);
-                        onSkillResult?.(outcome);
-                    }, 'potion');
-                } else {
-                    const outcome = this.applySelfItemSkill(session, skill);
-                    onSkillResult?.(outcome);
-                }
+                    this.deleteItem(session, id, 1, applySelf, 'potion');
+                } else applySelf();
             } catch (error) {
                 if (!actionOwner) throw error;
                 actionOwner.nativeEvent?.('native_settlement_failed', { reason: 'item_settlement_failed' });
@@ -1358,12 +1357,14 @@ class Backpack extends BackpackModel {
         });
     }
 
-    applySelfItemSkill(session, skill) {
-        return SkillEffects.execute(session, session.actor, session.actor, skill, {
-            magicSkill: skill.fetchSpell(),
-            rng: () => Math.random(),
-            attack: { clearLoadedShot() {} }
-        });
+    applySelfItemSkill(session, skill, actionOwner = null) {
+        const context = { magicSkill: skill.fetchSpell(), rng: () => Math.random(), attack: { clearLoadedShot() {} } };
+        // Recall is a semantic effect, not the item skill-coordinate shortcut.
+        // Carry this exact cast owner and retain settlement until native arrival.
+        if (actionOwner) context.recallOptions = { actionOwner,
+            onArrival: destination => actionOwner.nativeEvent?.('item_teleport_arrived', { destination }),
+            onInterrupted: reason => actionOwner.nativeEvent?.('native_settlement_failed', { reason }) };
+        return SkillEffects.execute(session, session.actor, session.actor, skill, context);
     }
 
     fetchSelectedPlayableTarget(session) {

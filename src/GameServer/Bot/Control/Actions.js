@@ -89,8 +89,14 @@ function createRun(input, lease, key, fingerprint) {
             if (actor.attack.queue.data?.actionOwner === run.owner) actor.attack.resetQueuedEvent();
             if (actor.storedAttack?.actionOwner === run.owner) actor.storedAttack = null;
             if (actor.storedSpell?.actionOwner === run.owner) actor.storedSpell = null;
-            Object.assign(receipt, { status, reasonCode: reason, reasonSource: source, phase: 'terminal', updatedAt: Date.now(), cancellable: false });
             receipt.evidence.finalPosition = position(actor);
+            if (run.destination && receipt.executionOutcome === 'not_applied'
+                && distance(receipt.evidence.from, receipt.evidence.finalPosition) > 1) {
+                receipt.executionOutcome = 'partial';
+                receipt.gameplayOutcome = 'movement_incomplete';
+                if (status === 'rejected') status = 'failed';
+            }
+            Object.assign(receipt, { status, reasonCode: reason, reasonSource: source, phase: 'terminal', updatedAt: Date.now(), cancellable: false });
             receipt.evidence.afterSelf = { hp: actor.fetchHp(), mp: actor.fetchMp(), cp: actor.fetchCp(), targetId: actor.fetchDestId() || null };
             if (session.mcpObservation) {
                 session.mcpObservation.emit('action_terminal', 'mcp_native_adapter', { status, reason, executionOutcome: receipt.executionOutcome,
@@ -266,7 +272,12 @@ function start(run) {
             run.finish(after !== before ? 'succeeded' : 'rejected', 'native_toggle_state');
         }
     } else if (command.kind === 'state') {
-        if (!Restrictions.canUseBasicAction(actor) || actor.isBlocked()) throw fault('native_state_blocked', 409);
+        // Movement/skill blocking includes being seated, so it cannot gate standing.
+        // Preserve the other native locks and the effect-specific basic-action gate.
+        const blocked = command.property === 'seated'
+            ? actor.state.fetchHits() || actor.state.fetchCasts() || actor.state.fetchAnimated() || actor.state.fetchPickinUp()
+            : actor.isBlocked();
+        if (!Restrictions.canUseBasicAction(actor) || blocked) throw fault('native_state_blocked', 409);
         const before = command.property === 'seated' ? actor.state.fetchSeated() : actor.state.fetchWalkin();
         if (before !== command.value) Generics.basicAction(session, actor, { actionId: command.property === 'seated' ? 0 : 1, actionOwner: owner });
         const after = command.property === 'seated' ? actor.state.fetchSeated() : actor.state.fetchWalkin();
@@ -295,8 +306,8 @@ function start(run) {
             if (!shot) {
                 run.itemBefore = item.fetchAmount(); run.itemId = command.itemId;
                 actor.backpack.useItem(session, command.itemId, { actionOwner: owner, onSkillResult(outcome) {
-                    owner.nativeEvent('cast_effect', { effective: invoke('GameServer/Bot/AI/BotActionFeedback').effective(outcome),
-                        heal: outcome.heal || 0, mpRestore: outcome.mpRestore || 0, effect: Boolean(outcome.effect) });
+                    owner.nativeEvent('cast_effect', { effective: outcome.recalled === true || invoke('GameServer/Bot/AI/BotActionFeedback').effective(outcome),
+                        heal: outcome.heal || 0, mpRestore: outcome.mpRestore || 0, effect: Boolean(outcome.effect), recalled: outcome.recalled === true });
                 } });
                 run.poll(); return;
             }

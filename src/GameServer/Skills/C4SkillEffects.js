@@ -90,7 +90,7 @@ function execute(session, actor, target, skill, context = {}) {
     }
 
     if (semantic.skillType === C4SkillRules.RECALL) {
-        result.recalled = applyRecall(session, target, semantic);
+        result.recalled = applyRecall(session, target, semantic, context.recallOptions);
         clearLoadedShot(context.attack || actor.attack, actor, magicSkill);
         return finish();
     }
@@ -545,7 +545,7 @@ function applyCombatPointHeal(session, actor, target, skill, semantic, magicSkil
 // a Clan Hall escape to the clan's own hall, a Castle escape to the clan's own
 // castle (this server has no castle owners), otherwise to the town by the
 // region rule, which sends a character with karma to the region's PK point.
-function applyRecall(session, target, semantic) {
+function applyRecall(session, target, semantic, options) {
     const targetSession = target?.session || (session?.actor === target ? session : null);
     if (
         !targetSession ||
@@ -560,8 +560,7 @@ function applyRecall(session, target, semantic) {
         ? require('../ClanHall/Runtime').destination(target)
         : null;
     const coords = hall || invoke('GameServer/World/TownRespawn').restartCoords(target);
-    invoke('GameServer/Actor/Generics/TeleportTo')(targetSession, target, coords);
-    return true;
+    return invoke('GameServer/Actor/Generics/TeleportTo')(targetSession, target, coords, options);
 }
 
 function applyGetPlayer(actor, target, rng = Math.random, updatePosition = null) {
