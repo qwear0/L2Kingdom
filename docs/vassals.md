@@ -91,7 +91,7 @@ Known wording mismatch: `CastellanDialog.js` currently says “one minute” in 
 
 ## Idle waiting near Castellan
 
-Service-duty vassals choose a random supported surface 180–640 units around Castellan, walk there through normal navigation and sit on arrival. The chosen destination stays fixed during the approach; failed routes or 30 seconds without local progress discard it and retry after a staggered 30–35-second delay. Surface sampling is bounded, routing uses the existing navigation recovery/worker budgets, and seated waiting performs no repeated destination searches or world-wide occupancy scans. Combat, recovery, owner trade and new orders retain their existing priority. Clan-ineligible vassals use the same seated waiting behavior while retaining cargo and the clan-ineligibility reason.
+Service-duty vassals choose a random supported surface 60–213⅓ units around Castellan, walk there through normal navigation and sit on arrival. The chosen destination stays fixed during the approach; failed routes or 30 seconds without local progress discard it and retry after a staggered 30–35-second delay. Surface sampling is bounded, routing uses the existing navigation recovery/worker budgets, and seated waiting performs no repeated destination searches or world-wide occupancy scans. Combat, recovery, owner trade and new orders retain their existing priority. Clan-ineligible vassals use the same seated waiting behavior while retaining cargo and the clan-ineligibility reason.
 
 ## Physical supplies and cargo
 
