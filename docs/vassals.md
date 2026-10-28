@@ -30,6 +30,7 @@ A vassal belongs to one **character**, with an original `boundClanId`. Another c
 - `VassalService.owns/issueOrder` checks ownership, contact/busy state, gathering area and expected `orderRevision`.
 - `Repository.updateVassalDuty` compare-and-swaps the revision. A stale UI or delayed callback must not overwrite a newer order.
 - `PartyCompanionService.attach` independently checks ownership, original-clan eligibility, capacity and transaction holds. Failed admission preserves the prior duty.
+- Successful admission preserves the bot's position and starts a physical walk to the leader. Initial assembly suppresses generic catch-up/stuck teleports and intertown gatekeeper transit until the bot reaches follow range; this also applies to non-vassal and roster admission. Unusable routes do not authorize teleportation. Later follow/recovery behavior is unchanged.
 - `BotAvailability`, `BotTradeService`, chat rules and AI tool execution enforce corresponding owner boundaries; UI filtering is not the sole guard.
 - Companion-control UI selects the current leader's members. Being a companion does not authorize remote Castellan orders.
 - Party dismissal/leave/disconnect does not erase the ownership record.

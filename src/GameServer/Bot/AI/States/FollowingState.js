@@ -26,6 +26,7 @@ const TownServiceCatalog = invoke('GameServer/Bot/Economy/TownServiceCatalog');
 const ItemDisposition = invoke('GameServer/Bot/Economy/ItemDisposition');
 const HotTownRebuff = invoke('GameServer/Bot/AI/HotTownRebuff');
 const CompanionTownTransit = invoke('GameServer/Bot/AI/CompanionTownTransit');
+const CompanionNavigationRecovery = invoke('GameServer/Bot/AI/CompanionNavigationRecovery');
 const HuntingVisibility = invoke('GameServer/Bot/AI/BotHuntingVisibility');
 
 const FOLLOW_RUN_DISTANCE = 250;
@@ -1139,7 +1140,28 @@ const FollowingState = {
             recordRoleDecision(session, bot, 'hold_position', 'karma_keeps_out_of_town');
             return true;
         }
-        if (!waitsOutsideTown && (session.companionTownTransit || distance > FOLLOW_TELEPORT_DISTANCE)) {
+        if (session.partyJoinApproach) {
+            if (distance <= FOLLOW_RUN_DISTANCE) {
+                delete session.partyJoinApproach;
+                session.stuckTicks = 0;
+                CompanionNavigationRecovery.clear(session);
+            } else if (!partyThreat && !waitsOutsideTown) {
+                const target = loc(player);
+                const previousTarget = session.activeMoveGoal?.requestedTo || session.pendingPathRequest?.requestedTo;
+                if (previousTarget && distance2d(previousTarget, target) > FOLLOW_TARGET_DRIFT) {
+                    bot.automation.abortAll(bot);
+                    CompanionNavigationRecovery.clear(session);
+                }
+                session.lastFollowMoveTarget = target;
+                const navigation = CompanionNavigationRecovery.move(session, bot, target, 'party_join', {
+                    targetActor: player,
+                    arrivalRadius: FOLLOW_RUN_DISTANCE - FOLLOW_FORMATION_TOLERANCE
+                });
+                recordRoleDecision(session, bot, 'follow_leader', `party_join_${navigation.status}`);
+                return true;
+            }
+        }
+        if (!session.partyJoinApproach && !waitsOutsideTown && (session.companionTownTransit || distance > FOLLOW_TELEPORT_DISTANCE)) {
             const transit = CompanionTownTransit.tick(session, bot, player);
             if (transit.handled) {
                 session.stuckTicks = 0;
@@ -1150,9 +1172,9 @@ const FollowingState = {
                 return true;
             }
         }
-        const separatedInsideTown = distance > FOLLOW_TELEPORT_DISTANCE
+        const separatedInsideTown = !session.partyJoinApproach && distance > FOLLOW_TELEPORT_DISTANCE
             && CompanionTownTransit.sameTown(bot, player);
-        if (!waitsOutsideTown && !pullerTravelling
+        if (!session.partyJoinApproach && !waitsOutsideTown && !pullerTravelling
             && (session.stuckTicks >= 3 || (distance > FOLLOW_TELEPORT_DISTANCE && !separatedInsideTown))) {
             session.stuckTicks = 0;
             recordRoleDecision(session, bot, 'follow_leader', distance > FOLLOW_TELEPORT_DISTANCE ? 'catch_up' : 'unstuck');

@@ -44,6 +44,8 @@ Rule-based execution is distinct from LLM dialogue. It is not globally reproduci
 
 `Bot/AI/HotActorLodPolicy.js` distinguishes full, visible and preload detail for hot actors. These labels describe live scheduling/detail, **not cold ownership**. Vassals promote to full owned context even without nearby players, and non-companion duty scheduling bypasses ordinary low-detail delays.
 
+`PartyCompanionService.attach/attachRoster` starts initial assembly in place rather than teleporting admitted bots. `States/FollowingState.tickTravel` uses `CompanionNavigationRecovery` and the native bounded worker pathfinding to walk into the leader's 250-unit follow range, retaining active routes and replanning when the leader moves substantially. During that approach, generic catch-up/stuck teleports and intertown gatekeeper transit are disabled; failed routes use the existing bounded navigation retries, never a warp fallback. Combat/control/karma restrictions remain in force. Arrival or detachment clears the live assembly marker; subsequent follow/recovery behavior is unchanged.
+
 Post-party safe rest measures eligible live time, not elapsed server downtime. See [vassal lifecycle](vassals.md) for the ten-minute rest and recovery rules.
 
 ## Native class decisions

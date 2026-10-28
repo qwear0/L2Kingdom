@@ -921,6 +921,8 @@ function detachState(companionSession, plan = 'hunting', preserveTakeover = fals
     companionSession.plan = plan;
     companionSession.followPlayerSession = null;
     companionSession.partyCompanion = false;
+    delete companionSession.partyJoinApproach;
+    Navigation.clear(companionSession);
     if (!preserveTakeover) invoke('GameServer/Bot/Population/BotLifeState').releasePlayerPartyTakeover(companionSession);
     invoke('GameServer/Bot/AI/BotPvpIndex').invalidate();
     refreshPartyMemberships([companionSession], invoke);
@@ -1097,27 +1099,14 @@ const PartyCompanionService = {
 
     bringToLeader(leaderSession, companionSession) {
         if (!isActiveCompanion(companionSession, leaderSession)) return false;
-        const destination = teleportTargetFor(companionSession);
-        if (!destination || staysOutOfTown(companionSession.actor, destination)) return false;
-
+        // Initial assembly must stay physical even beyond the normal follow
+        // catch-up range. Clear this only after reaching the leader or leaving.
+        companionSession.partyJoinApproach = true;
         companionSession.lastFollowMoveTarget = null;
         companionSession.stuckTicks = 0;
-        try {
-            return invoke(path.actor).teleportTo(
-                companionSession,
-                companionSession.actor,
-                destination,
-                { urgentWakeup: true }
-            ) !== false;
-        } catch (err) {
-            utils.infoWarn(
-                'BotParty',
-                'failed to bring %s to party leader: %s',
-                companionSession.actor?.fetchName?.() || 'unknown',
-                err.message || err
-            );
-            return false;
-        }
+        invoke('GameServer/Bot/AI/CompanionTownTransit').clear(companionSession);
+        invoke('GameServer/Bot/BotAI').wakeup(companionSession, { urgent: true });
+        return true;
     },
 
     canAttachRoster(leaderSession, companionSessions, options = {}) {
@@ -1204,9 +1193,7 @@ const PartyCompanionService = {
 
         leaderSession.dataSendToMe?.(ServerResponse.joinParty(1));
         roster.forEach((companionSession) => {
-            if (!this.bringToLeader(leaderSession, companionSession)) {
-                invoke('GameServer/Bot/BotAI').wakeup(companionSession, { urgent: true });
-            }
+            this.bringToLeader(leaderSession, companionSession);
         });
         refreshLeaderView(leaderSession);
 
@@ -1282,7 +1269,7 @@ const PartyCompanionService = {
 
         // A hot bot may accept while it is still fighting or moving in its
         // old solo context. Clear those server-owned timers before changing
-        // ownership; unselecting or teleporting alone does not stop Attack.
+        // ownership; unselecting alone does not stop Attack.
         cancelCompanionAction(companionSession);
 
         if (options.sendJoin !== false) {
@@ -1303,22 +1290,14 @@ const PartyCompanionService = {
         companionSession.actor?.unselect?.();
         companionSession.autoTaunt = settingsForLeader(leaderSession).pullMode !== 'off';
 
-        // Do not let an old solo AI timeout fire between the teleport packet
-        // and its delayed authoritative position update. TeleportTo performs
-        // one urgent wakeup after that update completes.
         invoke('GameServer/Bot/BotAI').cancelScheduledTick(companionSession);
-        const arrivalPending = this.bringToLeader(leaderSession, companionSession);
+        this.bringToLeader(leaderSession, companionSession);
 
         if (previousLeader && previousLeader !== leaderSession) {
             refreshLeaderView(previousLeader);
         }
 
         refreshLeaderView(leaderSession);
-        // If the actor could not teleport, preserve the old urgent catch-up
-        // fallback rather than leaving it without a scheduled AI tick.
-        if (!arrivalPending) {
-            invoke('GameServer/Bot/BotAI').wakeup(companionSession, { urgent: true });
-        }
         Promise.resolve(invoke('GameServer/Bot/AI/BotEventJournal').record({
             playerId: leader.fetchId(),
             botId: bot.fetchId(),
