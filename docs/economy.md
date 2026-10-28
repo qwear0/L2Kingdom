@@ -43,7 +43,7 @@ The foreground hold spans accepted native mutation/publication even after revoke
 
 ## Retained clan market errands
 
-`Bot/Economy/ColdMarketService.js` rejects an arrived clan errand when the buyer's clan snapshot differs from its tag: it saves removal of that errand before `Clan/ClanPurchaseCredit.js` attempts to return unused tagged treasury credit to the original clan. Save and refund are separate operations; a rejected refund does not restore the errand or create a debt/retry record. This branch does not itself close `GoalState` or recheck membership inside the money transaction. It does not enable autonomous clan execution under owned-only startup.
+`Bot/Economy/ColdMarketService.js` rejects an arrived clan errand when the buyer's clan snapshot differs from its tag. That drop and ordinary ended errands share `endErrand`: after the lifecycle save attempt, it asks `GoalState.clear` to mark the cached current goal `completed`, then attempts to return unused tagged treasury credit to the original clan through `Clan/ClanPurchaseCredit.js` only if the lifecycle save returned a state. Goal completion is attempted even if that save returned `null`; it neither loads an uncached goal nor checks its type/identity/revision. Lifecycle save, goal completion and refund are separate operations, not guaranteed completion/repayment or one transaction. `GoalState` reports ordinary save failures and returns `null`; unexpected rejected goal promises propagate and can prevent the refund. A rejected refund does not restore the errand or create a debt/retry record. The money transaction does not recheck clan membership. This change does not enable autonomous clan execution under owned-only startup.
 
 ## Native private stores and direct bot trade
 
