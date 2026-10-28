@@ -5,6 +5,7 @@ const DiskCache = require('./SpawnPlacementCache');
 
 const POOL_SIZE = 128;
 const SAMPLE_ATTEMPTS = 512;
+const DISCOVERY_TILES = 16;
 const PATH_NODES = 20000;
 const ANCHOR_RADIUS = 32768;
 const BUCKET_SIZE = 8192;
@@ -30,7 +31,8 @@ const distanceSquared = (a, b) => (a.locX - b.locX) ** 2 + (a.locY - b.locY) ** 
 const counters = () => ({ xyDraws: 0, sampledCells: 0, decodedLayers: 0, candidateLayers: 0,
     surfaceUnavailableCells: 0, blockedLayers: 0, outOfRangeLayers: 0,
     deterministicCells: 0, directWalkCalls: 0, strictWalkCalls: 0, localAuditWalkCalls: 0,
-    walkTransitions: 0, pathSearchRequests: 0, pathNodeAllowance: 0, fixedPathNodeAllowance: 0 });
+    walkTransitions: 0, pathSearchRequests: 0, pathNodeAllowance: 0, fixedPathNodeAllowance: 0,
+    skippedPathSearchRequests: 0, directProofsAfterSearchLimit: 0, retentionSkippedCandidates: 0 });
 
 class BudgetStop extends Error {
     constructor(limit, global = false) {
@@ -126,16 +128,25 @@ class Budget {
         if ((this.work.walkTransitions & 127) === 0) this.poll();
     }
     search(nodes) {
+        const target = this.target, fixed = target?.kind === 'fixed';
+        const limit = target?.searchLimit
+            || (fixed && this.work.fixedPathNodeAllowance + nodes > LIMITS.fixedNodeAllowance ? 'fixed:pathNodeAllowance'
+                : target && target.work.pathSearchRequests >= LIMITS.targetSearches ? 'target:pathSearchRequests'
+                    : target && target.work.pathNodeAllowance + nodes > LIMITS.targetNodeAllowance ? 'target:pathNodeAllowance' : null);
+        // A* exhaustion disables that operation, not the target. Later strict
+        // direct witnesses may still prove it within the unchanged walk/time limits.
+        if (limit) {
+            if (target) target.searchLimit = limit;
+            this.add('skippedPathSearchRequests');
+            return false;
+        }
         this.poll(true);
-        const fixed = this.target?.kind === 'fixed';
-        // Fixed witnesses are diagnostic: authored fixed spawns do not consume
-        // them. Keep unresolved witnesses explicit without starving random pools.
-        if (fixed && this.work.fixedPathNodeAllowance + nodes > LIMITS.fixedNodeAllowance) this.stop('fixed:pathNodeAllowance');
         this.reserve('pathSearchRequests', 1, LIMITS.searches, LIMITS.targetSearches);
         this.reserve('pathNodeAllowance', nodes, LIMITS.nodeAllowance, LIMITS.targetNodeAllowance);
         this.add('pathSearchRequests');
         this.add('pathNodeAllowance', nodes);
         if (fixed) this.add('fixedPathNodeAllowance', nodes);
+        return true;
     }
     scan() {
         this.tested();
@@ -257,6 +268,7 @@ class Proofs {
         this.budget = budget;
         this.trusted = [];
         this.trustedKeys = new Map();
+        this.shared = new Set();
         this.sources = new Map();
         this.targets = new Map();
         this.memberships = 0;
@@ -286,7 +298,7 @@ class Proofs {
     }
     enqueue(target) {
         if (target.pending || target.stopped || (target.kind === 'fixed' && target.proven)) return;
-        if (target.kind === 'random' && adequate(target).accepted) return;
+        if (target.kind === 'random' && (adequate(target).accepted || (target.complete && !target.eligible))) return;
         target.pending = true;
         this.queue.push(target);
     }
@@ -302,12 +314,23 @@ class Proofs {
         this.buckets({ minX: point.locX, maxX: point.locX, minY: point.locY, maxY: point.locY }, ANCHOR_RADIUS, bucketKey => {
             for (const target of this.targets.get(bucketKey) || []) {
                 if (seen.has(target.id) || !this.relevant(point, target.domain)) continue;
-                seen.add(target.id); target.proofVersion++;
+                seen.add(target.id);
+                // New connectivity witnesses cannot change exhausted layer discovery.
+                if (target.kind === 'random' && target.complete && !target.eligible) continue;
+                target.proofVersion++;
                 if (target.complete) target.retryScan = true;
                 this.enqueue(target);
             }
         });
         return index;
+    }
+    share(point) {
+        // Bands select supplemental witnesses only; every retained witness keeps
+        // its exact Z and every connection still needs a strict layer-aware proof.
+        const key = `${Math.floor(point.locX / BUCKET_SIZE)}:${Math.floor(point.locY / BUCKET_SIZE)}:${Math.floor(point.locZ / 64)}`;
+        if (this.shared.has(key)) return;
+        this.add(point);
+        this.shared.add(key);
     }
     nearby(target, point, limit = 8, candidates) {
         const found = [];
@@ -431,19 +454,26 @@ function fastCandidates(target, budget) {
 function fallbackCandidates(target, budget, proofs) {
     const points = [], seen = new Set(), d = target.domain;
     const width = Math.max(0, d.x1 - d.x0 + 1), height = Math.max(0, d.y1 - d.y0 + 1);
-    const total = width * height;
+    if (!width || !height) { target.complete = true; return points; }
+    const columns = Math.min(DISCOVERY_TILES, width), rows = Math.min(DISCOVERY_TILES, height);
+    const tileWidth = Math.ceil(width / columns), tileHeight = Math.ceil(height / rows);
+    const tiles = columns * rows, total = tileWidth * tileHeight * tiles;
     if (!Number.isSafeInteger(total)) budget.stop('target:boundingBox');
     const startedLayers = budget.work.decodedLayers;
     if (!target.cursor) target.scanVersion = target.proofVersion;
     let batch = 0;
+    // Interleave tiles across both axes before advancing inside each tile. Every
+    // real bounding-box cell occurs once per pass; ragged padding is not decoded.
     while (target.cursor < total && batch < LIMITS.batchCells && points.length <= LIMITS.candidateWindow - 255
         && budget.work.decodedLayers - startedLayers <= LIMITS.batchLayers - 255) {
-        budget.scan();
-        const index = target.cursor++;
-        target.scanned++; batch++;
-        const x = ((d.x0 + Math.floor(index / height)) * 16) + 8;
-        const y = ((d.y0 + index % height) * 16) + 8;
-        discoverCell(target, x, y, budget, points, seen);
+        const index = target.cursor++, tile = index % tiles, local = Math.floor(index / tiles);
+        const tileX = tile % columns, tileY = (Math.floor(tile / columns) + tileX) % rows;
+        const x = d.x0 + tileX * tileWidth + Math.floor(local / tileHeight);
+        const y = d.y0 + tileY * tileHeight + local % tileHeight;
+        batch++;
+        if (x > d.x1 || y > d.y1) continue;
+        budget.scan(); target.scanned++;
+        discoverCell(target, x * 16 + 8, y * 16 + 8, budget, points, seen);
     }
     budget.poll(true);
     if (target.cursor >= total) {
@@ -456,51 +486,59 @@ function fallbackCandidates(target, budget, proofs) {
     return points;
 }
 
-function connect(from, to, target, budget, initial, direct = true) {
-    if (direct) {
-        budget.add('directWalkCalls');
-        if (Surface.walk(from, to, budget)) return true;
-    }
+function directConnection(from, to, target, budget) {
+    budget.add('directWalkCalls');
+    const connected = Surface.walk(from, to, budget);
+    if (connected && target.searchLimit) budget.add('directProofsAfterSearchLimit');
+    return connected;
+}
+
+function connect(from, to, target, budget, initial) {
     const maxSearches = initial ? LIMITS.fastSearches : LIMITS.targetSearches;
     if (target.work.pathSearchRequests >= maxSearches) return false;
     return Surface.reachable(from, to, PATH_NODES, budget, true);
 }
 
+// Prune before connectivity work only when a full-pool candidate cannot improve
+// XY demand or a deficient span. Replacements must preserve every existing extreme;
+// each admission invalidates this transient retention summary.
+function retentionIndex(target, point) {
+    if (target.acceptedKeys.has(cellKey(point))) return -1;
+    if (target.points.length < POOL_SIZE) return target.points.length;
+    const summary = adequate(target), box = summary.extent, cache = target.adequacyCache;
+    if (!cache.retention) {
+        const cells = new Map(), extremes = [0, 0, 0, 0];
+        for (const p of target.points) {
+            const xy = `${p.locX >> 4}:${p.locY >> 4}`;
+            cells.set(xy, (cells.get(xy) || 0) + 1);
+            if (p.locX === box.minX) extremes[0]++;
+            if (p.locX === box.maxX) extremes[1]++;
+            if (p.locY === box.minY) extremes[2]++;
+            if (p.locY === box.maxY) extremes[3]++;
+        }
+        let index = summary.uniqueCells < summary.demand
+            ? target.points.findIndex(p => cells.get(`${p.locX >> 4}:${p.locY >> 4}`) > 1) : -1;
+        const needsCells = index >= 0;
+        if (index < 0) index = target.points.findIndex(p => (p.locX !== box.minX || extremes[0] > 1)
+            && (p.locX !== box.maxX || extremes[1] > 1) && (p.locY !== box.minY || extremes[2] > 1)
+            && (p.locY !== box.maxY || extremes[3] > 1));
+        cache.retention = { cells, index, needsCells };
+    }
+    const { cells, index, needsCells } = cache.retention;
+    if (cells.has(`${point.locX >> 4}:${point.locY >> 4}`)) return -1;
+    const width = target.domain.maxX - target.domain.minX, height = target.domain.maxY - target.domain.minY;
+    const extendsX = width >= 256 && box.maxX - box.minX < width * 0.25 && (point.locX < box.minX || point.locX > box.maxX);
+    const extendsY = height >= 256 && box.maxY - box.minY < height * 0.25 && (point.locY < box.minY || point.locY > box.maxY);
+    return needsCells || extendsX || extendsY ? index : -1;
+}
+
 function accept(target, point, proofs) {
-    const key = cellKey(point);
-    if (target.acceptedKeys.has(key)) return;
-    if (target.points.length >= POOL_SIZE) {
-        const summary = adequate(target), box = summary.extent;
-        if (target.points.some(p => (p.locX >> 4) === (point.locX >> 4) && (p.locY >> 4) === (point.locY >> 4))) return;
-        let index = -1;
-        // Multiple layers at one XY can fill 128 slots before XY demand is
-        // met. Replacing a duplicate XY preserves every established extreme.
-        if (summary.uniqueCells < summary.demand) {
-            const counts = new Map();
-            for (const p of target.points) {
-                const xy = `${p.locX >> 4}:${p.locY >> 4}`;
-                counts.set(xy, (counts.get(xy) || 0) + 1);
-            }
-            index = target.points.findIndex(p => counts.get(`${p.locX >> 4}:${p.locY >> 4}`) > 1);
-        }
-        if (index < 0) {
-            if (point.locX >= box.minX && point.locX <= box.maxX && point.locY >= box.minY && point.locY <= box.maxY) return;
-            const extremes = [0, 0, 0, 0];
-            for (const p of target.points) {
-                if (p.locX === box.minX) extremes[0]++;
-                if (p.locX === box.maxX) extremes[1]++;
-                if (p.locY === box.minY) extremes[2]++;
-                if (p.locY === box.maxY) extremes[3]++;
-            }
-            index = target.points.findIndex(p => (p.locX !== box.minX || extremes[0] > 1)
-                && (p.locX !== box.maxX || extremes[1] > 1) && (p.locY !== box.minY || extremes[2] > 1)
-                && (p.locY !== box.maxY || extremes[3] > 1));
-        }
-        if (index < 0) return;
-        target.acceptedKeys.delete(cellKey(target.points[index])); target.points[index] = point;
-    } else target.points.push(point);
-    target.acceptedKeys.add(key);
-    if (target.admissions++ % 32 === 0) proofs.add(point);
+    const index = retentionIndex(target, point);
+    if (index < 0) return;
+    if (index < target.points.length) target.acceptedKeys.delete(cellKey(target.points[index]));
+    target.points[index] = point;
+    target.acceptedKeys.add(cellKey(point)); target.admissions++;
+    proofs.share(point);
 }
 
 function fillPool(target, points, budget, proofs, initial) {
@@ -510,21 +548,24 @@ function fillPool(target, points, budget, proofs, initial) {
             locY: (target.domain.minY + target.domain.maxY) / 2, locZ: target.domain.minZ };
         const sources = proofs.nearby(target, centre, 8, points);
         target.nearbyRoots = Math.max(target.nearbyRoots || 0, sources.length);
+        const pending = [];
         let entered = false;
         for (const source of sources) {
             for (const point of nearest(points, source.point, 2)) {
-                if (!proofs.pair(target, source.index, point)) continue;
-                const entrySearches = target.work.pathSearchRequests;
-                // Preserve the fast entry allowance; later discovery may use
-                // the remaining per-target budget, never a fresh reset.
-                const canSearch = !initial || entrySearches < LIMITS.fastSearches / 2;
-                budget.add('directWalkCalls');
-                if (Surface.walk(source.point, point, budget)
-                    || (canSearch && connect(source.point, point, target, budget, initial, false))) {
+                if (retentionIndex(target, point) < 0 || !proofs.pair(target, source.index, point)) continue;
+                if (directConnection(source.point, point, target, budget)) {
                     accept(target, point, proofs); entered = true; break;
                 }
+                pending.push({ source, point });
             }
             if (entered) break;
+        }
+        // Try the selected direct witnesses before spending entry A* allowance.
+        for (const { source, point } of pending) {
+            if (entered || (initial && target.work.pathSearchRequests >= LIMITS.fastSearches / 2)) break;
+            if (connect(source.point, point, target, budget, initial)) {
+                accept(target, point, proofs); entered = true;
+            }
         }
     }
     if (!target.points.length) return;
@@ -533,18 +574,18 @@ function fillPool(target, points, budget, proofs, initial) {
         for (const point of points) {
             const key = cellKey(point);
             if (target.acceptedKeys.has(key) || lastProof.get(key) === target.admissions) continue;
+            if (retentionIndex(target, point) < 0) { budget.add('retentionSkippedCandidates'); continue; }
             const neighbours = nearest(target.points, point, 4);
             let connected = false;
             for (const source of neighbours) {
                 if (proofs.failed(target, source, point, 'walk')) continue;
-                budget.add('directWalkCalls');
-                if (Surface.walk(source, point, budget)) { connected = true; break; }
+                if (directConnection(source, point, target, budget)) { connected = true; break; }
                 proofs.failed(target, source, point, 'walk', true);
             }
             const source = neighbours[0];
             if (!connected && !proofs.failed(target, source, point, 'path')) {
                 const before = target.work.pathSearchRequests;
-                connected = connect(source, point, target, budget, initial, false);
+                connected = connect(source, point, target, budget, initial);
                 if (!connected && target.work.pathSearchRequests > before) proofs.failed(target, source, point, 'path', true);
             }
             if (connected) accept(target, point, proofs);
@@ -574,7 +615,10 @@ function poolAttempt(target, initial, budget, proofs) {
         });
     } catch (error) {
         if (error.code !== 'SPAWN_BUDGET') throw error;
-        target.reason = 'budget_exhausted'; target.limit = error.limit; target.stopped = true;
+        // Optional extra discovery/sharing cannot revoke already sufficient
+        // strict points. A hard global stop still blocks publication/startup.
+        target.reason = adequate(target).accepted ? null : 'budget_exhausted';
+        target.limit = error.limit; target.stopped = true;
     }
     target.attempts.push({ phase: initial ? 'fast' : 'deterministic', ...Object.fromEntries(Object.keys(before)
         .map(key => [key, target.work[key] - before[key]])), reason: target.reason, limit: target.limit || null });
@@ -622,18 +666,27 @@ function proveFixed(target, budget, proofs) {
     try {
         budget.enter(target, () => {
             const sources = proofs.nearby(target, target.point);
+            target.nearbyRoots = Math.max(target.nearbyRoots || 0, sources.length);
+            const pending = [];
+            let witness = null;
             for (const source of sources) {
                 if (!proofs.pair(target, source.index, target.point)) continue;
-                if (!connect(source.point, target.point, target, budget, false)) continue;
+                if (directConnection(source.point, target.point, target, budget)) { witness = source; break; }
+                pending.push(source);
+            }
+            if (!witness) witness = pending.find(source => connect(source.point, target.point, target, budget, false));
+            if (witness) {
                 target.proven = true;
                 for (const record of target.records) {
-                    record.global = 'proven'; record.reason = null; record.witness = source.index;
+                    record.global = 'proven'; record.reason = null; record.witness = witness.index; record.limit = null;
                 }
-                // Share selected fixed proofs, not every authored coordinate.
-                if (target.id % 32 === 0) proofs.add(target.point);
+                proofs.share(target.point);
                 return;
             }
-            for (const record of target.records) record.reason = sources.length ? 'connectivity_unknown' : 'root_unavailable';
+            for (const record of target.records) {
+                record.reason = target.searchLimit ? 'budget_exhausted' : target.nearbyRoots ? 'connectivity_unknown' : 'root_unavailable';
+                if (target.searchLimit) record.limit = target.searchLimit;
+            }
         });
     } catch (error) {
         if (error.code !== 'SPAWN_BUDGET') throw error;
@@ -762,6 +815,12 @@ function init(definitions, cacheOptions = {}) {
     }
     if (inv) {
         for (const target of inv.targets) {
+            if (target.searchLimit) {
+                target.limit ||= target.searchLimit;
+                if (!adequate(target).accepted && target.reason !== 'no_layer_in_z_interval' && target.reason !== 'invalid_bounds') {
+                    target.reason = 'budget_exhausted';
+                }
+            }
             if (budget.stopped && !adequate(target).accepted) { target.reason = 'budget_exhausted'; target.limit ||= budget.stopped; }
             if (!disk?.cached || !pools.has(target.key)) pools.set(target.key, Int32Array.from(target.points.flatMap(xyz)));
             poolStates.set(target.key, { reason: target.reason, adequate: adequate(target).accepted,

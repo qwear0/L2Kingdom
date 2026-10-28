@@ -109,7 +109,7 @@ function walk(from, to, budget) {
 
 function reachable(from, to, maxNodes, budget, skipDirect = false) {
     if (!skipDirect && walk(from, to, budget)) return true;
-    budget?.search(maxNodes + 1);
+    if (budget?.search(maxNodes + 1) === false) return false;
     const route = Geo.findPath(from.locX, from.locY, from.locZ,
         to.locX, to.locY, to.locZ, maxNodes, { debug: false, checkBudget: budget && (() => budget.poll()) });
     budget?.poll();
