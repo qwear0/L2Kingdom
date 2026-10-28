@@ -673,6 +673,13 @@ async function acquireMaterials(state, requirements) {
 async function buyErrand(state, options = {}) {
     const errand = pendingErrand(state);
     if (!errand || state.activity !== 'shopping' || errand.town !== state.currentRegion) return null;
+    if (errand.purpose === 'clan' && Number(state.stats?.clanId) !== Number(errand.tag?.clanId)) {
+        // A buyer outside the errand's clan must not spend its carried treasury credit.
+        // Saving the drop precedes a separate refund attempt; rejection does not restore the errand.
+        const dropped = await LifeState.upsertState(CombinedErrands.complete(state, errand), 'market_errand_no_offer');
+        const refunded = dropped ? await invoke('GameServer/Clan/ClanPurchaseCredit').returnUnspent(state.characterId, errand, 0) : null;
+        return { state: refunded?.state || dropped || state, purchased: false, units: 0, reason: 'market_errand_no_offer' };
+    }
     const terms = { towns: [errand.town], purpose: errand.purpose, ...savedRoute(errand), ...fundingTerms(errand),
         money: errand.money ?? Infinity, maxPrice: errand.maxPrice ?? Infinity };
     const plan = planPurchase(state, errand.selfId, errand.amount,

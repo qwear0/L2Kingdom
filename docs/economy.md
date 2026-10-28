@@ -35,6 +35,10 @@ Retained clan crafting planners pool personal inventory with available clan ware
 
 Recipes, skills, item definitions and catalogue descriptions must agree; see [content](content.md).
 
+## Retained clan market errands
+
+`Bot/Economy/ColdMarketService.js` rejects an arrived clan errand when the buyer's clan snapshot differs from its tag: it saves removal of that errand before `Clan/ClanPurchaseCredit.js` attempts to return unused tagged treasury credit to the original clan. Save and refund are separate operations; a rejected refund does not restore the errand or create a debt/retry record. This branch does not itself close `GoalState` or recheck membership inside the money transaction. It does not enable autonomous clan execution under owned-only startup.
+
 ## Native private stores and direct bot trade
 
 - `src/GameServer/PrivateStore.js` validates store lots and budget.
