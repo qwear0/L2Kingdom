@@ -35,6 +35,18 @@ const FOLLOW_TARGET_DRIFT = 650;
 const FOLLOW_TELEPORT_DISTANCE = 4500;
 const FOLLOW_FORMATION_TOLERANCE = 45;
 const STUCK_SAMPLE_INTERVAL_MS = 750;
+const PARTY_JOIN_PATH_FAILURE_MESSAGES = [
+    "Can't find a way to you.",
+    "Can't find a route over there.",
+    "No luck finding a path to you.",
+    "Can't figure out how to reach you.",
+    "Not finding a way to your spot.",
+    "Can't find a path to the group.",
+    "Tried getting to you, no path found.",
+    "Can't find a way over from here.",
+    "Still can't find a route from here.",
+    "Can't work out a path to you guys."
+];
 // Aggression transfers threat; it must not consume every combat tick when
 // the native transfer has not yet changed the monster's target.
 const AGGRESSION_RETRY_MS = 5000;
@@ -1140,26 +1152,10 @@ const FollowingState = {
             recordRoleDecision(session, bot, 'hold_position', 'karma_keeps_out_of_town');
             return true;
         }
-        if (session.partyJoinApproach) {
-            if (distance <= FOLLOW_RUN_DISTANCE) {
-                delete session.partyJoinApproach;
-                session.stuckTicks = 0;
-                CompanionNavigationRecovery.clear(session);
-            } else if (!partyThreat && !waitsOutsideTown) {
-                const target = loc(player);
-                const previousTarget = session.activeMoveGoal?.requestedTo || session.pendingPathRequest?.requestedTo;
-                if (previousTarget && distance2d(previousTarget, target) > FOLLOW_TARGET_DRIFT) {
-                    bot.automation.abortAll(bot);
-                    CompanionNavigationRecovery.clear(session);
-                }
-                session.lastFollowMoveTarget = target;
-                const navigation = CompanionNavigationRecovery.move(session, bot, target, 'party_join', {
-                    targetActor: player,
-                    arrivalRadius: FOLLOW_RUN_DISTANCE - FOLLOW_FORMATION_TOLERANCE
-                });
-                recordRoleDecision(session, bot, 'follow_leader', `party_join_${navigation.status}`);
-                return true;
-            }
+        if (session.partyJoinApproach && distance <= FOLLOW_RUN_DISTANCE) {
+            delete session.partyJoinApproach;
+            session.stuckTicks = 0;
+            CompanionNavigationRecovery.clear(session);
         }
         if (!session.partyJoinApproach && !waitsOutsideTown && (session.companionTownTransit || distance > FOLLOW_TELEPORT_DISTANCE)) {
             const transit = CompanionTownTransit.tick(session, bot, player);
@@ -1172,9 +1168,11 @@ const FollowingState = {
                 return true;
             }
         }
-        const separatedInsideTown = !session.partyJoinApproach && distance > FOLLOW_TELEPORT_DISTANCE
+        // Recovery must precede the joining walk: its early return would
+        // otherwise suppress distance-based catch-up and stuck teleports.
+        const separatedInsideTown = distance > FOLLOW_TELEPORT_DISTANCE
             && CompanionTownTransit.sameTown(bot, player);
-        if (!session.partyJoinApproach && !waitsOutsideTown && !pullerTravelling
+        if (!waitsOutsideTown && !pullerTravelling
             && (session.stuckTicks >= 3 || (distance > FOLLOW_TELEPORT_DISTANCE && !separatedInsideTown))) {
             session.stuckTicks = 0;
             recordRoleDecision(session, bot, 'follow_leader', distance > FOLLOW_TELEPORT_DISTANCE ? 'catch_up' : 'unstuck');
@@ -1189,6 +1187,29 @@ const FollowingState = {
                     templates: ['Caught up.']
                 });
             }
+            return true;
+        }
+        if (session.partyJoinApproach && !partyThreat && !waitsOutsideTown) {
+            const target = loc(player);
+            const previousTarget = session.activeMoveGoal?.requestedTo || session.pendingPathRequest?.requestedTo;
+            if (previousTarget && distance2d(previousTarget, target) > FOLLOW_TARGET_DRIFT) {
+                bot.automation.abortAll(bot);
+                CompanionNavigationRecovery.clear(session);
+            }
+            session.lastFollowMoveTarget = target;
+            const navigation = CompanionNavigationRecovery.move(session, bot, target, 'party_join', {
+                targetActor: player,
+                arrivalRadius: FOLLOW_RUN_DISTANCE - FOLLOW_FORMATION_TOLERANCE
+            });
+            if (navigation.status === 'exhausted') {
+                BotPartyChat.announce(session, {
+                    priority: 'coordination',
+                    dedupeMs: 60000,
+                    key: `party-join-no-path:${bot.fetchId()}`,
+                    templates: PARTY_JOIN_PATH_FAILURE_MESSAGES
+                });
+            }
+            recordRoleDecision(session, bot, 'follow_leader', `party_join_${navigation.status}`);
             return true;
         }
         return false;

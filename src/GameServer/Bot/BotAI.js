@@ -346,7 +346,7 @@ const BotAI = {
         // Keep native party membership and the C4 party window intact. The
         // bot first restarts in town, refreshes Newbie Guide buffs when it is
         // eligible, then uses the existing bounded recovery teleport to
-        // return to the leader. Party admission itself stays on foot.
+        // return to the leader. Party admission itself does not teleport.
         session.preBuffLocation = { ...spawnTarget };
         session.preBuffPlan = 'following';
         session.resumeAfterBuff = {

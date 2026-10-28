@@ -1099,8 +1099,8 @@ const PartyCompanionService = {
 
     bringToLeader(leaderSession, companionSession) {
         if (!isActiveCompanion(companionSession, leaderSession)) return false;
-        // Initial assembly must stay physical even beyond the normal follow
-        // catch-up range. Clear this only after reaching the leader or leaving.
+        // Admission starts in place; ordinary follow catch-up and stuck
+        // recovery remain available while the bot approaches the leader.
         companionSession.partyJoinApproach = true;
         companionSession.lastFollowMoveTarget = null;
         companionSession.stuckTicks = 0;
