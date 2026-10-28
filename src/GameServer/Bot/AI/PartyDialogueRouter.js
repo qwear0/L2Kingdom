@@ -68,7 +68,7 @@ function roleFor(session, actor) {
     return String(
         session?.partyRole ||
         session?.role ||
-        session?.botStatus?.role ||
+        (actor ? BotRoles.inferRole(actor) : session?.botStatus?.role) ||
         session?.roleDecision?.role ||
         actor?.partyRole ||
         actor?.role ||

@@ -48,6 +48,16 @@ Rule-based execution is distinct from LLM dialogue. It is not globally reproduci
 
 Post-party safe rest measures eligible live time, not elapsed server downtime. See [vassal lifecycle](vassals.md) for the ten-minute rest and recovery rules.
 
+## Full and map status reads
+
+`Bot/AI/BotStatus.js` owns both read shapes. `getStatus` retains detailed party/nearby, movement, gear, effects, trade, inference and persona output; `BotAI.getStatus` also updates the full `session.botStatus` cache. Native panels, snapshots and gameplay status consumers keep this contract.
+
+`BotStatus.getMapStatus` returns internal projection input only: identity/class/level, mode/intent/role, home/location, compact party core and the dead blocker. `BotAI.getMapStatus` forwards without writing that cache; `BotManager.getAllBotMapStatuses` preserves the full enumeration's actor filtering and order. This API is prepared for observer integration; observer callers still use the full reader until that separate switch.
+
+The lean read is not pure: it retains ambient TTL refresh/journaling, settings/pull/combat/threat inspection, effect pruning, trade/negotiation expiry, inference-budget pruning and policy restore in the full reader's relative order. Party inspection can synchronize raids and update player auto-fight constraints. Internal party/world scans and some summary allocations remain necessary through existing entrypoints; this is not a claim of globally linear map work or measured CPU savings.
+
+Lifecycle capture, equipment shopping and dialogue infer a live actor's current role through `BotRoles.inferRole`, not observer-driven cache freshness. Capture reuses that role for both stats and build hints. Dialogue preserves stronger explicit role overrides and its existing actorless fallbacks.
+
 ## Native class decisions
 
 - `Bot/AI/BotClassPolicy.js` derives class/ancestry skill eligibility, role, PvE/PvP solo/party context and resource preferences.

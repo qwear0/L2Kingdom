@@ -614,6 +614,7 @@ function recordFromSession(session, phase, reason = '') {
     const timestamp = now();
     const characterId = Number(actor.fetchId());
     const inventory = inventorySummaryFromItems(actor.backpack?.fetchItems ? actor.backpack.fetchItems() : []);
+    const role = BotRoles.inferRole(actor) || null;
     const stats = {
         tradeMeeting: cache.get(characterId)?.stats?.tradeMeeting || null,
         ...Object.fromEntries(['playedHours', 'economyClock', 'frustration', 'lifelongKills', 'peoplePoints'].map(key => [key, session.coldLifeState?.stats?.[key] ?? cache.get(characterId)?.stats?.[key] ?? 0])),
@@ -621,7 +622,7 @@ function recordFromSession(session, phase, reason = '') {
         ...(session.peopleKnowledge || {}),
         playedHours: invoke('GameServer/Social/RelationshipContext').playedHours(session, timestamp),
         pk: Number(actor.fetchPk?.() || 0),
-        role: session.botStatus?.role || null,
+        role,
         deathExperience: actor.deathExperience ? { ...actor.deathExperience } : null,
         karma: Number(actor.fetchKarma?.() || 0),
         pvpEncounter: session.pvpEncounter || cache.get(characterId)?.stats?.pvpEncounter || null,
@@ -647,7 +648,7 @@ function recordFromSession(session, phase, reason = '') {
         clanHallVisit: session.clanHallVisit === undefined ? session.coldLifeState?.stats?.clanHallVisit || null : session.clanHallVisit,
         clanHallRetryAt: session.clanHallRetryAt ?? session.coldLifeState?.stats?.clanHallRetryAt ?? 0,
         route: currentSpot?.route || null,
-        build: GearSkillHints.forCharacter(actor, { role: session.botStatus?.role || null }),
+        build: GearSkillHints.forCharacter(actor, { role }),
         equipment: equipmentSummaryFromInventory(inventory),
         // Cold combat must start from the exact same character model as the
         // hot session: equipped item totals, learned skills and live effects.

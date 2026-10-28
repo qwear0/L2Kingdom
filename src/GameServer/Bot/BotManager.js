@@ -131,6 +131,12 @@ const BotManager = {
         return BotAI.getStatus(session);
     },
 
+    getAllBotMapStatuses() {
+        return this.sessions
+            .filter((session) => session.actor)
+            .map((session) => BotAI.getMapStatus(session));
+    },
+
     getAllBotStatuses() {
         return this.sessions
             .filter((session) => session.actor)

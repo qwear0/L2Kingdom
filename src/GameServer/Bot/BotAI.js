@@ -997,6 +997,10 @@ const BotAI = {
         return fetchVisiblePlayers(session, bot).filter(isRealPlayerSession);
     },
 
+    getMapStatus(session) {
+        return BotStatus.getMapStatus(session);
+    },
+
     getStatus(session) {
         const status = BotStatus.getStatus(session);
         session.botStatus = status;

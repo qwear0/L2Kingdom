@@ -1,5 +1,6 @@
 const Speech = invoke('GameServer/Bot/AI/BotSpeechTemplates');
 const Voice = invoke('GameServer/Bot/AI/BotChatVoice');
+const BotRoles = invoke('GameServer/Bot/AI/BotRoles');
 const CONVERSATION_COOLDOWN_MS = 90 * 1000;
 const CONVERSATION_RANGE = 800;
 
@@ -37,7 +38,8 @@ function chooseTopic(initiator, responder) {
     add('hunting', Speech.lines('dialogue.hunting.1', {}, { cautious, social }));
     add('hunting', Speech.lines('dialogue.hunting.2', {}, { cautious, social }));
 
-    const role = String(responder?.botStatus?.role || responder?.role || '').toLowerCase();
+    const inferredRole = responder?.actor ? BotRoles.inferRole(responder.actor) : responder?.botStatus?.role;
+    const role = String(inferredRole || responder?.role || '').toLowerCase();
     if (['healer', 'buffer', 'tank', 'archer', 'dagger'].includes(role)) {
         add('party', Speech.lines('dialogue.party.1', {reply: Speech.line('dialogue.role.' + role)}, { cautious, social }));
     }

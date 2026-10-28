@@ -2,6 +2,7 @@ const refreshPartyMemberships = require('../../World/PartyMembershipPublication'
 const World = invoke('GameServer/World/World');
 const LifeState = invoke('GameServer/Bot/Population/BotLifeState');
 const GearAcquisitionPlanner = invoke('GameServer/Bot/AI/GearAcquisitionPlanner');
+const BotRoles = invoke('GameServer/Bot/AI/BotRoles');
 const PurchaseFunding = invoke('GameServer/Bot/Economy/PurchaseFunding');
 const MarketOpportunity = invoke('GameServer/Bot/Economy/MarketOpportunity');
 const TownNpcCatalog = invoke('GameServer/Bot/Economy/TownNpcCatalog');
@@ -35,7 +36,7 @@ function currentState(session, bot, town, economy = null) {
             ...(physical?.stats || {}),
             ...(previous.stats || {}),
             classId: Number(bot.fetchClassId?.() ?? previous.stats?.classId ?? 0),
-            role: session.botStatus?.role || previous.stats?.role || null
+            role: BotRoles.inferRole(bot) || previous.stats?.role || null
         },
         inventory
     };

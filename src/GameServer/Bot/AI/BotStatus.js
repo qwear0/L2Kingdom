@@ -283,7 +283,93 @@ function personaSnapshot(session) {
     };
 }
 
+function readStatusInputs(session, bot) {
+    const vitals = {
+        hp: bot.fetchHp(),
+        maxHp: bot.fetchMaxHp(),
+        hpPct: ratio(bot.fetchHp(), bot.fetchMaxHp()),
+        mp: bot.fetchMp(),
+        maxMp: bot.fetchMaxMp(),
+        mpPct: ratio(bot.fetchMp(), bot.fetchMaxMp())
+    };
+    const role = BotRoles.inferRole(bot);
+    const dead = bot.state.fetchDead();
+    const ambient = BotAmbientDirector.snapshot(session);
+    const target = findTarget(session, bot);
+    const leaderSession = session.followPlayerSession && session.partyCompanion === true ? session.followPlayerSession : null;
+    const partySettings = leaderSession ? PartyCompanionService.getSettings(leaderSession) : null;
+    const pull = leaderSession ? PartyPulling.current(leaderSession, partySettings) : null;
+    return { vitals, role, dead, ambient, target, leaderSession, partySettings, pull };
+}
+
+function statusMode(session, dead) {
+    return dead ? 'dead' : session.pvpDefense ? `pvp_${session.pvpDefense.action}` : session.plan || 'hunting';
+}
+
+function companionPartyCore(session, bot, role, leaderSession, partySettings) {
+    const isAssignedPuller = partySettings?.pullMode === 'bot' &&
+        Number(partySettings.pullerId || 0) === Number(bot.fetchId());
+    return {
+        leader: actorSummary(leaderSession.actor, bot),
+        role,
+        stance: isAssignedPuller ? 'pulling' : (session.botStay ? 'stay' : 'follow')
+    };
+}
+
+function backgroundPartyCore(session, bot, role, leader) {
+    return {
+        id: session.hotBackgroundPartyId,
+        leader: actorSummary(leader.actor, bot),
+        role: session.coldLifeState?.party?.role || role,
+        stance: 'shared_hunt'
+    };
+}
+
 const BotStatus = {
+    // Internal map input only: never replace the full session.botStatus cache.
+    getMapStatus(session) {
+        const bot = session.actor;
+        if (!bot) return { available: false, reason: 'missing_actor' };
+
+        const { vitals, role, dead, target, leaderSession, partySettings } = readStatusInputs(session, bot);
+        // Combat inspection can synchronize raids, prune NPC effects and
+        // update player auto-fight constraints. Its internal roster work stays.
+        if (leaderSession) PartyCombatState.combatState(leaderSession);
+        let party = leaderSession ? companionPartyCore(session, bot, role, leaderSession, partySettings) : null;
+        // Preserve the later TTL-aware threat read, but not its diagnostic DTO.
+        if (leaderSession) PartyAwareness.findThreatTargetingPartyProjected(leaderSession);
+        if (!party && session.hotBackgroundPartyId) {
+            const background = invoke('GameServer/Bot/AI/HotBackgroundParty');
+            party = backgroundPartyCore(session, bot, role, background.leader(session));
+        }
+
+        const status = {
+            available: true,
+            id: bot.fetchId(),
+            name: bot.fetchName(),
+            level: bot.fetchLevel(),
+            classId: bot.fetchClassId(),
+            mode: statusMode(session, dead),
+            intent: undefined,
+            role,
+            home: { region: session.homeRegion || null, visitor: !!session.visitor },
+            loc: actorLocation(bot),
+            party,
+            blockers: []
+        };
+
+        // Sample fields before expiry/restore, as the full reader does. These
+        // native reads can mutate state; timers alone do not replace them.
+        EffectStore.prune(bot);
+        invoke('GameServer/Bot/BotTradeService').activeTradeSummary(session);
+        invoke('GameServer/Bot/Economy/BotNegotiationService').activeSummary(session);
+        BotInferenceBudget.snapshot(session);
+        HotBotPolicyOverlay.get(session);
+        status.intent = inferIntent(session, bot, vitals, target);
+        if (bot.state.fetchDead()) status.blockers.push('dead');
+        return status;
+    },
+
     getStatus(session) {
         const bot = session.actor;
         if (!bot) {
@@ -293,30 +379,14 @@ const BotStatus = {
             };
         }
 
-        const vitals = {
-            hp: bot.fetchHp(),
-            maxHp: bot.fetchMaxHp(),
-            hpPct: ratio(bot.fetchHp(), bot.fetchMaxHp()),
-            mp: bot.fetchMp(),
-            maxMp: bot.fetchMaxMp(),
-            mpPct: ratio(bot.fetchMp(), bot.fetchMaxMp())
-        };
-
-        const role = BotRoles.inferRole(bot);
-        const dead = bot.state.fetchDead();
-        const ambient = BotAmbientDirector.snapshot(session);
-        const target = findTarget(session, bot);
-        const leaderSession = session.followPlayerSession && session.partyCompanion === true ? session.followPlayerSession : null;
-        const partySettings = leaderSession ? PartyCompanionService.getSettings(leaderSession) : null;
-        const pull = leaderSession ? PartyPulling.current(leaderSession, partySettings) : null;
+        const { vitals, role, dead, ambient, target, leaderSession, partySettings, pull } = readStatusInputs(session, bot);
         const combat = leaderSession ? PartyCombatState.combatState(leaderSession) : null;
-        const isAssignedPuller = partySettings?.pullMode === 'bot' &&
-            Number(partySettings.pullerId || 0) === Number(bot.fetchId());
+        const partyCore = leaderSession ? companionPartyCore(session, bot, role, leaderSession, partySettings) : null;
         let party = leaderSession ? {
-            leader: actorSummary(leaderSession.actor, bot),
-            role,
+            leader: partyCore.leader,
+            role: partyCore.role,
             settings: partySettings,
-            stance: isAssignedPuller ? 'pulling' : (session.botStay ? 'stay' : 'follow'),
+            stance: partyCore.stance,
             roleStance: BotRoles.partyRoleStance(role),
             autoTaunt: session.autoTaunt !== false,
             pull: pull?.enabled ? {
@@ -357,8 +427,7 @@ const BotStatus = {
         if (!party && session.hotBackgroundPartyId) {
             const background = invoke('GameServer/Bot/AI/HotBackgroundParty');
             const leader = background.leader(session);
-            party = { id: session.hotBackgroundPartyId, leader: actorSummary(leader.actor, bot),
-                role: session.coldLifeState?.party?.role || role, stance: 'shared_hunt',
+            party = { ...backgroundPartyCore(session, bot, role, leader),
                 members: background.roster(session).map(member => partyMemberSummary(member, leader, bot)),
                 decision: session.lastDecision || null };
         }
@@ -369,7 +438,7 @@ const BotStatus = {
             name: bot.fetchName(),
             level: bot.fetchLevel(),
             classId: bot.fetchClassId(),
-            mode: dead ? 'dead' : session.pvpDefense ? `pvp_${session.pvpDefense.action}` : session.plan || 'hunting',
+            mode: statusMode(session, dead),
             intent: undefined,
             role,
             roleDecision: dead ? null : session.roleDecision || null,
