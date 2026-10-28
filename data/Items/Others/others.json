@@ -14401,5 +14401,13 @@
     "selfId": 1000,
     "template": {"kind": "Other.Quest", "name": "Book of Aklantoth - Part 3", "class1": 4, "class2": 3, "mass": 0, "price": 0},
     "etc": { "stackable": true, "consumable": false }
+},{
+    "selfId": 7231,
+    "template": { "kind": "Other.Quest", "name": "Munitions Box", "class1": 4, "class2": 3, "mass": 0, "price": 0 },
+    "etc": { "stackable": true, "consumable": false }
+},{
+    "selfId": 7232,
+    "template": { "kind": "Other.Quest", "name": "Munitions Box", "class1": 4, "class2": 3, "mass": 0, "price": 0 },
+    "etc": { "stackable": true, "consumable": false }
 }
 ]

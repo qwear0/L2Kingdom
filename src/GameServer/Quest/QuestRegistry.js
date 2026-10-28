@@ -1,6 +1,4 @@
 const disabledReasons = new Map([
-  [11, "Required NPC templates are absent: 8296, 8256, 8371"],
-  [12, "Required NPC templates are absent: 8296, 8258, 8378"],
   [13, "Required NPC templates are absent: 8274, 8539"],
   [14, "Required NPC templates are absent: 8263, 8538"],
   [15, "Required NPC templates are absent: 8302, 8517, 8518"],

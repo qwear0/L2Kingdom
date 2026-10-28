@@ -5,8 +5,13 @@ const MUNITIONS_BOX = 7232;
 const SOUND_ACCEPT = "ItemSound.quest_accept";
 const SOUND_MIDDLE = "ItemSound.quest_middle";
 const SOUND_FINISH = "ItemSound.quest_finish";
-function service() {
-  return invoke("GameServer/Quest/QuestService");
+function step(state, changes) {
+  return invoke("GameServer/Quest/QuestStep").apply(state, changes);
+}
+function hasBox(state) {
+  return state.session.actor.backpack.fetchItems().some((item) =>
+    item.fetchSelfId() === MUNITIONS_BOX && !item.fetchEquipped() && item.fetchAmount() >= 1,
+  );
 }
 function page(title, text, action = "") {
   return `<html><body>${title}:<br>${text}<br><br>${action}</body></html>`;
@@ -21,9 +26,8 @@ module.exports = {
   async onEvent(state, event) {
     const actor = state.session.actor;
     if (event === "start" && !state.isStarted() && !state.isCompleted()) {
-      if (Number(actor.fetchLevel()) >= 74) return null;
-      await state.setState("started");
-      await state.set("cond", 1);
+      if (!(Number(actor.fetchLevel()) >= 74)) return null;
+      await step(state, { variables: { ...state.variables, cond: "1" } });
       state.playSound(SOUND_ACCEPT);
       return page("Cadmon", "Meet Helmut to collect the munitions.");
     }
@@ -32,17 +36,21 @@ module.exports = {
       state.isStarted() &&
       state.getInt("cond") === 1
     ) {
-      await service().giveItem(state.session, MUNITIONS_BOX, 1);
-      await state.set("cond", 2);
+      await step(state, {
+        gives: [[MUNITIONS_BOX, 1]],
+        variables: { ...state.variables, cond: "2" },
+      });
       state.playSound(SOUND_MIDDLE);
       return page("Helmut", "Deliver the box to Naran Ashanuk.");
     }
     if (event === "reward" && state.isStarted() && state.getInt("cond") === 2) {
-      if (!(await service().takeItem(state.session, MUNITIONS_BOX)))
-        return null;
-      service().rewardExpSp(state.session, 79761, 0);
+      if (!hasBox(state)) return null;
+      await step(state, {
+        takes: [[MUNITIONS_BOX, 1]],
+        status: "completed",
+        exp: 79761,
+      });
       state.playSound(SOUND_FINISH);
-      await state.exit(false);
       return page("Naran Ashanuk", "The Varka Silenos thank you.");
     }
     return null;
@@ -54,28 +62,32 @@ module.exports = {
       return page("Quest", "You have already completed this quest.");
     if (!state.isStarted())
       return npcId === CADMON
-        ? Number(actor.fetchLevel()) < 74
+        ? Number(actor.fetchLevel()) >= 74
           ? page(
               "Cadmon",
-              "I need a discreet courier.",
+              "The Varka Silenos are fierce warriors. Delivering supplies could earn their trust. Will you help Trader Helmut?",
               '<a action="bypass -h quest 12 start">Accept.</a>',
             )
-          : page("Cadmon", "This task is for adventurers below level 74.")
+          : page("Cadmon", "This quest requires level 74 or above.")
         : page("Quest", "You are not on a quest that involves this NPC.");
     const cond = state.getInt("cond");
-    if (npcId === CADMON) return page("Cadmon", "Meet Helmut.");
+    if (npcId === CADMON)
+      return page("Cadmon", cond === 1 ? "Meet Trader Helmut in Goddard."
+        : "Deliver Helmut's munitions box to Naran Ashanuk at the Varka Silenos base.");
     if (npcId === HELMUT)
       return cond === 1
         ? page(
             "Helmut",
-            "Take this munitions box.",
+            "Deliver this box of supplies to Naran Ashanuk at the Varka Silenos base. Be careful not to offend the Varka.",
             '<a action="bypass -h quest 12 supplies">Receive the box.</a>',
           )
         : page("Helmut", "Deliver it to Naran Ashanuk.");
+    if (cond === 2 && !hasBox(state))
+      return page("Naran Ashanuk", "Bring the munitions box entrusted to you by Helmut.");
     return cond === 2
       ? page(
           "Naran Ashanuk",
-          "Have you brought the box?",
+          "Have you brought the supplies from Trader Helmut?",
           '<a action="bypass -h quest 12 reward">Deliver the box.</a>',
         )
       : page("Naran Ashanuk", "Speak with Helmut first.");

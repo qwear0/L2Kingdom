@@ -551,6 +551,36 @@
                 "total": 1,
                 "respawn": 60,
                 "bias": 0
+            },
+            {
+                "selfId": 8371,
+                "name": "Wahkan",
+                "coords": [
+                    {
+                        "locX": 146980,
+                        "locY": -67483,
+                        "locZ": -3656,
+                        "head": 33000
+                    }
+                ],
+                "total": 1,
+                "respawn": 60,
+                "bias": 0
+            },
+            {
+                "selfId": 8378,
+                "name": "Naran Ashanuk",
+                "coords": [
+                    {
+                        "locX": 125440,
+                        "locY": -40944,
+                        "locZ": -3701,
+                        "head": 7000
+                    }
+                ],
+                "total": 1,
+                "respawn": 60,
+                "bias": 0
             }
         ]
     }

@@ -637954,6 +637954,56 @@
   },
   {
     "grade": "none",
+    "id": 7231,
+    "kind": "Other.Quest",
+    "name": "Munitions Box",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": false,
+        "stackable": true
+      },
+      "selfId": 7231,
+      "template": {
+        "class1": 4,
+        "class2": 3,
+        "kind": "Other.Quest",
+        "mass": 0,
+        "name": "Munitions Box",
+        "price": 0
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 7232,
+    "kind": "Other.Quest",
+    "name": "Munitions Box",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": false,
+        "stackable": true
+      },
+      "selfId": 7232,
+      "template": {
+        "class1": 4,
+        "class2": 3,
+        "kind": "Other.Quest",
+        "mass": 0,
+        "name": "Munitions Box",
+        "price": 0
+      }
+    }
+  },
+  {
+    "grade": "none",
     "id": 7528,
     "kind": "Other.Quest",
     "name": "Spinneret",
