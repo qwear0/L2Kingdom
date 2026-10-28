@@ -128,6 +128,10 @@ Read these only when maintaining that architecture; they are not current vassal 
 4. `HotActivation.js` fences worker work before handoff. `Cooldown.js` saves native state before explicit return to cold ownership.
 5. `HotPartyLifecycle.js` owns whole-party publication/cooling. `BackgroundJobRegistry.js` coalesces intervals and prevents overlapping jobs; `BackgroundWorkGovernor.js` admits work against budgets and leases.
 
+With `developerDiagnostics` enabled, the retained worker adds numeric matchup/spot-value cache snapshots to its existing heartbeat and `PopulationStatus`'s `workerCaches` summary. Counters accumulate for that worker's lifetime; sizes describe individual maps/pools, not all retained references or memory bytes. `fingerprintHits` combines profile-array identity hits and shared-fingerprint reuse, `verdictEntries` covers tracked shared maps only, and `uniqueSpotResults` is the deduplicated pool size. `memoClears` counts individual oldest-row evictions, not full-memo resets. These observations do not establish a speedup or activate the worker for owned vassals.
+
+The competition-frame size predictor reserves the same optional numeric cache shape with diagnostics on or off, using its existing conservative numeric padding. The 256-KiB IPC limit is unchanged, but the larger reserved envelope can reduce a limit-bound legacy event batch in both modes. Snapshot collection is constant-size work; diagnostic counting is guarded, not a promise of zero overhead when disabled.
+
 The population scheduler timer in the retained coordinator is not evidence of a main-thread cold simulation loop. The [resource competition document](../src/GameServer/Bot/Population/COLD_COMPETITION.md) contains broader historical contracts and must be read with this activation boundary.
 
 ## Pathfinding remains a separate worker boundary

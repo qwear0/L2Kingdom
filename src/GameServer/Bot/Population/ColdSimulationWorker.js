@@ -108,6 +108,8 @@ const TableMirror = require('./TableMirror');
 const { BoardIndex, recordOf } = require('../../AfkTrade/BoardIndex');
 const { MarketBuyerWaiters } = require('../Economy/MarketBuyerWaiters');
 const SpotIndex = require('../AI/SpotIndex');
+const BotTargetMatchup = require('../AI/BotTargetMatchup');
+const SpotValueTable = require('../AI/SpotValueTable');
 const forbiddenLoaded = Object.keys(require.cache).filter((filename) => (
     /[\\/]src[\\/]Database\.js$/i.test(filename)
     || /[\\/]GameServer[\\/]World[\\/]World\.js$/i.test(filename)
@@ -1282,7 +1284,8 @@ function startKernel(config = {}) {
                         deliverySendFailures: large, lastScanEvents: 160, consumedSpotKeys: 32, consumedActorKeys: 128,
                         pendingSpotKeys: large, pendingActorKeys: large, deliveryMode: 'addressed',
                         revenge: { evaluated: large, intents: large, at: frame.at, active: 128, sampledActors: 128, overflow: false } },
-                    tables: tables.summary(), heapUsed: large, rss: large,
+                    tables: tables.summary(), caches: { matchup: BotTargetMatchup.cacheStats(), spotValue: SpotValueTable.cacheStats() },
+                    heapUsed: large, rss: large,
                     eventLoopUtilization: 1, eventLoopLagP95Ms: large,
                     eventLoopLagMaxMs: large
                 }, 'x'.repeat(160));
@@ -1309,6 +1312,7 @@ function startKernel(config = {}) {
             tables: tables.summary(),
             developerDiagnostics: economyDiagnostics.metrics(),
             ...heapTelemetry.snapshot(),
+            caches: { matchup: BotTargetMatchup.cacheStats(), spotValue: SpotValueTable.cacheStats() },
             heapUsed: process.memoryUsage().heapUsed,
             rss: process.memoryUsage().rss,
             eventLoopUtilization: elu.utilization,
