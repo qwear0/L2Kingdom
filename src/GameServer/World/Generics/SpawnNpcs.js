@@ -2,7 +2,7 @@ const ItemTemplateIndex = require('../../Item/ItemTemplateIndex');
 const Npc       = invoke('GameServer/Npc/Npc');
 const DataCache = invoke('GameServer/DataCache');
 const ServerResponse = invoke('GameServer/Network/Response');
-const NpcVisibility = invoke('GameServer/World/NpcVisibility');
+const NpcDecay = invoke('GameServer/World/Generics/NpcDecay');
 const NpcAggro = invoke('GameServer/Npc/NpcAggro');
 const RaidBossState = invoke('GameServer/World/RaidBossState');
 const MinionManager = invoke('GameServer/World/RaidBossMinionManager');
@@ -271,12 +271,7 @@ function despawnQuestNpc(world, npc, sourceSession = null) {
 
     clearQuestSpawn(npc);
     npc.destructor?.(sourceSession || { dataSendToMeAndOthers: () => {}, dataSendToMe: () => {} });
-    NpcVisibility.deleteKnownNpc(world, sourceSession, objectId);
-    if (world.removeNpcFromGrid) world.removeNpcFromGrid(npc);
-    const index = world.npc.spawns.indexOf(npc);
-    if (index >= 0) world.npc.spawns.splice(index, 1);
-    if (!world.removeNpcFromGrid) world.indexSpawnsInGrid?.();
-    return true;
+    return NpcDecay.decay(world, npc, sourceSession);
 }
 
 function spawnNpcs() {

@@ -1,7 +1,7 @@
 const DiagnosticConfig = require('../Bot/Population/PopulationConfig');
 const ItemTemplateIndex = require('../Item/ItemTemplateIndex');
 const DataCache = invoke('GameServer/DataCache');
-const NpcVisibility = invoke('GameServer/World/NpcVisibility');
+const NpcDecay = invoke('GameServer/World/Generics/NpcDecay');
 const RaidEntityIndex = invoke('GameServer/World/RaidEntityIndex');
 const SpawnPlacement = invoke('GameServer/Geodata/SpawnPlacement');
 
@@ -246,15 +246,10 @@ function onMinionDeath(world, minion) {
 
 function cleanupMinion(world, minion, sourceSession) {
     if (!liveNpc(world, minion)) return false;
-    const objectId = minion.fetchId?.();
     try {
         minion.destructor?.(sourceSession || { dataSendToMeAndOthers() {}, dataSendToMe() {} });
     } catch (_) {}
-    world.removeNpcFromGrid?.(minion);
-    const index = world.npc.spawns.indexOf(minion);
-    if (index >= 0) world.npc.spawns.splice(index, 1);
-    NpcVisibility.deleteKnownNpc(world, sourceSession, objectId);
-    return true;
+    return NpcDecay.decay(world, minion, sourceSession);
 }
 
 // A raid boss's death and an ordinary leader's replacement remove the group.

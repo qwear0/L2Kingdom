@@ -4,6 +4,7 @@ const GeodataEngine = invoke('GameServer/Geodata/GeodataEngine');
 
 const FEAR_RANGE = 500;
 const FEAR_TICK_MS = 6000;
+const CONFUSION_RADIUS = 600;
 
 function canMove(actor) {
     if (actor?.fakeDeath) return false;
@@ -131,15 +132,20 @@ function stopConfusion(actor, key = 'confusion') {
 
 function confusionTargets(actor, attackableOnly) {
     const World = invoke('GameServer/World/World');
-    const npcs = World.npc?.spawns || [];
-    const users = attackableOnly ? [] : (World.user?.sessions || []).map((session) => session.actor).filter(Boolean);
+    const loc = {
+        locX: actor.fetchLocX?.() || 0,
+        locY: actor.fetchLocY?.() || 0,
+        locZ: actor.fetchLocZ?.() || 0
+    };
+    const npcs = World.fetchNpcsInRadius(loc.locX, loc.locY, CONFUSION_RADIUS);
+    const users = attackableOnly ? [] : World.actorSessionsNear(loc, CONFUSION_RADIUS).map((session) => session.actor);
     return [...npcs, ...users].filter((candidate) => {
         if (!candidate || candidate === actor || candidate.state?.fetchDead?.()) return false;
         if (attackableOnly && candidate.fetchAttackable?.() !== true) return false;
-        const dx = (candidate.fetchLocX?.() || 0) - (actor.fetchLocX?.() || 0);
-        const dy = (candidate.fetchLocY?.() || 0) - (actor.fetchLocY?.() || 0);
-        const dz = (candidate.fetchLocZ?.() || 0) - (actor.fetchLocZ?.() || 0);
-        return Math.hypot(dx, dy, dz) <= 600;
+        const dx = (candidate.fetchLocX?.() || 0) - loc.locX;
+        const dy = (candidate.fetchLocY?.() || 0) - loc.locY;
+        const dz = (candidate.fetchLocZ?.() || 0) - loc.locZ;
+        return dx * dx + dy * dy + dz * dz <= CONFUSION_RADIUS * CONFUSION_RADIUS;
     });
 }
 

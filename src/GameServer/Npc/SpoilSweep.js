@@ -7,7 +7,7 @@ const EffectStore = invoke('GameServer/Effects/EffectStore');
 const EffectTicker = invoke('GameServer/Effects/EffectTicker');
 const Formulas = invoke('GameServer/Formulas');
 const HotPartyCastTracker = invoke('GameServer/Bot/AI/HotPartyCastTracker');
-const NpcObjectIndex = require('../World/NpcObjectIndex');
+const NpcDecay = invoke('GameServer/World/Generics/NpcDecay');
 
 const SPOIL_SKILL_ID = 254;
 const SPOIL_FESTIVAL_SKILL_ID = 302;
@@ -295,10 +295,8 @@ const SpoilSweep = {
                 });
             }
 
-            session.dataSendToMeAndOthers(ServerResponse.deleteOb(npc.fetchId()), npc);
             const World = invoke('GameServer/World/World');
-            NpcObjectIndex.remove(World, npc);
-            World.npc.spawns = World.npc.spawns.filter((ob) => ob.fetchId() !== npc.fetchId());
+            NpcDecay.decay(World, npc, session);
             const results = await Promise.all(settlements);
             if (results.some(result => result.status !== 'awarded')) throw Error('sweep_award_uncertain');
             return { effective: awarded.length > 0, awarded: awarded.map(item => ({ templateId: item.selfId, amount: item.amount })),

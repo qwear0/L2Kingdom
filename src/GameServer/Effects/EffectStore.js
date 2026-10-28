@@ -113,10 +113,9 @@ function removeStored(actor, key, clearTimer = true) {
     return true;
 }
 
-function prune(actor) {
+function prune(actor, current = now()) {
     if (!actor) return {};
     const store = ensure(actor);
-    const current = now();
     Object.keys(store).forEach((key) => {
         const effect = store[key];
         if (effect?.expiresAt && effect.expiresAt <= current) {
@@ -182,8 +181,8 @@ function includedInBuffCount(effect) {
         && !['hp_recover', 'life_force_orc'].includes(effect.stackFamily);
 }
 
-function orderedEffects(actor) {
-    const effects = Object.values(prune(actor));
+function orderedEffects(actor, current) {
+    const effects = Object.values(prune(actor, current));
     const bySequence = (a, b) => Number(a.sequence || 0) - Number(b.sequence || 0);
     const commonBuffs = effects.filter((effect) => (
         effect.type !== 'debuff' && effect.toggle !== true && !(effect.id > 4360 && effect.id < 4367)
@@ -252,9 +251,10 @@ function list(actor, options = {}) {
 }
 
 function packetEffects(actor, options = {}) {
+    const current = now();
     const includeBuffs = options.includeBuffs !== false;
     const includeDebuffs = options.includeDebuffs !== false;
-    const effects = orderedEffects(actor)
+    const effects = orderedEffects(actor, current)
         .filter((effect) => effect.type !== 'item_passive')
         .filter((effect) => (
             (effect.type === 'debuff' && includeDebuffs) ||
@@ -266,7 +266,7 @@ function packetEffects(actor, options = {}) {
             level: effect.level || DEFAULT_EFFECT_LEVEL,
             duration: effect.toggle && !effect.expiresAt
                 ? 0x7fffffff
-                : Math.max(0, Math.round(remainingMs(actor, effect.key) / 1000)),
+                : effect.expiresAt ? Math.max(0, Math.round((effect.expiresAt - current) / 1000)) : 0,
             type: effect.type,
             key: effect.key
         }))

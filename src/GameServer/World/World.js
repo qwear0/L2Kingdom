@@ -341,7 +341,7 @@ const World = {
     isBotSession,
 
     async init() {
-        NpcDecay.stop(this);
+        NpcDecay.dispose(this);
         RaidBossMinionManager.stop(this);
         DayNightSpawnManager.stop(this);
         this.user  = { sessions : [], revision: 0 };

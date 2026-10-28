@@ -684,8 +684,7 @@ function applySummon(session, actor, target, skill, semantic, magicSkill, attack
         const World = invoke('GameServer/World/World');
         const coords = fetchSummonCoords(actor, target, skill);
         if (skill.fetchTargetKind?.() === 'corpse_mob') {
-            World.removeNpcFromGrid?.(target);
-            World.npc.spawns = World.npc.spawns.filter((spawn) => spawn.fetchId?.() !== target?.fetchId?.());
+            invoke('GameServer/World/Generics/NpcDecay').decay(World, target, session);
         }
 
         const npc = placeSummon(session, actor, skill, npcData, coords);

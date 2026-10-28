@@ -1,7 +1,7 @@
 'use strict';
 
 // Maintained by the world's spawn/grid lifecycle, plus legacy direct removals
-// (Sweep and summon death). Whole-world replacement uses indexSpawnsInGrid;
+// (summon death). Whole-world replacement uses indexSpawnsInGrid;
 // normal corpse batches can replace the array after removing each member.
 // Object IDs are immutable for the lifetime of an NPC. Keep the actual actor,
 // not a combat snapshot: HP, target and death checks still read live state.
