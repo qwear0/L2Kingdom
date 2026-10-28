@@ -8,6 +8,7 @@ const Competition = invoke('GameServer/Bot/AI/BotMobCompetition');
 const Restrictions = invoke('GameServer/Effects/EffectRestrictions');
 const NpcObjectIndex = require('../World/NpcObjectIndex');
 const CombatUtility = invoke('GameServer/Bot/AI/BotCombatUtility');
+const C4SkillRules = invoke('GameServer/Skills/C4SkillRules');
 const Capabilities = invoke('GameServer/Bot/AI/BotSkillCapabilities');
 const SupportPlanner = invoke('GameServer/Bot/AI/BotSupportPlanner');
 const SkillIntent = invoke('GameServer/Bot/AI/BotSkillIntent');
@@ -149,8 +150,8 @@ class PlayerAutoFight {
         if (!semantic || skill.fetchPassive() || semantic.notUsedInC4 || semantic.toggle) return false;
         const kind = skill.fetchTargetKind(), type = skill.fetchSkillType();
         if ([42, 92, 254, 302].includes(Number(skill.fetchSelfId()))) return true;
-        if (kind === 'enemy') return CombatUtility.OFFENSIVE_TYPES.has(type)
-            && !(type === 'effect' && semantic.effectType === 'debuff');
+        if (kind === 'enemy') return type === C4SkillRules.AGGRO_DAMAGE
+            || (CombatUtility.OFFENSIVE_TYPES.has(type) && !(type === 'effect' && semantic.effectType === 'debuff'));
         if (kind === 'self' && type === 'charge') return true;
         const Roles = invoke('GameServer/Bot/AI/BotRoles');
         if (SummonerTactics.isSummonSkill(skill)) return Roles.isSummoner(this.actor);
@@ -181,6 +182,15 @@ class PlayerAutoFight {
         if (!skill) return this.legalTarget(target);
         if (!this.allowsSkill(skill)) return false;
         const kind = skill.fetchTargetKind();
+        if (skill.fetchSkillType() === C4SkillRules.AGGRO_DAMAGE) {
+            const action = this.run?.aggroAction;
+            if (action?.skill !== skill || !this.partyAttacker(action.target) || !this.legalTarget(action.target)) return false;
+            if (skill.fetchSemantic?.().sourceTarget === 'aura') {
+                return target === this.actor
+                    && distance(loc(this.actor), loc(action.target)) <= Number(skill.fetchSemantic().radius);
+            }
+            return target === action.target;
+        }
         if (kind === 'enemy') return target === this.actor && skill.fetchSemantic?.().sourceTarget === 'aura'
             ? true : this.legalTarget(target);
         if (kind === 'corpse_mob') return this.run?.corpses.get(target.fetchId()) === target
@@ -204,6 +214,11 @@ class PlayerAutoFight {
         const members = PartyAwareness.partyActors(this.session);
         const SummonControl = invoke('GameServer/Npc/SummonControl');
         return [...members, ...members.map(member => SummonControl.activeSummon(member)).filter(Boolean)];
+    }
+
+    partyAttacker(target, members = PartyAwareness.partyActors(this.session)) {
+        return target?.state?.fetchCombats?.() === true && members.some(member => member !== this.actor
+            && !member.isDead?.() && Number(target.fetchDestId?.()) === Number(member.fetchId()));
     }
 
     threatening(target, members = this.members()) {
@@ -503,7 +518,11 @@ class PlayerAutoFight {
     }
 
     clearTarget(run) {
-        const hadAction = run.target || run.lookupPending || run.route;
+        const hadAction = run.target || run.lookupPending || run.route || run.aggroAction;
+        if (run.aggroAction) {
+            run.resumeTarget = run.aggroAction.previousTarget;
+            run.aggroAction = null;
+        }
         run.target = null;
         run.dispatched = false;
         run.lookupPending = false;
@@ -516,6 +535,8 @@ class PlayerAutoFight {
 
     rejectCandidate(run) {
         if (this.run !== run) return;
+        // A failed taunt must neither reject the original enemy nor replace it.
+        if (run.aggroAction) { this.clearTarget(run); return; }
         if (run.target) run.rejected.set(run.target.fetchId(), Date.now() + 30000);
         this.clearTarget(run);
         this.setState(run, 'seeking', 'candidate_unreachable');
@@ -665,6 +686,34 @@ class PlayerAutoFight {
         });
         run.nativeStarted = this.actor.state.fetchCasts();
         return true;
+    }
+
+    aggroAction(run, encounter, now) {
+        if (this.basicAttackOnly || run.aggroAction) return false;
+        const skills = [...this.allowedSkillIds].map(id => this.actor.skillset.fetchSkill(id))
+            .filter(skill => skill?.fetchSkillType() === C4SkillRules.AGGRO_DAMAGE && this.executable(skill));
+        if (!skills.length) return false;
+        const members = PartyAwareness.partyActors(this.session);
+        const attackers = encounter.filter(target => this.partyAttacker(target, members) && this.legalTarget(target));
+        for (const skill of skills) {
+            const aura = skill.fetchSemantic?.().sourceTarget === 'aura';
+            const attacker = attackers.find(target => !aura
+                || distance(loc(this.actor), loc(target)) <= Number(skill.fetchSemantic().radius));
+            if (!attacker) continue;
+            const target = aura ? this.actor : attacker;
+            const targets = this.actor.attack.resolveSkillTargets(this.session, this.actor, target, skill);
+            if (!targets.includes(attacker) || !this.canInitiate(targets)) continue;
+            const previousTarget = run.target;
+            this.clearTarget(run);
+            run.target = previousTarget;
+            // Keep the combat target separate from the temporary cast target.
+            // Completion, rejection and failed approaches all resume it once
+            // before another taunt, even if the monster still attacks the party.
+            run.aggroAction = { target: attacker, skill, previousTarget };
+            if (!this.cast(run, target, skill, now)) this.clearTarget(run);
+            return true;
+        }
+        return false;
     }
 
     supportAction(run, now, inCombat) {
@@ -857,6 +906,12 @@ class PlayerAutoFight {
             run.safeRestSince = null;
             return;
         }
+        if (run.aggroAction && !run.route) this.clearTarget(run);
+        if (run.resumeTarget) {
+            const target = run.resumeTarget;
+            run.resumeTarget = null;
+            if (this.legalTarget(target)) { this.dispatch(run, target, now); return; }
+        }
         if (now < run.nextScanAt) return;
         run.nextScanAt = now + 500;
         const encounter = this.encounter(run);
@@ -887,8 +942,9 @@ class PlayerAutoFight {
             run.route = null;
             run.loot = null;
         }
+        if (now >= run.nextActionAt && this.aggroAction(run, encounter, now)) return;
         if (!run.route && now >= run.nextActionAt && this.supportAction(run, now, activeEncounter)) return;
-        if (this.tickRoute(run, now)) return;
+        if (this.tickRoute(run, now) || run.resumeTarget) return;
         if (run.target && !this.legalTarget(run.target)) this.clearTarget(run);
         const target = defensive || encounter.find(readyTarget);
         if (target) {
