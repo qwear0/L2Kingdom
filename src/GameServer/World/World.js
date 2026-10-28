@@ -1168,10 +1168,12 @@ const World = {
             }
         }
         
-        const SpeckMath = invoke('GameServer/SpeckMath');
-        const pt = new SpeckMath.Point(locX, locY);
         return npcs.filter(npc => {
-            return new SpeckMath.Point(npc.fetchLocX(), npc.fetchLocY()).distance(pt) <= radius;
+            const npcX = npc.fetchLocX();
+            const npcY = npc.fetchLocY();
+            const dX = locX - npcX;
+            const dY = locY - npcY;
+            return Math.sqrt((dX ** 2) + (dY ** 2)) <= radius;
         });
     },
 
