@@ -101,8 +101,13 @@ function execute(session, actor, target, skill, context = {}) {
     }
 
     if (semantic.skillType === C4SkillRules.HEAL_PERCENT) {
-        // Battle Roar and Spirit of Ogre raise maximum HP before their percentage heal.
-        const effectBeforeHeal = [109, 121].includes(Number(skill.fetchSelfId?.()));
+        if (semantic.healMaxHpContribution) {
+            result.effect = applyEffect(session, target, skill, semantic, actor, result);
+            clearLoadedShot(context.attack || actor.attack, actor, magicSkill);
+            return finish();
+        }
+        // Spirit of Ogre raises maximum HP before its unchanged percentage heal.
+        const effectBeforeHeal = Number(skill.fetchSelfId?.()) === 109;
         if (effectBeforeHeal && semantic.effect) {
             result.effect = applyEffect(session, target, skill, semantic, actor, result);
         }
@@ -487,6 +492,24 @@ function applyHealPercent(session, actor, target, skill, semantic, magicSkill, a
     refreshVitals(session, actor, target);
     clearLoadedShot(attack || actor.attack, actor, magicSkill);
     return Math.max(0, nextHp - currentHp);
+}
+
+function applyMaxHpHeal(target, effect, hpBefore) {
+    if (target.session && !target.fetchKind) {
+        const calculateStats = invoke('GameServer/Actor/Generics/CalculateStats');
+        const displacedMaxHp = calculateStats.maxHp(target, effect.stats.maxHpMul);
+        const maxHp = calculateStats.maxHp(target);
+        // Replacement/slot eviction clamps before the incoming capacity heals;
+        // equal accepted replacements therefore heal even with an unchanged max.
+        const displacedHp = Math.min(target.fetchHp(), displacedMaxHp);
+        const amount = Math.max(0, Math.round(maxHp - displacedMaxHp));
+        target.setMaxHp(maxHp);
+        target.setHp(Math.min(maxHp, displacedHp + amount));
+    }
+    // Actor.statusUpdateVitals already calculates all stats. Publish once after
+    // preparing final HP, not through refreshStats plus a second percent heal.
+    target.statusUpdateVitals?.(target);
+    return Math.max(0, target.fetchHp() - hpBefore);
 }
 
 function applyManaRecharge(session, actor, target, skill, semantic, magicSkill, attack) {
@@ -937,12 +960,22 @@ function applyEffect(session, target, skill, semantic, source = session?.actor, 
         durationMs
     };
     if (!admitRaidEffect(target, definition, result)) return null;
+    const hpBefore = semantic.healMaxHpContribution ? target.fetchHp() : 0;
     const effect = EffectStore.apply(target, definition);
 
     // A stronger effect already occupies this C4 stack slot. The rejected cast
     // must not restart its DoT/HoT ticker, refresh its icon, or interrupt the
     // target as though the weaker effect had landed.
     if (!effect) return null;
+    if (semantic.healMaxHpContribution && effect.removedEffects.includes(effect)) {
+        // Debuff slot pressure can discard the incoming buff itself. Any older
+        // displaced stats still need a final refresh, but no cast heal is earned.
+        const displacedSilentMoving = effect.removedEffects.find((removed) => removed.stats?.silentMoving);
+        if (displacedSilentMoving) ToggleSkills.cleanupState(target?.session || session, target, displacedSilentMoving);
+        target.statusUpdateVitals?.(target);
+        refreshEffects(session, target);
+        return null;
+    }
 
     const buff = BuffCatalog.byTypeOrKey(semantic.effect);
     if (buff && semantic.effectType === 'buff') {
@@ -979,7 +1012,9 @@ function applyEffect(session, target, skill, semantic, source = session?.actor, 
     // reads it first); recompute it from the store, then refresh as before.
     const displacedSilentMoving = effect.removedEffects.find((removed) => removed.stats?.silentMoving);
     if (displacedSilentMoving) invoke('GameServer/Skills/ToggleSkills').cleanupState(target?.session || session, target, displacedSilentMoving);
-    if (hasStats(effect) || effect.removedEffects.some(hasStats)) {
+    if (semantic.healMaxHpContribution) {
+        result.heal = applyMaxHpHeal(target, effect, hpBefore);
+    } else if (hasStats(effect) || effect.removedEffects.some(hasStats)) {
         refreshStats(target?.session || session, target);
     }
     refreshEffects(session, target);

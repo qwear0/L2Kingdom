@@ -12,10 +12,16 @@ function effectiveBaseStat(actor, stat, fallback) {
     return Math.max(1, Math.round(added * EffectStats.multiplier(actor, `${stat}Mul`)));
 }
 
-function setCollectiveTotalHp(actor) {
+// A cast can inspect the post-displacement maximum without its incoming HP
+// multiplier. Exclude it from the product, never from additive-inclusive HP.
+function calculateMaxHp(actor, excludedMultiplier = 1) {
     const con = effectiveBaseStat(actor, 'CON', () => actor.fetchCon());
-    const base = (Formulas.calcHp(actor.fetchLevel(), actor.fetchClassId(), con) * EffectStats.multiplier(actor, 'maxHpMul')) + EffectStats.add(actor, 'maxHpAdd');
-    actor.setMaxHp(base);
+    const multiplier = EffectStats.multiplier(actor, 'maxHpMul') / excludedMultiplier;
+    return (Formulas.calcHp(actor.fetchLevel(), actor.fetchClassId(), con) * multiplier) + EffectStats.add(actor, 'maxHpAdd');
+}
+
+function setCollectiveTotalHp(actor) {
+    actor.setMaxHp(calculateMaxHp(actor));
     actor.setHp(Math.min(actor.fetchHp(), actor.fetchMaxHp()));
 }
 
@@ -191,6 +197,7 @@ function calculateStats(session, actor) {
     setCollectiveTotalRunSpd  (actor);
 }
 
+calculateStats.maxHp = calculateMaxHp;
 calculateStats.refreshConditionalCombatStats = (actor) => {
     setCollectiveTotalEvasion(actor);
     setCollectiveTotalCritical(actor);
