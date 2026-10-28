@@ -19,20 +19,45 @@ function privatePeer(raw) {
     }
     return net.isIPv6(peer) && /^(?:f[cd][\da-f]{2}:|fe[89ab][\da-f]:)/i.test(peer);
 }
-function access(request, binding) {
-    if (!privatePeer(request.socket.remoteAddress)) throw Config.error('Trusted LAN access only.', 403);
+function parsePublicOrigin(value) {
+    if (value === undefined || value === null || value === '') return '';
+    const invalid = () => Config.error('WorldObserver.publicOrigin must be an absolute HTTP origin without credentials, path, query or fragment.');
+    if (typeof value !== 'string' || !/^http:\/\/[^/?#@\\\s]+\/?$/.test(value)) throw invalid();
+    let url;
+    try { url = new URL(value); } catch (_) { throw invalid(); }
+    if (url.protocol !== 'http:' || url.username || url.password || url.pathname !== '/' || url.search || url.hash) throw invalid();
+    return url.origin;
+}
+// Proxy authority is opt-in at the parent call site, never inferred from INI
+// here: standalone observers retain their direct-peer contract. Keep the socket
+// intact so independent loopback/token consumers cannot inherit client headers.
+function access(request, binding, publicOrigin = '') {
+    const forwarded = request.headers['x-real-ip'];
+    const proxied = Boolean(publicOrigin && forwarded !== undefined);
+    let clientAddress = request.socket.remoteAddress;
+    if (proxied) {
+        if (!['127.0.0.1', '::ffff:127.0.0.1'].includes(clientAddress)
+            || typeof forwarded !== 'string' || !net.isIP(forwarded)) throw Config.error('Invalid proxy client address.', 403);
+        clientAddress = forwarded.replace(/^::ffff:/, '');
+    }
+    if (!privatePeer(clientAddress)) throw Config.error('Trusted LAN access only.', 403);
     let host;
     try { host = new URL(`http://${request.headers.host}`); } catch (_) { throw Config.error('Invalid Host.', 403); }
-    const hostname = host.hostname.replace(/^\[|\]$/g, '').toLowerCase();
-    const bound = String(binding.hostname).toLowerCase();
-    const expectedNames = new Set(['localhost', os.hostname().toLowerCase(), `${os.hostname().toLowerCase()}.local`, bound]);
-    if (host.username || host.password || host.pathname !== '/' || host.search || host.hash
-        || Number(host.port || 80) !== binding.port
-        || !(expectedNames.has(hostname) || (['0.0.0.0', '::'].includes(bound) && privatePeer(hostname)))) throw Config.error('Unexpected Host.', 403);
+    if (host.username || host.password || host.pathname !== '/' || host.search || host.hash) throw Config.error('Unexpected Host.', 403);
+    if (proxied) {
+        if (host.origin !== publicOrigin) throw Config.error('Unexpected Host.', 403);
+    } else {
+        const hostname = host.hostname.replace(/^\[|\]$/g, '').toLowerCase();
+        const bound = String(binding.hostname).toLowerCase();
+        const expectedNames = new Set(['localhost', os.hostname().toLowerCase(), `${os.hostname().toLowerCase()}.local`, bound]);
+        if (Number(host.port || 80) !== binding.port
+            || !(expectedNames.has(hostname) || (['0.0.0.0', '::'].includes(bound) && privatePeer(hostname)))) throw Config.error('Unexpected Host.', 403);
+    }
     if (!['GET', 'HEAD'].includes(request.method)) {
         if (request.headers['sec-fetch-site'] === 'cross-site') throw Config.error('Foreign browser origin denied.', 403);
         if (request.headers.origin && request.headers.origin !== host.origin) throw Config.error('Foreign browser origin denied.', 403);
     }
+    return { clientAddress, proxied };
 }
 function keys(payload, allowed, required = []) {
     if (Object.keys(payload).some(key => !allowed.includes(key)) || required.some(key => !Object.hasOwn(payload, key))) throw Config.error('Unexpected or missing action fields.');
@@ -80,9 +105,9 @@ function gameRoute(pathname) {
     return /^\/observer\/api\/(?:snapshot|world\/(?:bootstrap|changes|status)|characters\/search|clans(?:\/social)?|market(?:\/history)?|knowledge\/(?:meta|items(?:\/\d+)?|npcs(?:\/\d+)?)|clan-order-items|clan\/\d+(?:\/craft-preview|\/orders(?:\/\d+(?:\/(?:pause|resume|replan|cancel))?)?|\/crest)?|bot\/\d+(?:\/relationships)?|actor\/(?:bot|player)\/\d+(?:\/(?:inventory|warehouse|skills|pvp|board))?|control\/teleport-player-to-raid)$/.test(pathname)
         || /^\/observer\/item-icons\/[^/]+$/.test(pathname);
 }
-async function proxy(request, response, url, controller) {
+async function proxy(request, response, url, controller, context) {
     if (!gameRoute(url.pathname)) return false;
-    if (url.pathname === '/observer/api/control/teleport-player-to-raid' && !loopback(request.socket.remoteAddress)) throw Config.error('loopback_only', 403);
+    if (url.pathname === '/observer/api/control/teleport-player-to-raid' && !loopback(context.clientAddress)) throw Config.error('loopback_only', 403);
     if (!['GET', 'POST', 'PATCH', 'DELETE'].includes(request.method)) throw Config.error('Method not allowed.', 405);
     const endpoint = controller.endpoint;
     if (controller.phase !== 'running' || !endpoint) { sendJson(response, { error: 'Game observer unavailable.', phase: controller.phase, observer: controller.public().observer }, 503); return true; }
@@ -107,4 +132,4 @@ async function proxy(request, response, url, controller) {
     upstream.end(body);
     return true;
 }
-module.exports = { access, managementRoute, proxy, privatePeer, gameRoute };
+module.exports = { access, parsePublicOrigin, managementRoute, proxy, privatePeer, gameRoute };

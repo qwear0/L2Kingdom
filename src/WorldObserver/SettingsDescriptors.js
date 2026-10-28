@@ -84,7 +84,9 @@ function catalogue(config) {
     add('server', 'Diagnostics', 'BotPopulation', 'economyDiagnostics', 'Economy diagnostics', 'boolean', false,
         'Detail switch; effective only with developerDiagnostics. Does not enable the master switch.', { mode: 'restart' });
     for (const [key, fallback] of [['hostname', '127.0.0.1'], ['port', 8088]]) add('server', 'Management service', 'WorldObserver', key,
-        `Public management ${key}`, key === 'port' ? 'integer' : 'text', fallback, 'Management-service restart is external and temporarily removes this UI; in-page Stop affects only the game.', { mode: 'service' });
+        `Backend management ${key}`, key === 'port' ? 'integer' : 'text', fallback, 'Management API binding, not the frontend address. With publicOrigin set, hostname must be 127.0.0.1. Management-service restart is external; in-page Stop affects only the game.', { mode: 'service' });
+    add('server', 'Management service', 'WorldObserver', 'publicOrigin', 'L2Kingdom frontend origin', 'text', '',
+        'Absolute HTTP browser origin without credentials, path, query or fragment. Enables the same-host loopback proxy boundary; empty disables proxy trust and browser auto-open, not API access. Edit externally and restart management.', { mode: 'service' });
     return rows;
 }
 

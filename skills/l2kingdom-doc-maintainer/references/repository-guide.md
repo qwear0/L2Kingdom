@@ -22,7 +22,7 @@ These are starting anchors, not an exhaustive architecture map or a guarantee th
 | Castellan and vassals | `src/GameServer/Lord/`, `src/GameServer/Bot/` | Where are ownership, recruitment, commands, and persistence enforced? Which legacy population paths are bypassed? |
 | Protocol | `src/Packet/` and the relevant server handler | Who dispatches a packet, validates input, changes state, and serializes a reply? |
 | Persistence | `src/Database.js`, adjacent `src/Database*.js`, `src/History*.js`, `database/` | Who writes durable state, performs transactions/restores/checkpoints, and owns authored schema versus live database files? |
-| Web observer | `src/WorldObserver/` | Which APIs, snapshots, UI consumers, and mutations cross the server/observer boundary? Do not assume all observer routes are read-only. |
+| WorldObserver backend / L2Kingdom frontend | `src/WorldObserver/`, `src/frontend/public/` | Trace API-only management, parent-only `publicOrigin`/client checks, game projections, browser consumers and shared atlas/icon files separately. Standalone/private-child static routing is retained; frontend packaging/deployment is not implied by the source move. Do not assume observer APIs are read-only. |
 | AI and social behavior | `src/GameServer/Bot/AI/`, `src/GameServer/Social/`, AI sections in configuration | Which deterministic behavior, external requests, failure handling, and state updates are involved? |
 | Authored resources | `data/`, relevant loaders in `src/GameServer/` | Which files are authored, generated, or downloaded? Which loader actually consumes the resource? |
 | Maintenance and verification | `scripts/`, `tests/`, `package.json` | What does a command read/write, and could it start processes, fetch resources, or mutate state? |

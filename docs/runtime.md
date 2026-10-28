@@ -6,28 +6,33 @@ Read this when changing startup, effective configuration or shutdown behavior. S
 
 | Entrypoint | Responsibility |
 | --- | --- |
-| `package.json` → `scripts/start.js` (`npm start`) | Persistent WorldObserver management parent. Serves the frontend/Settings, owns configuration/preset writes and lifecycle/data operations. Does not start gameplay on launch. |
+| `package.json` → `scripts/start.js` (`npm start`) | Persistent API-only WorldObserver management parent. Owns auth/Settings APIs, configuration/preset writes and lifecycle/data operations; does not serve browser pages/assets. Does not start gameplay on launch. |
 | `scripts/run-server.js` (`npm run NodeL2`) | Geodata/runtime wrapper. Spawns `src/NodeL2.js` with `--openssl-legacy-provider`, repository working directory and shutdown IPC; not another management frontend. |
 | `src/NodeL2.js` | Owns SQLite, world, TCP listeners, bots and optional game observer API. Direct invocation bypasses geodata preparation. |
-| `src/ConfigLoader.js`, `src/Global.js` | Shared INI loading; only the runtime installs `invoke`, utilities and global options. The parent does not import game singletons or open the world DB to serve assets/settings. |
+| `src/ConfigLoader.js`, `src/Global.js` | Shared INI loading; only the runtime installs `invoke`, utilities and global options. The parent does not import game singletons or open the world DB to serve auth/Settings APIs. |
 | `src/Server.js` | TCP listener/session owner, with a `ready` promise and listener-error callback. |
 
-`npm start` listens at `[WorldObserver] hostname/port` (committed default `127.0.0.1:8088`) and normally opens `/observer/settings/server`; `L2NODE_NO_BROWSER=1` suppresses the browser. Public browser pages/APIs require a personal admin-key session; create the first key with `npm run observer:key -- "User name"` using the same `L2NODE_RUNTIME_DIR` as management (default `tmp`). Login uses only the key, with a persistent 30-day cookie; see [observer authentication](world-observer.md#personal-keys-and-browser-sessions). There is no launcher page/listener on 8090 and no legacy `/api/*` management namespace or launcher host/port/name flags.
+`npm start` listens for APIs at `[WorldObserver] hostname/port` (committed default `127.0.0.1:8088`). It opens `/observer/settings/server` at the separate `publicOrigin` only when that origin is configured and `L2NODE_NO_BROWSER` is not `1`; it logs the backend binding separately and does not check frontend availability. Empty `publicOrigin` disables proxy trust/auto-open, not API access. A configured origin requires management to bind `127.0.0.1`; port changes are not required by separation.
+
+Browser sources now live in `src/frontend/public/`; the independent frontend deployment artifact is not yet included. New parent processes do **not** serve pages, login HTML or frontend assets. Complete frontend packaging and separately authorized cutover before expecting a working browser entrypoint; this backend-only revision does not change existing running processes.
+
+Browser APIs require a personal admin-key session; create the first key with `npm run observer:key -- "User name"` using the same `L2NODE_RUNTIME_DIR` as management (default `tmp`). Login uses only the key, with a persistent 30-day cookie; see [observer authentication](world-observer.md#personal-keys-and-browser-sessions) and the [proxy/direct boundary](world-observer.md#lan-and-peer-sensitive-boundary). There is no launcher page/listener on 8090 and no legacy `/api/*` management namespace or launcher host/port/name flags.
 
 ```text
-trusted LAN browser -> management parent /observer/*
-                       |-- static pages, Settings and all management actions
-                       |-- sole local INI and preset JSON writer
-                       `-- bounded known-route proxy -> private 127.0.0.1:<OS-assigned port>
-                                                        wrapper -> NodeL2
-                               generation-bound readiness/settings/shutdown IPC
+required separate frontend (not packaged yet): browser pages/maps
+                       `-> management parent /observer/api/* and item-icons/*
+local MCP directly ------> |-- auth, Settings and all management actions
+                           |-- sole local INI and preset JSON writer
+                           `-- bounded known-route proxy -> private 127.0.0.1:<OS-assigned port>
+                                                            wrapper -> NodeL2
+                                   generation-bound readiness/settings/shutdown IPC
 ```
 
-In managed mode the game observer binds loopback port **0**, reports the actual port through the wrapper, and never reuses the public listener. Direct `npm run NodeL2` retains the standalone observer binding/disabled behavior, but has no persistent Settings management API; use `npm start` for the unified UI, not a second supervisor.
+In managed mode the game observer binds loopback port **0**, reports the actual port through the wrapper, and never reuses the management listener. The frontend must never target this ephemeral endpoint. Direct `npm run NodeL2` retains the standalone observer binding/disabled/static behavior, reading moved browser resources, but has no persistent Settings management API or trusted-proxy mode. It is not a replacement management frontend/supervisor.
 
 ### WorldObserver.enabled
 
-Under `npm start`, this controls the **game observer API only**, not the persistent management UI. When false there is no private observer listener or proxy readiness requirement; game readiness still requires authentication/game listeners and initialization. Settings, logs, saved-game management and explicit inference remain available. Live world/search/count routes return unavailable, not an empty world. Hostname/port still select the public management listener, and are read-only in Settings because their restart owner is external.
+Under `npm start`, this controls the **game observer API only**, not the persistent management/auth/Settings APIs. When false there is no private observer listener or proxy readiness requirement; game readiness still requires authentication/game listeners and initialization. Settings, logs, saved-game management and explicit inference remain available. Live world/search/count routes return unavailable, not an empty world. Hostname/port still select the backend management listener. They and `publicOrigin` are read-only service-owned Settings fields, with active values captured at parent startup; their restart owner is external.
 
 This is a migration in entrypoint ownership, not evidence that an existing service command, firewall or LAN binding has been changed. Confirm the real service owner/command and private binding before separately authorized stop-and-replace deployment.
 

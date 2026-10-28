@@ -4,7 +4,7 @@ L2Kingdom is a private Lineage II C4 server derived from L2Solo / NodeL2. Packag
 
 ## Scope and current runtime
 
-- `npm start` owns the persistent public WorldObserver/Settings management origin and launches a geodata/runtime wrapper on demand. NodeL2 owns authentication/game TCP, world state, worker threads and an optional private loopback observer API; source directories are not independently deployed services.
+- `npm start` owns the persistent API-only WorldObserver management listener and launches a geodata/runtime wrapper on demand. Browser sources are in `src/frontend/public/`; separate frontend packaging/deployment is not yet included. NodeL2 owns authentication/game TCP, world state, worker threads and an optional private loopback observer API. See the [frontend boundary](world-observer.md#l2kingdom-frontend-sources-and-deployment-boundary) before starting a new browser deployment.
 - Built-in SQLite stores the world; a separate history database receives asynchronous projections. Authored resources, generated catalogues and live persistence are different sources of truth.
 - **Owned-only policy is enforced after configuration overrides.** Live player-owned vassals remain active; ambient seeding, cold simulation, background parties and autonomous clan simulation are bypassed. Historical modules/options do not prove activation.
 - External AI is optional. Native rule-based behavior and service validation remain responsible for game actions.
@@ -32,7 +32,7 @@ L2Kingdom is a private Lineage II C4 server derived from L2Solo / NodeL2. Packag
 | Who validates item/Adena transfers and owns custody? | [Economy and storage](economy.md) | `src/GameServer/Inventory/`, `src/GameServer/World/GroundItemVisibility.js`, `src/GameServer/World/Generics/PickupItem.js`, `src/GameServer/Crafting/`, `src/GameServer/Warehouse/`, `src/GameServer/AfkTrade/`, `src/GameServer/PrivateStoreTrade.js`, `src/Database.js` |
 | What crosses the external inference boundary and becomes memory? | [AI and social behavior](ai-social.md) | `src/GameServer/Bot/AI/`, `src/GameServer/Social/`, `src/GameServer/Clan/` |
 | How does an MCP host observe an existing bot or explicitly take manual native control? | [Bot MCP control and observation (P1–P4)](bot-mcp.md) | `scripts/bot-mcp.js`, `src/Mcp/`, `src/GameServer/Bot/Control/`, `src/WorldObserver/BotControlRoutes.js` |
-| What does the browser read, configure or operate? | [WorldObserver](world-observer.md) | `src/WorldObserver/ManagementController.js`, `ManagementRoutes.js`, `ObserverAuth.js`, `ObserverAuthStore.js`, `SettingsService.js`, `SettingsRuntime.js`, `WorldObserverServer.js` and `public/` |
+| What does the browser read, configure or operate? | [WorldObserver backend / L2Kingdom frontend](world-observer.md) | `src/WorldObserver/ManagementController.js`, `ManagementRoutes.js`, `ObserverAuth.js`, `ObserverAuthStore.js`, `SettingsService.js`, `SettingsRuntime.js`, `WorldObserverServer.js`; browser sources in `src/frontend/public/` |
 | Which resource/rule is authoritative for a catalogue or NPC service? | [Content and progression](content.md) | `data/`, `src/GameServer/DataCache.js`, `src/GameServer/Knowledge/`, `src/GameServer/Quest/`, `src/GameServer/World/GatekeeperService.js`, progression/service modules |
 
 Code anchors are repository-relative; wildcard notation identifies a family, not a literal filename.
@@ -42,7 +42,7 @@ Code anchors are repository-relative; wildcard notation identifies a family, not
 ```text
 management parent -> geodata wrapper -> NodeL2 initialization
      |                                     |
-     +-> static Settings / sole config writer / lifecycle & data operations
+     +-> Settings API / sole config writer / lifecycle & data operations
 C4 client -> TCP/session -> request -> gameplay owner -> native response
                                       |          |
                                       |          +-> live actor/world/visibility
@@ -53,7 +53,7 @@ C4 client -> TCP/session -> request -> gameplay owner -> native response
                                                outbox -> history worker -> history SQLite
 
 management known-route proxy <- private game observer <- projections/catalogues/history
-browser controls -> parent peer/origin checks -> durable admin-key session -> validated game services -> gameplay/persistence
+separate frontend -> parent validated client/Host/Origin -> durable admin-key session -> validated game services -> gameplay/persistence
 chat -> deterministic routing / optional provider -> validated tools -> native services
 ```
 

@@ -8,7 +8,7 @@ Use this as a side-effect guide, not an instruction to run commands automaticall
 - Install dependencies only when setup is requested. `node_modules/` and `package-lock.json` are ignored; syntax checking does not require importing application dependencies.
 - The native client must speak Lineage II C4 protocol `656`; WorldObserver is not a replacement game client.
 - Defaults/examples live in `config/default.ini`/`config/local.example.ini`; private overrides use ignored `config/local.ini` or the selected override file.
-- The unified public management listener uses WorldObserver hostname/port (default loopback 8088). Authentication/game TCP defaults still bind all interfaces. Preserve the intended trusted LAN/firewall boundary; Host/Origin/private-peer checks are not user identity; browser access additionally requires a personal admin-key session. Neither is permission for Internet exposure.
+- The API-only management listener uses WorldObserver hostname/port (default loopback 8088), not the browser origin. A configured `publicOrigin` requires `hostname=127.0.0.1`; it enables only the selected same-host proxy contract. Browser sources are in `src/frontend/public/`, but the separate deployment artifact is not yet included. Do not treat a new parent start as a working UI deployment; see the [staged boundary](world-observer.md#l2kingdom-frontend-sources-and-deployment-boundary). Authentication/game TCP defaults still bind all interfaces. Host/Origin/private-peer checks and personal-key sessions are not permission for Internet exposure.
 
 ## Command side effects
 
@@ -16,7 +16,7 @@ These are existing commands, not checks executed by creating this document.
 
 | Command | Effect and caution |
 | --- | --- |
-| `npm start` | Starts persistent WorldObserver management and normally opens Settings → Server management (personal-key sign-in first). Start gameplay with its separate Start action; Stop keeps the same UI/logs/saves available. |
+| `npm start` | Starts persistent WorldObserver management APIs, never browser-page delivery. Opens Settings at `publicOrigin` only when configured (unless `L2NODE_NO_BROWSER=1`); does not check frontend availability. Start gameplay with the separate Start action once the frontend is deployed; Stop keeps management APIs/logs/saves available. |
 | `npm run observer:key -- "User name"` | Creates a named full-admin observer key in the runtime's separate auth SQLite and prints the raw key once. No server startup, restart or world database access. Names must be unique; keep the key private. |
 | `npm run NodeL2` | Standalone geodata/runtime wrapper, not another full management UI. Starts gameplay, which may migrate/write SQLite and restore owned actors. Prefer `npm start` for the unified product. |
 | `node scripts/run-simulations.js` | Creates isolated per-instance files as needed and starts management parents on 8181..8183, one origin per instance. Does not start games unless `--start-servers` (or `--restart-servers`) is explicitly selected. `--stop-servers` operates through management; `--count=1..3` and `--no-browser` remain supported. Lifecycle flags require `L2NODE_OBSERVER_KEY_<managementPort>` (for example `L2NODE_OBSERVER_KEY_8181`), or the fallback `L2NODE_OBSERVER_KEY`; the script logs in and reuses a session cookie. These are runtime operations, not checks. |
@@ -85,7 +85,7 @@ Full-world cold/warm coverage and real-client acceptance remain separate operati
 
 ## Persistent management and settings
 
-Use `/observer/settings/server` at the single public origin. Full controls cover status/readiness/PID/uptime/last exit and cleanup, Start/Stop, Open map/full log, bounded output, explicit inference, named saves and typed-scope wipes. There is no separate old launcher page/listener, Restart/force-stop button or compatibility route.
+Once the separate frontend is deployed, use `/observer/settings/server` at its single browser origin (`publicOrigin`), not at the loopback management binding. The backend-only separation step does not include that frontend artifact or authorize service changes. Full controls cover status/readiness/PID/uptime/last exit and cleanup, Start/Stop, Open map/full log, bounded output, explicit inference, named saves and typed-scope wipes. There is no separate old launcher page/listener, Restart/force-stop button or compatibility route.
 
 Settings tab Save, the preset form and management actions are independent. Saved next-start values are not running values. Restart-only settings and saved-but-unapplied live changes require an explicit **Stop → wait for confirmed exit → Start**; saving never starts/restarts anything. Management hostname/port are externally restarted settings, not in-page Stop targets. See [runtime precedence, numeric bounds and pending recovery](runtime.md).
 

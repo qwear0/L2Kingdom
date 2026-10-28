@@ -10,8 +10,9 @@ const LOGIN = '/observer/login';
 const API = '/observer/api/auth/';
 
 class ObserverAuth {
-    constructor(port) {
+    constructor(port, { servePages = true } = {}) {
         this.store = new ObserverAuthStore();
+        this.servePages = servePages;
         // Cookies have no port scope; isolate management instances sharing a hostname.
         this.cookieName = `l2observer_session_${port}`;
         this.attempts = new Map();
@@ -26,8 +27,8 @@ class ObserverAuth {
         return `${this.cookieName}=${token}; Path=/observer/; HttpOnly; SameSite=Strict; Max-Age=${maxAge}${request.socket.encrypted ? '; Secure' : ''}`;
     }
 
-    rateLimit(request, response) {
-        const now = Date.now(), peer = request.socket.remoteAddress;
+    rateLimit(request, response, context) {
+        const now = Date.now(), peer = context?.clientAddress ?? request.socket.remoteAddress;
         let entry = this.attempts.get(peer);
         if (!entry || entry.until <= now) {
             if (this.attempts.size >= 1024) {
@@ -43,15 +44,19 @@ class ObserverAuth {
         }
     }
 
-    async handle(request, response, url) {
+    async handle(request, response, url, context) {
         response.setHeader('Cache-Control', 'no-store');
         response.setHeader('X-Content-Type-Options', 'nosniff');
         response.setHeader('Referrer-Policy', 'no-referrer');
+        // The parent authenticates APIs and backend-owned icons, not pages;
+        // even the login document belongs to the frontend. Standalone observers
+        // keep their existing page gate.
+        if (!this.servePages && !url.pathname.startsWith('/observer/api/') && !url.pathname.startsWith('/observer/item-icons/')) return false;
         if (PUBLIC.has(url.pathname) && ['GET', 'HEAD'].includes(request.method)) return false;
         const token = this.token(request);
         if (url.pathname === `${API}login`) {
             if (request.method !== 'POST') { response.setHeader('Allow', 'POST'); throw error('Method not allowed.', 405); }
-            this.rateLimit(request, response);
+            this.rateLimit(request, response, context);
             const payload = await readJson(request);
             if (Object.keys(payload).length !== 1 || !Object.hasOwn(payload, 'key')) throw error('Supply only a personal key.');
             const session = this.store.login(payload.key);
@@ -76,7 +81,7 @@ class ObserverAuth {
             return true;
         }
         if (!user) {
-            if (url.pathname.startsWith('/observer/api/') || !['GET', 'HEAD'].includes(request.method)) {
+            if (!this.servePages || url.pathname.startsWith('/observer/api/') || !['GET', 'HEAD'].includes(request.method)) {
                 sendJson(response, { error: 'Authentication required.' }, 401);
             } else {
                 const next = url.pathname.startsWith('/observer/') ? url.pathname + url.search : '/observer/';

@@ -24,7 +24,7 @@ MCP host -> scripts/bot-mcp.js (SDK stdio)
    { "command": "node", "args": ["/apps/L2Kingdom/scripts/bot-mcp.js"] }
    ```
 
-   `L2NODE_BOT_CONTROL_URL` optionally selects the existing management origin, default `http://127.0.0.1:8088`. Only literal-loopback HTTP (`127.0.0.1` or `[::1]`) without credentials/path/query is accepted. Remote hosts can launch stdio through independently authorized SSH; do not widen HTTP exposure.
+   `L2NODE_BOT_CONTROL_URL` optionally selects the existing management origin, default `http://127.0.0.1:8088`. Only literal-loopback HTTP (`127.0.0.1` or `[::1]`) without credentials/path/query is accepted. This remains a **direct backend** request, not the browser `publicOrigin` or a frontend proxy route; the parent rejects proxied bot-control requests. Keep the management port where possible. If it must change during authorized cutover, locate/update the actual MCP host configuration separately; there is no INI endpoint discovery or protocol migration. Remote hosts can launch stdio through independently authorized SSH; do not widen HTTP exposure.
 4. `npm run bot:mcp --silent` is a convenience command; ordinary npm banners must not enter the protocol stream. No bridge command starts/restarts the application.
 
 Exact direct dependencies are `@modelcontextprotocol/server@2.4.0` and `zod@4.3.6`, compatible with CommonJS and Node >=22.5.0. The repository ignores `package-lock.json`; exact direct versions do not claim a pinned transitive graph. The SDK owns framing/negotiation; direct stdio inspection negotiated `2025-11-25`.
