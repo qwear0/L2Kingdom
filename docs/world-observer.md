@@ -111,12 +111,14 @@ Some game read handlers do not enforce GET-only; parent management methods are s
 
 ## Incremental world flow and offline behavior
 
-1. `ensureWorldProjection` collects live actors and bounded lifecycle-cache entries.
-2. Dynamic refresh builds a local first-session-by-numeric-ID map once to join the existing available hot-status list. It does not keep a permanent BotManager index or change status/detail collection, PK/lifecycle fallbacks, actor order or removal detection. `WorldObserverProjection.js` keys by kind/id and retains bounded revision history.
-3. Bootstrap supplies row schema, process epoch and revision. `src/frontend/public/worldState.js` decodes the supplied contract.
+1. `refreshDynamicProjection` owns the single readiness check per bootstrap/changes request. `ensureWorldProjection` coalesces first initialization and resets from lean live-bot input plus up to 2,000 recent lifecycle-cache entries; once initialized, readiness returns without materializing a snapshot. Failed collection remains retryable, and the cold-change subscription is retained.
+2. Initialization and dynamic refresh use `BotManager.getAllBotMapStatuses`, without publishing lean input to the full `session.botStatus` cache. Both use collection-local first-session-by-numeric-ID joins; aggregate live PK membership and last-applied duplicate row winners remain separate rules. Refresh retains cached non-hot PK supplements (including outside the recent-state seed), prior/current persisted PK membership, cold fallbacks and removals. No permanent session index or new cache is introduced. `WorldObserverProjection.js` still owns kind/id keys and bounded revision history.
+3. First bootstrap keeps initial reset followed by a fresh dynamic pass; the two lean reads preserve inter-pass state effects. Bootstrap then reads the snapshot needed for its unchanged row schema, process epoch and revision. `src/frontend/public/worldState.js` decodes the supplied contract.
 4. Changes coalesce removals/upserts; expired/invalid cursors reset. Unchanged replies are HTTP 204 with epoch/revision headers. New process epochs invalidate old state.
 5. `src/frontend/public/app.js` polls approximately every two seconds while visible/live, plus slower status polling. Settings is a separate entrypoint, excluded from this router interception and loop.
 6. HTTP 503 and refresh failures mark the world unavailable and link Server management in the map and visible Overview/Characters/Parties/dungeon workspace, rather than reporting zero population or endless loading. A retained last observation is explicitly stale across exploration routes; successful bootstrap replaces it and clears the unavailable state before normal rendering resumes.
+
+Full snapshot, clan/native panels and actor/bot detail paths retain the full status reader. Lean map reads still perform necessary native expiry/policy/party work, including internal scans; see the [status read contract](bot-runtime.md#full-and-map-status-reads). Unchanged changes requests do not create discarded readiness actor arrays, but still refresh current dynamic state.
 
 This is HTTP polling, not pushed native packet state. Map publication is not native-client visibility or authority.
 

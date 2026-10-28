@@ -1933,7 +1933,19 @@ function mapCooperatively(items, mapper, sliceBudgetMs = 4) {
     });
 }
 
-async function collectWorldActors() {
+function firstHotSessionsById(sessions) {
+    const sessionsById = new Map();
+    for (const session of sessions) {
+        const id = session.actor?.fetchId();
+        // Match findSessionById's first strict numeric match, including duplicates.
+        if (Number.isFinite(id) && !sessionsById.has(id)) sessionsById.set(id, session);
+    }
+    return sessionsById;
+}
+
+// Full snapshots need detail fields; only projection initialization opts into
+// lean reads. Keep its join local to the synchronous hot collection.
+async function collectWorldActors({ mapOnly = false } = {}) {
     await refreshPersistedPkIds();
     const BotManager = invoke('GameServer/Bot/BotManager');
     const LifeState = invoke('GameServer/Bot/Population/BotLifeState');
@@ -1941,12 +1953,14 @@ async function collectWorldActors() {
     const pkHotIds = new Set(BotManager.sessions
         .filter((session) => isPkActor(session.actor))
         .map((session) => Number(session.actor.fetchId())));
-    const hotBots = BotManager.getAllBotStatuses()
+    const sessionsById = mapOnly ? firstHotSessionsById(BotManager.sessions) : null;
+    const statuses = mapOnly ? BotManager.getAllBotMapStatuses() : BotManager.getAllBotStatuses();
+    const hotBots = statuses
         .filter((status) => status && status.available)
         .map((status) => compactHotBot(
             status,
             pkHotIds,
-            BotManager.findSessionById(Number(status.id))
+            mapOnly ? sessionsById.get(Number(status.id)) : BotManager.findSessionById(Number(status.id))
         ));
     const hotIds = new Set(hotBots.map((bot) => Number(bot.id)));
     // The previous 700-item cap made the observer silently report 735 bots
@@ -2012,21 +2026,20 @@ function bindColdProjection() {
 }
 
 async function ensureWorldProjection() {
-    if (projectionRuntime.initialized) return WorldProjection.snapshot();
+    if (projectionRuntime.initialized) return;
     if (projectionRuntime.initializing) return projectionRuntime.initializing;
-    projectionRuntime.initializing = collectWorldActors().then(({ bots, players }) => {
+    projectionRuntime.initializing = collectWorldActors({ mapOnly: true }).then(({ bots, players }) => {
         const actors = [
             ...bots.map((actor) => projectionActor(actor, 'bot')),
             ...players.map((actor) => projectionActor(actor, 'player'))
         ];
-        const result = WorldProjection.reset(actors);
+        WorldProjection.reset(actors);
         projectionRuntime.dynamicKeys = new Set([
             ...bots.filter((actor) => actor.phase === 'hot').map((actor) => `bot:${Number(actor.id)}`),
             ...players.map((actor) => `player:${Number(actor.id)}`)
         ]);
         projectionRuntime.initialized = true;
         bindColdProjection();
-        return result;
     }).finally(() => {
         projectionRuntime.initializing = null;
     });
@@ -2040,13 +2053,8 @@ async function refreshDynamicProjection() {
     const pkHotIds = new Set(BotManager.sessions
         .filter((session) => isPkActor(session.actor))
         .map((session) => Number(session.actor.fetchId())));
-    const sessionsById = new Map();
-    for (const session of BotManager.sessions) {
-        const id = session.actor?.fetchId();
-        // Match findSessionById's first strict numeric match, including duplicates.
-        if (Number.isFinite(id) && !sessionsById.has(id)) sessionsById.set(id, session);
-    }
-    const hot = BotManager.getAllBotStatuses()
+    const sessionsById = firstHotSessionsById(BotManager.sessions);
+    const hot = BotManager.getAllBotMapStatuses()
         .filter((status) => status && status.available)
         .map((status) => projectionActor(compactHotBot(
             status,
@@ -2088,7 +2096,6 @@ async function refreshDynamicProjection() {
 }
 
 async function worldBootstrap() {
-    await ensureWorldProjection();
     await refreshDynamicProjection();
     const projection = WorldProjection.snapshot();
     const actors = projection.actors;
@@ -2205,7 +2212,6 @@ async function marketHistorySnapshot(selfId, range = '24h') {
 }
 
 async function worldChanges(revision) {
-    await ensureWorldProjection();
     await refreshDynamicProjection();
     return { epoch: WORLD_EPOCH, ...WorldProjection.changesSince(revision) };
 }

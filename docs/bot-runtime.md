@@ -52,7 +52,7 @@ Post-party safe rest measures eligible live time, not elapsed server downtime. S
 
 `Bot/AI/BotStatus.js` owns both read shapes. `getStatus` retains detailed party/nearby, movement, gear, effects, trade, inference and persona output; `BotAI.getStatus` also updates the full `session.botStatus` cache. Native panels, snapshots and gameplay status consumers keep this contract.
 
-`BotStatus.getMapStatus` returns internal projection input only: identity/class/level, mode/intent/role, home/location, compact party core and the dead blocker. `BotAI.getMapStatus` forwards without writing that cache; `BotManager.getAllBotMapStatuses` preserves the full enumeration's actor filtering and order. This API is prepared for observer integration; observer callers still use the full reader until that separate switch.
+`BotStatus.getMapStatus` returns internal projection input only: identity/class/level, mode/intent/role, home/location, compact party core and the dead blocker. `BotAI.getMapStatus` forwards without writing that cache; `BotManager.getAllBotMapStatuses` preserves the full enumeration's actor filtering and order. Observer map/directory initialization and refresh use this API; full snapshot, clan/native and detail readers retain the full contract.
 
 The lean read is not pure: it retains ambient TTL refresh/journaling, settings/pull/combat/threat inspection, effect pruning, trade/negotiation expiry, inference-budget pruning and policy restore in the full reader's relative order. Party inspection can synchronize raids and update player auto-fight constraints. Internal party/world scans and some summary allocations remain necessary through existing entrypoints; this is not a claim of globally linear map work or measured CPU savings.
 
