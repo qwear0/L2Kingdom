@@ -21,6 +21,8 @@ const distance = (a, b) => Math.hypot(a.locX - b.locX, a.locY - b.locY);
 const MAX_SAFE_REST_MS = 6 * 60 * 60 * 1000;
 const DEFENCE_RADIUS = 400;
 const MAX_POINT_DISTANCE = 3000;
+const CHASE_REPATH_MS = 1000;
+const CHASE_REPATH_DISTANCE = 128;
 
 // A slope may gain more than one cell's step height over its full length.
 // Require real geodata before relaxing the height guard: missing-region
@@ -211,10 +213,21 @@ class PlayerAutoFight {
                 && Date.now() - Number(member.session?.incomingThreatAt || 0) < 5000));
     }
 
-    inside(target, extra = 0) {
+    inside(target, extra = 0, ignoreHeight = false) {
         const center = this.run?.center || this.center;
         return !!center && distance(loc(target), center) <= (this.run?.radius || this.radius) + extra
-            && sameTerrainLayer(center, loc(target));
+            && (ignoreHeight || sameTerrainLayer(center, loc(target)));
+    }
+
+    rangedPressure(target, members) {
+        const ranged = Number(target.fetchAtkRadius?.()) >= 200
+            || ['archer', 'mage'].includes(target.fetchAiType?.());
+        if (!ranged) return false;
+        const targetId = Number(target.fetchId());
+        const victimId = Number(target.fetchDestId?.());
+        return members.some(member => victimId === Number(member.fetchId())
+            || (Number(member.session?.incomingThreatId) === targetId
+                && Date.now() - Number(member.session?.incomingThreatAt || 0) < 5000));
     }
 
     engaged(target) {
@@ -252,13 +265,20 @@ class PlayerAutoFight {
 
     legalTarget(target, source = this.actor) {
         const run = this.run;
-        if (!run || !this.ordinaryMonster(target) || !sameTerrainLayer(loc(source), loc(target))) return false;
-        if (this.threatening(target) && this.defending()) run.defenceAnchor ||= loc(this.actor);
+        if (!run || !this.ordinaryMonster(target)) return false;
+        const members = this.members();
+        const threat = this.threatening(target, members);
+        // Incoming ranged pressure may cross the acquisition height guard,
+        // but never the XY leash, physical route or native hit checks.
+        const retaliation = threat && this.rangedPressure(target, members);
+        if (!retaliation && !sameTerrainLayer(loc(source), loc(target))) return false;
+        if (threat && this.defending()) run.defenceAnchor ||= loc(this.actor);
+        const engaged = run.engaged.get(target.fetchId()) === target || threat;
         if (run.defenceAnchor) {
-            return this.engaged(target) && distance(loc(target), run.defenceAnchor) <= DEFENCE_RADIUS
+            return engaged && distance(loc(target), run.defenceAnchor) <= DEFENCE_RADIUS
                 && distance(loc(source), run.defenceAnchor) <= DEFENCE_RADIUS;
         }
-        if (this.engaged(target)) return this.inside(target, 200) && this.inside(source, 200);
+        if (engaged) return this.inside(target, 200, retaliation) && this.inside(source, 200, retaliation);
         return this.canAcquire(target, source);
     }
 
@@ -449,8 +469,10 @@ class PlayerAutoFight {
 
     route(run, destination, purpose, options = {}) {
         if (!Restrictions.canMove(this.actor) || !this.setSeated(false)) return false;
-        run.route = { destination: { ...destination }, purpose, attempts: 1 + (run.fixedFailures[purpose] || 0), lastProgress: loc(this.actor),
-            progressAt: Date.now(), deadline: Date.now() + 5000 };
+        const now = Date.now();
+        run.route = { destination: { ...destination }, purpose, options, attempts: 1 + (run.fixedFailures[purpose] || 0),
+            lastProgress: loc(this.actor), progressAt: now, deadline: now + 5000,
+            expiresAt: now + 90000, nextRepathAt: now + CHASE_REPATH_MS };
         this.actor.moveTo({ from: loc(this.actor), to: { ...destination }, actionOwner: run.owner, ...options });
         return true;
     }
@@ -475,8 +497,8 @@ class PlayerAutoFight {
         }
         const travelMs = length / Math.max(1, this.actor.fetchCollectiveRunSpd()) * 1000;
         if (length > 6000 || travelMs > 60000) return false;
-        run.route.deadline = Date.now() + Math.min(90000, Math.max(5000, travelMs * 1.5 + 3000));
-        run.route.progressAt = Date.now();
+        run.route.deadline = Math.min(run.route.expiresAt, Date.now() + Math.max(5000, travelMs * 1.5 + 3000));
+        if (run.route.purpose !== 'candidate') run.route.progressAt = Date.now();
         return true;
     }
 
@@ -520,6 +542,7 @@ class PlayerAutoFight {
             route.progressAt = Date.now();
             route.lastProgress = loc(this.actor);
             route.deadline = Date.now() + 5000;
+            route.expiresAt = Date.now() + 90000;
             this.actor.moveTo({ from: loc(this.actor), to: { ...route.destination }, actionOwner: run.owner, forceRepath: true });
             return;
         }
@@ -554,8 +577,24 @@ class PlayerAutoFight {
                 route.lastProgress = loc(this.actor);
                 route.progressAt = now;
             }
-            if (now > route.deadline || now - route.progressAt > 5000
-                || (!this.session.moveTimer && !this.session.pendingPathRequest)) this.routeFailed(run);
+            const idle = !this.session.moveTimer && !this.session.pendingPathRequest;
+            const shifted = target && (distance(destination, route.destination) >= 8
+                || Math.abs(destination.locZ - route.destination.locZ) > 8);
+            if (now > route.deadline || now - route.progressAt > 5000) this.routeFailed(run);
+            else if (shifted && !this.session.pendingPathRequest && (idle
+                || distance(destination, route.destination) >= CHASE_REPATH_DISTANCE
+                || Math.abs(destination.locZ - route.destination.locZ) > 64)) {
+                // Follow the actor, not the old path endpoint. Do not cancel
+                // in-flight worker requests or reset the no-progress budget:
+                // a moving target must not keep an immobile player stuck.
+                if (now >= route.nextRepathAt) {
+                    route.destination = { ...destination };
+                    route.nextRepathAt = now + CHASE_REPATH_MS;
+                    route.deadline = Math.min(route.expiresAt, Math.max(route.deadline, now + 5000));
+                    this.actor.moveTo({ from: loc(this.actor), to: { ...destination }, actionOwner: run.owner,
+                        ...route.options, forceRepath: true });
+                }
+            } else if (idle) this.routeFailed(run);
         }
         return true;
     }
