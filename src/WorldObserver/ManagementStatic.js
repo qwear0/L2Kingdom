@@ -8,7 +8,7 @@ const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'application/javascri
 function sendFile(request, response, file) {
     fs.stat(file, (error, stat) => {
         if (error || !stat.isFile()) { response.writeHead(404); response.end('Not found'); return; }
-        const headers = { 'Cache-Control': 'public, max-age=0, must-revalidate', ETag: `W/"asset-${stat.size}-${Math.floor(stat.mtimeMs)}"`, 'Last-Modified': stat.mtime.toUTCString() };
+        const headers = { 'Cache-Control': response.getHeader('Cache-Control') || 'public, max-age=0, must-revalidate', ETag: `W/"asset-${stat.size}-${Math.floor(stat.mtimeMs)}"`, 'Last-Modified': stat.mtime.toUTCString() };
         if (request.headers['if-none-match'] === headers.ETag) { response.writeHead(304, headers); response.end(); return; }
         response.writeHead(200, { ...headers, 'Content-Type': MIME[path.extname(file)] || 'application/octet-stream', 'Content-Length': stat.size });
         if (request.method === 'HEAD') { response.end(); return; }

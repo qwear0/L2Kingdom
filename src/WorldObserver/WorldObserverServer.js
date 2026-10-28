@@ -2510,7 +2510,7 @@ function sendFile(request, response, filePath) {
         }
         const etag = `W/"asset-${stat.size}-${Math.floor(stat.mtimeMs)}"`;
         const cacheHeaders = {
-            'Cache-Control': 'public, max-age=0, must-revalidate',
+            'Cache-Control': response.getHeader('Cache-Control') || 'public, max-age=0, must-revalidate',
             ETag: etag,
             'Last-Modified': stat.mtime.toUTCString()
         };
@@ -3047,7 +3047,31 @@ const WorldObserverServer = {
         const config = binding || options.default.WorldObserver || {};
         const hostname = config.hostname || '127.0.0.1';
         const port = Number(config.port ?? 8088);
-        this.server = http.createServer(route);
+        const { access } = require('./ManagementRoutes');
+        const ObserverAuth = require('./ObserverAuth');
+        const { sendJson: sendAuthError } = require('./SettingsRoutes');
+        const internal = binding?.internal === true;
+        if (internal && hostname !== '127.0.0.1') throw new Error('Private observer must bind loopback.');
+        const auth = internal ? null : new ObserverAuth(port);
+        this.server = http.createServer((request, response) => {
+            (async () => {
+                if (internal) {
+                    // The parent authenticates sessions before proxying. Reject direct
+                    // browser traffic here so loopback cannot bypass that boundary.
+                    if (!loopbackRequest(request) || request.headers.origin || request.headers['sec-fetch-site']) {
+                        sendAuthError(response, { error: 'Private observer access denied.' }, 403); return;
+                    }
+                } else {
+                    access(request, { hostname, port: this.server.address().port });
+                    const url = new URL(request.url, 'http://localhost');
+                    if (!url.pathname.startsWith(BotControlRoutes.BASE) && await auth.handle(request, response, url)) return;
+                }
+                route(request, response);
+            })().catch(error => sendAuthError(response, { error: error.statusCode ? error.message : 'Observer request failed.' }, error.statusCode || 500));
+        });
+        this.server.requestTimeout = 15000;
+        this.server.headersTimeout = 10000;
+        this.server.once('close', () => auth?.close());
         this.ready = new Promise((resolve, reject) => {
             this.server.once('error', reject);
             this.server.listen(port, hostname, () => {

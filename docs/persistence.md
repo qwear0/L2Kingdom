@@ -13,6 +13,7 @@ Read this before changing database writes, snapshots, worker handoffs or recover
 | `src/DatabaseCheckpointCoordinator.js`, `src/DatabaseCheckpointWorker.js` | Background WAL checkpoint work. |
 | `src/DatabaseRestore.js` | Interrupted paired world/history replacement recovery. |
 | `scripts/database-access.js`, `scripts/saved-games.js` | Cross-process access lock and stopped-database saves. |
+| `src/WorldObserver/ObserverAuthStore.js` | Separate runtime-local `observer-auth/auth.sqlite`: named admin-key hashes and expiring session-token hashes, not game accounts or world/history save content. |
 
 `database/sql/sqlite.sql` is the SQLite bootstrap, but **not the complete evolved schema**. `Database.applySchemaMigrations` adds migrations transactionally with their receipts. Account warehouses additionally use `src/DatabasePlayerWarehouse.js`; Lord/vassal tables and capacity triggers use `src/GameServer/Lord/Repository.js`. `database/sql/database.sql` is legacy MySQL material, not the running SQLite bootstrap.
 

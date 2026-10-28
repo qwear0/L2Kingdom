@@ -10,6 +10,7 @@ const { settingsRoute, sendJson } = require('../src/WorldObserver/SettingsRoutes
 const { access, managementRoute, proxy } = require('../src/WorldObserver/ManagementRoutes');
 const { serveStatic } = require('../src/WorldObserver/ManagementStatic');
 const BotControlRoutes = require('../src/WorldObserver/BotControlRoutes');
+const ObserverAuth = require('../src/WorldObserver/ObserverAuth');
 const controller = new ManagementController();
 const settings = new SettingsService(controller);
 const config = Config.load().effective.WorldObserver || {};
@@ -17,12 +18,14 @@ const hostname = config.hostname || '127.0.0.1';
 const port = Number(config.port ?? 8088);
 if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('WorldObserver.port must be 1..65535.');
 controller.binding = { hostname, port };
+const auth = new ObserverAuth(port);
 
 const server = http.createServer((request, response) => {
     (async () => {
         access(request, controller.binding);
         const url = new URL(request.url, 'http://localhost');
         if (await BotControlRoutes.proxy(request, response, url, controller)) return;
+        if (await auth.handle(request, response, url)) return;
         if (await settingsRoute(request, response, url, settings)) return;
         if (await managementRoute(request, response, url, controller)) return;
         if (await proxy(request, response, url, controller)) return;
@@ -50,6 +53,7 @@ async function shutdown() {
     const closed = new Promise(resolve => server.close(resolve));
     try {
         await controller.shutdown(); await closed;
+        auth.close();
         const clean = controller.treeConfirmed && (!controller.lastExit || controller.shutdownOutcome === 'clean');
         process.exitCode = process.exitCode || (clean ? 0 : 1);
     }

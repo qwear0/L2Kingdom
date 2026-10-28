@@ -39,6 +39,9 @@ button { cursor: pointer; }
 .app-navigation nav a[aria-current="page"] { color: var(--gold); background: var(--accent-bg); border-color: color-mix(in srgb, var(--gold), transparent 78%); }
 .app-navigation svg, .app-header svg, .world-search-dialog svg { width: 19px; height: 19px; flex: 0 0 auto; }
 .app-nav-footer { display: grid; gap: 9px; margin-top: auto; padding: 24px 10px 0; }
+.app-account { display: grid; gap: 8px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+.app-account span { overflow-wrap: anywhere; color: var(--muted); font-size: 11px; }
+.app-account button { padding: 8px 4px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--text); font-size: 11px; cursor: pointer; }
 .app-nav-footer label { color: var(--muted); font-size: 11px; }
 .app-nav-footer select { width: 100%; padding: 9px 10px; border: 1px solid var(--line); border-radius: 8px; color: var(--text); background: var(--surface); font-size: 12px; }
 .app-nav-footer > span { margin-top: 14px; color: var(--faint); font-size: 10px; line-height: 1.5; }

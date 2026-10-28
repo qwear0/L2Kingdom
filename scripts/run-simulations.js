@@ -102,26 +102,46 @@ function openBrowser(url) {
     child.unref();
 }
 
-function requestJson(port, pathname, method = 'GET') {
+const managementSessions = new Map();
+async function requestJson(port, pathname, method = 'GET') {
+    let cookie = managementSessions.get(port);
+    if (!cookie) {
+        const key = process.env[`L2NODE_OBSERVER_KEY_${port}`] || process.env.L2NODE_OBSERVER_KEY;
+        if (!key) throw Object.assign(new Error(`Set L2NODE_OBSERVER_KEY_${port} to this instance's personal observer key before using lifecycle flags.`), { code: 'OBSERVER_KEY_REQUIRED' });
+        const login = await sendRequest(port, '/observer/api/auth/login', 'POST', { key });
+        cookie = login.cookie;
+        if (!cookie) throw new Error('Management login did not issue a session cookie.');
+        managementSessions.set(port, cookie);
+    }
+    try { return (await sendRequest(port, pathname, method, {}, cookie)).data; }
+    catch (error) {
+        if (error.statusCode === 401) managementSessions.delete(port);
+        throw error;
+    }
+}
+
+function sendRequest(port, pathname, method, payload, cookie) {
+    const body = method === 'GET' ? undefined : JSON.stringify(payload);
     return new Promise((resolve, reject) => {
         const request = http.request({
             hostname: '127.0.0.1',
             port,
             path: pathname,
             method,
-            headers: { 'Content-Type': 'application/json', 'Content-Length': method === 'GET' ? '0' : '2' }
+            headers: { 'Content-Type': 'application/json', 'Content-Length': body ? Buffer.byteLength(body) : 0,
+                ...(cookie ? { Cookie: cookie } : {}) }
         }, (response) => {
             let body = '';
             response.setEncoding('utf8');
             response.on('data', (chunk) => { body += chunk; });
             response.on('end', () => {
                 if (response.statusCode < 200 || response.statusCode >= 300) {
-                    reject(new Error(body || `HTTP ${response.statusCode}`));
+                    reject(Object.assign(new Error(body || `HTTP ${response.statusCode}`), { statusCode: response.statusCode }));
                     return;
                 }
 
                 try {
-                    resolve(body ? JSON.parse(body) : {});
+                    resolve({ data: body ? JSON.parse(body) : {}, cookie: response.headers['set-cookie']?.[0]?.split(';')[0] });
                 } catch (error) {
                     reject(new Error(`Invalid management response: ${error.message}`));
                 }
@@ -130,7 +150,7 @@ function requestJson(port, pathname, method = 'GET') {
 
         request.setTimeout(10000, () => request.destroy(new Error('Management request timed out.')));
         request.on('error', reject);
-        request.end(method === 'GET' ? undefined : '{}');
+        request.end(body);
     });
 }
 
@@ -146,6 +166,7 @@ async function waitForManagement(definition, timeoutMs = 10000) {
         try {
             return await requestJson(definition.managementPort, '/observer/api/server/status');
         } catch (error) {
+            if (error.code === 'OBSERVER_KEY_REQUIRED' || [400, 401, 403, 429].includes(error.statusCode)) throw error;
             lastError = error;
             await wait(100);
         }
@@ -164,7 +185,8 @@ async function waitForPhase(definition, expectedPhase, timeoutMs) {
             if (lastStatus.phase === expectedPhase) return lastStatus;
             if (lastStatus.phase === 'error') throw new Error(`${definition.label}: cleanup=${lastStatus.shutdownOutcome}, descendant exit=${lastStatus.treeConfirmed ? 'confirmed' : 'unknown'}`);
         } catch (error) {
-            if (lastStatus?.phase === 'error') throw error;
+            if (lastStatus?.phase === 'error' || error.code === 'OBSERVER_KEY_REQUIRED'
+                || [400, 401, 403, 429].includes(error.statusCode)) throw error;
             // Losing the management listener is not proof the game stopped.
         }
         await wait(250);

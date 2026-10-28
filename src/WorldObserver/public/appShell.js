@@ -21,6 +21,22 @@
         <p class="app-nav-label">Explore your world</p>
         <nav aria-label="Main navigation">${sections.map(([key, label, glyph, href]) => `<a href="${href}" data-section="${key}" aria-label="${label}" title="${label}">${icon(glyph)}<span>${label}</span></a>`).join('')}</nav>
         <div class="app-nav-footer"><label for="appearanceSelect">Appearance</label><select id="appearanceSelect"><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></select><span>A living world, at a glance.</span></div>`;
+    const account = document.createElement('div');
+    account.className = 'app-account';
+    const accountName = document.createElement('span');
+    accountName.textContent = 'Administrator';
+    const logout = document.createElement('button');
+    logout.type = 'button'; logout.textContent = 'Sign out';
+    account.append(accountName, logout);
+    navigation.querySelector('.app-nav-footer').prepend(account);
+    root.WorldObserverAuth.user().then(user => {
+        if (user) accountName.textContent = `${user.name} · admin`;
+    }).catch(error => { accountName.textContent = error.message; });
+    logout.addEventListener('click', async () => {
+        logout.disabled = true;
+        try { await root.WorldObserverAuth.logout(); }
+        catch (error) { accountName.textContent = error.message; logout.disabled = false; }
+    });
     const header = document.createElement('header');
     header.className = 'app-header';
     header.innerHTML = `<button class="app-menu-toggle" type="button" aria-label="Open navigation" aria-controls="appNavigation" aria-expanded="false">☰</button><div class="app-page-heading"><span>World Observer</span><strong id="appSectionTitle">World map</strong></div><button class="app-search-button" type="button" aria-label="Search the world">${icon('search')}<span>Search the world</span><kbd>⌘ K</kbd></button><span class="app-connection" role="status"><i></i><span>Live world</span></span>`;

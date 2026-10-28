@@ -1,0 +1,16 @@
+:root { color-scheme: light; --background: #f0f3f8; --card: #fff; --text: #1d2739; --muted: #536079; --border: #a3afc0; --accent: #3456cc; }
+:root[data-theme="dark"] { color-scheme: dark; --background: #111827; --card: #1c2638; --text: #e7edf8; --muted: #a7b5cb; --border: #526179; --accent: #809bff; }
+* { box-sizing: border-box; }
+body { min-height: 100vh; margin: 0; display: grid; place-items: center; padding: 24px; background: var(--background); color: var(--text); font: 16px/1.5 system-ui, sans-serif; }
+.login-card { width: 100%; max-width: 420px; padding: 32px; border: 1px solid var(--border); border-radius: 18px; background: var(--card); box-shadow: 0 16px 60px #0001; }
+h1 { margin: 8px 0; font-size: 28px; }
+p, small { color: var(--muted); }
+.login-kicker { margin-bottom: 0; font-size: 12px; letter-spacing: .14em; }
+form { display: grid; gap: 12px; margin: 24px 0; }
+label { font-weight: 600; }
+input, button { width: 100%; min-height: 44px; border-radius: 8px; padding: 10px 12px; font: inherit; }
+input { border: 1px solid var(--border); background: var(--background); color: var(--text); }
+button { border: 0; background: var(--accent); color: var(--card); font-weight: 700; cursor: pointer; }
+button:disabled { opacity: .6; cursor: wait; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+#loginMessage { margin: 0; min-height: 24px; }

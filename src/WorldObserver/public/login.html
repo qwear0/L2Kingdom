@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Sign in · World Observer</title>
+    <script src="/observer/appearance.js"></script>
+    <link rel="icon" type="image/png" href="/observer/world-observer-logo.png">
+    <link rel="stylesheet" href="/observer/login.css">
+    <script src="/observer/auth.js" defer></script>
+</head>
+<body>
+    <main class="login-card">
+        <img src="/observer/world-observer-logo.png" width="64" height="64" alt="">
+        <p class="login-kicker">LINEAGE II · C4</p>
+        <h1>World Observer</h1>
+        <p>Sign in with your personal administrator key.</p>
+        <form id="observerLogin">
+            <label for="personalKey">Personal key</label>
+            <input id="personalKey" name="key" type="password" autocomplete="current-password" autocapitalize="none" spellcheck="false" maxlength="46" required autofocus>
+            <button type="submit">Sign in</button>
+            <p id="loginMessage" role="status" aria-live="polite"></p>
+        </form>
+        <small>Keys are issued by the server administrator. No user name is required to sign in.</small>
+    </main>
+</body>
+</html>

@@ -32,7 +32,7 @@ L2Kingdom is a private Lineage II C4 server derived from L2Solo / NodeL2. Packag
 | Who validates item/Adena transfers and owns custody? | [Economy and storage](economy.md) | `src/GameServer/Inventory/`, `src/GameServer/World/GroundItemVisibility.js`, `src/GameServer/World/Generics/PickupItem.js`, `src/GameServer/Crafting/`, `src/GameServer/Warehouse/`, `src/GameServer/AfkTrade/`, `src/GameServer/PrivateStoreTrade.js`, `src/Database.js` |
 | What crosses the external inference boundary and becomes memory? | [AI and social behavior](ai-social.md) | `src/GameServer/Bot/AI/`, `src/GameServer/Social/`, `src/GameServer/Clan/` |
 | How does an MCP host observe an existing bot or explicitly take manual native control? | [Bot MCP control and observation (P1–P4)](bot-mcp.md) | `scripts/bot-mcp.js`, `src/Mcp/`, `src/GameServer/Bot/Control/`, `src/WorldObserver/BotControlRoutes.js` |
-| What does the browser read, configure or operate? | [WorldObserver](world-observer.md) | `src/WorldObserver/ManagementController.js`, `ManagementRoutes.js`, `SettingsService.js`, `SettingsRuntime.js`, `WorldObserverServer.js` and `public/` |
+| What does the browser read, configure or operate? | [WorldObserver](world-observer.md) | `src/WorldObserver/ManagementController.js`, `ManagementRoutes.js`, `ObserverAuth.js`, `ObserverAuthStore.js`, `SettingsService.js`, `SettingsRuntime.js`, `WorldObserverServer.js` and `public/` |
 | Which resource/rule is authoritative for a catalogue or NPC service? | [Content and progression](content.md) | `data/`, `src/GameServer/DataCache.js`, `src/GameServer/Knowledge/`, `src/GameServer/Quest/`, `src/GameServer/World/GatekeeperService.js`, progression/service modules |
 
 Code anchors are repository-relative; wildcard notation identifies a family, not a literal filename.
@@ -53,7 +53,7 @@ C4 client -> TCP/session -> request -> gameplay owner -> native response
                                                outbox -> history worker -> history SQLite
 
 management known-route proxy <- private game observer <- projections/catalogues/history
-browser controls -> parent peer/origin checks -> validated game services -> gameplay/persistence
+browser controls -> parent peer/origin checks -> durable admin-key session -> validated game services -> gameplay/persistence
 chat -> deterministic routing / optional provider -> validated tools -> native services
 ```
 
@@ -67,7 +67,7 @@ These arrows show responsibility direction, not an assertion that every action t
 - **Activation:** owned-only startup skips retained cold/clan schedulers, but native pathfinding/history/checkpoint workers have separate activation paths.
 - **Operations:** the parent survives game Stop and distinguishes cleanup outcome from OS exit. Saves/restore/wipes, content generation and load scripts have real effects. Do not run them as incidental checks.
 - **Settings:** saved files, inherited/environment ownership and observed active values are distinct; disk/IPC are not one transaction. Pending live recovery is explicit Stop → Start. See runtime for bounded controls and retained cumulative-SP/variable-reward native limits.
-- **Local exposure:** the observer contains mutations and no general browser-to-player authentication boundary; game-side authentication-key handoff is also incomplete. Keep local-project assumptions explicit; see the specific guides rather than assuming production guarantees.
+- **Local exposure:** the observer contains mutations behind personal-key admin sessions, not player/character ownership permissions; game-side authentication-key handoff is also incomplete. Keep local-project assumptions explicit; see the specific guides rather than assuming production guarantees.
 
 ## Existing detailed and historical material
 

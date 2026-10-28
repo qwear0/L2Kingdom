@@ -159,7 +159,7 @@ Database.init(() => {
         await BotManager.init();
         if (shuttingDown) return;
         WorldObserver.onListenError = startupFailure;
-        const observer = await WorldObserver.init(managed ? { hostname: '127.0.0.1', port: 0 } : undefined);
+        const observer = await WorldObserver.init(managed ? { hostname: '127.0.0.1', port: 0, internal: true } : undefined);
         if (shuttingDown) return;
         DevConsole.init();
         report({ type: 'ready', listeners: { auth: true, game: true }, observer: observer ? 'ready' : 'disabled', port: observer?.port });

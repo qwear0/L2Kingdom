@@ -8,7 +8,7 @@ Use this as a side-effect guide, not an instruction to run commands automaticall
 - Install dependencies only when setup is requested. `node_modules/` and `package-lock.json` are ignored; syntax checking does not require importing application dependencies.
 - The native client must speak Lineage II C4 protocol `656`; WorldObserver is not a replacement game client.
 - Defaults/examples live in `config/default.ini`/`config/local.example.ini`; private overrides use ignored `config/local.ini` or the selected override file.
-- The unified public management listener uses WorldObserver hostname/port (default loopback 8088). Authentication/game TCP defaults still bind all interfaces. Preserve the intended trusted LAN/firewall boundary; Host/Origin/private-peer checks are not LAN-user authentication or permission for Internet exposure.
+- The unified public management listener uses WorldObserver hostname/port (default loopback 8088). Authentication/game TCP defaults still bind all interfaces. Preserve the intended trusted LAN/firewall boundary; Host/Origin/private-peer checks are not user identity; browser access additionally requires a personal admin-key session. Neither is permission for Internet exposure.
 
 ## Command side effects
 
@@ -16,9 +16,10 @@ These are existing commands, not checks executed by creating this document.
 
 | Command | Effect and caution |
 | --- | --- |
-| `npm start` | Starts persistent WorldObserver management and normally opens Settings → Server management. Start gameplay with its separate Start action; Stop keeps the same UI/logs/saves available. |
+| `npm start` | Starts persistent WorldObserver management and normally opens Settings → Server management (personal-key sign-in first). Start gameplay with its separate Start action; Stop keeps the same UI/logs/saves available. |
+| `npm run observer:key -- "User name"` | Creates a named full-admin observer key in the runtime's separate auth SQLite and prints the raw key once. No server startup, restart or world database access. Names must be unique; keep the key private. |
 | `npm run NodeL2` | Standalone geodata/runtime wrapper, not another full management UI. Starts gameplay, which may migrate/write SQLite and restore owned actors. Prefer `npm start` for the unified product. |
-| `node scripts/run-simulations.js` | Creates isolated per-instance files as needed and starts management parents on 8181..8183, one origin per instance. Does not start games unless `--start-servers` (or `--restart-servers`) is explicitly selected. `--stop-servers` operates through management; `--count=1..3` and `--no-browser` remain supported. These are runtime operations, not checks. |
+| `node scripts/run-simulations.js` | Creates isolated per-instance files as needed and starts management parents on 8181..8183, one origin per instance. Does not start games unless `--start-servers` (or `--restart-servers`) is explicitly selected. `--stop-servers` operates through management; `--count=1..3` and `--no-browser` remain supported. Lifecycle flags require `L2NODE_OBSERVER_KEY_<managementPort>` (for example `L2NODE_OBSERVER_KEY_8181`), or the fallback `L2NODE_OBSERVER_KEY`; the script logs in and reuses a session cookie. These are runtime operations, not checks. |
 | `npm run geodata` | Prepares/checks geodata; may download/install a large archive. Does not start gameplay. |
 | `npm run generate:knowledge-base` | Regenerates the five committed `data/KnowledgeBase/` outputs. |
 | `npm run check:knowledge-base` | Rebuilds catalogue content in memory and compares outputs; not gameplay verification. |
@@ -30,6 +31,8 @@ These are existing commands, not checks executed by creating this document.
 | `npm run wipe:bots` | Direct destructive `world-wipe.js` call, without management's stopped-state/typed-confirmation guards. Includes owned vassals, not just obsolete ambient bots. |
 
 Simulation runtime/config/database/history/log/save/preset paths remain isolated below `tmp/simulations/<id>/`; shared configuration is loaded before instance overrides. The old separate launcher ports and old `/api/status`, `/api/start`, `/api/stop` requests are removed. Unavailable management is **not** evidence a game has stopped. New generated configs explicitly isolate history as well as world paths. Existing generated configs are preserved, not overwritten: before launch, confirm that any inherited shared `Database.historyPath` does not join instances, and keep customized public ports consistent with the consumer definition. No config/data is silently relocated.
+
+Observer keys and sessions are isolated per runtime in `observer-auth/auth.sqlite` and are not part of game saves. Generate an instance's key with, for example, `L2NODE_RUNTIME_DIR=tmp/simulations/simulation-1 npm run observer:key -- "Administrator"`; use the corresponding key in that instance's browser or lifecycle-script environment. Do not place raw keys in configuration, shell command arguments, docs or committed files. The existing HTTP transport is unencrypted; keep the trusted-network restriction. See [observer authentication](world-observer.md#personal-keys-and-browser-sessions).
 
 Other scripts can migrate, generate, benchmark or mutate data. Inspect the specific owner and side effects before invoking them; a file's presence is not an operating schedule.
 

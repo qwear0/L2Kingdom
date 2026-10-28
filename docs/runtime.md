@@ -12,7 +12,7 @@ Read this when changing startup, effective configuration or shutdown behavior. S
 | `src/ConfigLoader.js`, `src/Global.js` | Shared INI loading; only the runtime installs `invoke`, utilities and global options. The parent does not import game singletons or open the world DB to serve assets/settings. |
 | `src/Server.js` | TCP listener/session owner, with a `ready` promise and listener-error callback. |
 
-`npm start` listens at `[WorldObserver] hostname/port` (committed default `127.0.0.1:8088`) and normally opens `/observer/settings/server`; `L2NODE_NO_BROWSER=1` suppresses the browser. There is no launcher page/listener on 8090 and no legacy `/api/*` management namespace or launcher host/port/name flags.
+`npm start` listens at `[WorldObserver] hostname/port` (committed default `127.0.0.1:8088`) and normally opens `/observer/settings/server`; `L2NODE_NO_BROWSER=1` suppresses the browser. Public browser pages/APIs require a personal admin-key session; create the first key with `npm run observer:key -- "User name"` using the same `L2NODE_RUNTIME_DIR` as management (default `tmp`). Login uses only the key, with a persistent 30-day cookie; see [observer authentication](world-observer.md#personal-keys-and-browser-sessions). There is no launcher page/listener on 8090 and no legacy `/api/*` management namespace or launcher host/port/name flags.
 
 ```text
 trusted LAN browser -> management parent /observer/*

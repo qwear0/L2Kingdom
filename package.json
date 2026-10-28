@@ -11,6 +11,7 @@
         "start": "node scripts/start.js",
         "NodeL2": "node scripts/run-server.js",
         "bot:mcp": "node scripts/bot-mcp.js",
+        "observer:key": "node scripts/generate-observer-key.js",
         "geodata": "node scripts/ensure-geodata.js",
         "generate:knowledge-base": "node scripts/generate-knowledge-base.js",
         "check:knowledge-base": "node scripts/generate-knowledge-base.js --check",
