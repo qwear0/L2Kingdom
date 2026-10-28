@@ -17,7 +17,7 @@
     const navigation = document.createElement('aside');
     navigation.className = 'app-navigation';
     navigation.id = 'appNavigation';
-    navigation.innerHTML = `<a class="app-brand" href="/observer/overview"><img src="/observer/world-observer-logo.png" width="40" height="40" alt=""><span><strong>World Observer</strong><small>LINEAGE II · C4</small></span></a>
+    navigation.innerHTML = `<a class="app-brand" href="/observer/overview"><img src="/observer/l2kingdom-logo.png" width="40" height="40" alt=""><span><strong>L2Kingdom</strong><small>LINEAGE II · C4</small></span></a>
         <p class="app-nav-label">Explore your world</p>
         <nav aria-label="Main navigation">${sections.map(([key, label, glyph, href]) => `<a href="${href}" data-section="${key}" aria-label="${label}" title="${label}">${icon(glyph)}<span>${label}</span></a>`).join('')}</nav>
         <div class="app-nav-footer"><label for="appearanceSelect">Appearance</label><select id="appearanceSelect"><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></select><span>A living world, at a glance.</span></div>`;
@@ -39,7 +39,7 @@
     });
     const header = document.createElement('header');
     header.className = 'app-header';
-    header.innerHTML = `<button class="app-menu-toggle" type="button" aria-label="Open navigation" aria-controls="appNavigation" aria-expanded="false">☰</button><div class="app-page-heading"><span>World Observer</span><strong id="appSectionTitle">World map</strong></div><button class="app-search-button" type="button" aria-label="Search the world">${icon('search')}<span>Search the world</span><kbd>⌘ K</kbd></button><span class="app-connection" role="status"><i></i><span>Live world</span></span>`;
+    header.innerHTML = `<button class="app-menu-toggle" type="button" aria-label="Open navigation" aria-controls="appNavigation" aria-expanded="false">☰</button><div class="app-page-heading"><span>L2Kingdom</span><strong id="appSectionTitle">World map</strong></div><button class="app-search-button" type="button" aria-label="Search the world">${icon('search')}<span>Search the world</span><kbd>⌘ K</kbd></button><span class="app-connection" role="status"><i></i><span>Live world</span></span>`;
     const liveToggle = document.getElementById('liveToggle') || document.getElementById('marketLiveToggle');
     if (liveToggle) header.insertBefore(liveToggle, header.querySelector('.app-connection'));
     document.body.prepend(header);

@@ -127,7 +127,7 @@ function setApplicationView(route) {
     playerPages?.show(route);
     window.WorldObserverShell?.update(route);
     const names = { overview: 'Overview', characters: 'Characters', parties: 'Parties', dungeon: 'Dungeon', actor: 'Character', world: 'World map', clans: 'Clans', rankings: 'Rankings', 'raid-bosses': 'Raid bosses' };
-    document.title = `${names[route.name] || 'World'} · World Observer`;
+    document.title = `${names[route.name] || 'World'} · L2Kingdom`;
     if (route.name === 'world' || route.name === 'actor') requestAnimationFrame(() => { renderSelected(); renderLabels(); renderPoints(); });
 }
 
@@ -178,7 +178,7 @@ function applyRoute(route = Router.parse(`${window.location.pathname}${window.lo
             return;
         }
         if (route.name === 'world') {
-            document.title = 'World Observer';
+            document.title = 'L2Kingdom';
             const clanId = Number(route.clanId) || null;
             const npcId = Number(route.npcId) || null;
             const scopeChanged = Number(state.clanMapScope?.id || 0) !== Number(clanId || 0);
@@ -1599,7 +1599,7 @@ async function loadClanDetail(id, { updateRoute = true } = {}) {
         if (requestId !== state.clanRequest || Number(state.selectedClanId) !== clanId) return;
         state.clanDetail = detail;
         state.clanDetailSignature = clanOverviewSignature(clanItems().find((clan) => Number(clan.id) === clanId));
-        if (state.clanOpen && detail.clan?.name) document.title = `${detail.clan.name} · Clans · World Observer`;
+        if (state.clanOpen && detail.clan?.name) document.title = `${detail.clan.name} · Clans · L2Kingdom`;
     } catch (error) {
         if (requestId === state.clanRequest) state.clanError = error.message;
     } finally {
@@ -1927,7 +1927,7 @@ function openClans(clanId = null, { updateRoute = true } = {}) {
     els.observerShell?.setAttribute('aria-hidden', 'true');
     if (els.observerShell) els.observerShell.inert = true;
     document.body.classList.add('rankings-open');
-    document.title = 'Clans · World Observer';
+    document.title = 'Clans · L2Kingdom';
     renderClans();
     loadClanDirectory({ force: true, selectFirst: !requestedClanId });
     requestAnimationFrame(() => els.closeClans.focus());
@@ -1942,7 +1942,7 @@ function closeClans({ updateRoute = true } = {}) {
     els.observerShell?.removeAttribute('aria-hidden');
     if (els.observerShell) els.observerShell.inert = false;
     if (!state.rankingOpen && !state.raidBossOpen) document.body.classList.remove('rankings-open');
-    if (updateRoute) document.title = 'World Observer';
+    if (updateRoute) document.title = 'L2Kingdom';
     state.clanFocusReturn?.focus?.();
     state.clanFocusReturn = null;
     state.clanManagerOpen = false;
@@ -3222,7 +3222,7 @@ function renderInspector() {
         return;
     }
 
-    if (document.body.dataset.view === 'profile') document.title = `${actor.name} · World Observer`;
+    if (document.body.dataset.view === 'profile') document.title = `${actor.name} · L2Kingdom`;
     const build = actor.build;
     const family = actorClassName(actor);
     const location = actor.loc ? `${Math.round(actor.loc.locX)}, ${Math.round(actor.loc.locY)}, ${Math.round(actor.loc.locZ || 0)}` : 'Unknown';

@@ -27,7 +27,7 @@ Key entry points and areas:
 - `src/GameServer/`: game server and simulation.
 - `src/Packet/`: packet handling.
 - `src/WorldObserver/`: management/auth/Settings APIs and game observer backend. The management parent is API-only; `publicOrigin` enables its explicit same-host proxy boundary, not static delivery.
-- `src/frontend/public/`: browser sources, maps and shared atlas/icon catalogs. Backend file consumers remain coupled to shared resources; standalone/private-child static routing is retained. Independent frontend packaging/deployment is a separate step.
+- `src/frontend/`: independent Nginx/Docker/Compose frontend (service `frontend`, container `l2kingdom_frontend`); `public/` contains browser sources, maps and shared atlas/icon catalogs. Backend file consumers remain coupled to shared resources; standalone/private-child static routing is retained. Build/container operations require explicit authorization; frontend-only replacements must not restart management/game.
 - `src/Database.js` and adjacent database modules: persistence.
 - `config/default.ini`, `config/local.example.ini`: configuration defaults and local override example. `config/local.ini` is Git-ignored.
 - `data/`, `database/`: inspect the relevant files before changing authored resources or database assets.

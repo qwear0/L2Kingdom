@@ -1,0 +1,146 @@
+# Match the management document grammar, not a catch-all SPA fallback.
+map $uri $l2kingdom_file {
+    default "";
+    ~^/observer/login/?$ /observer/login.html;
+    ~^/observer/settings(?:/(?:world|bots|server))?/?$ /observer/settings.html;
+    ~^/observer/database(?:/(?:items|npcs)(?:/\d+)?)?/?$ /observer/knowledge-base.html;
+    ~^/observer/market/?$ /observer/market.html;
+    ~^/observer/(?:world|overview|characters|parties|dungeons/[a-z0-9_-]+|rankings|raid-bosses(?:/\d+)?|clans(?:/\d+)?(?:/map)?|actors/(?:bot|player)/\d+)?/?$ /observer/index.html;
+    ~^/observer/[^/]+\.(?:html|js|css|json|svg|png|webp|jpg|jpeg)$ $uri;
+    ~^/observer/map-tiles/[^/]+\.(?:webp|png|jpg|jpeg|json)$ $uri;
+}
+
+map $l2kingdom_file $l2kingdom_document {
+    default 0;
+    ~\.html$ 1;
+}
+
+# A rewrite-phase gate also covers redirects/returns, which skip allow/deny's
+# access phase. Never enable real_ip rewriting: this must use the socket peer.
+geo $l2kingdom_allowed {
+    default 0;
+    ${L2KINGDOM_ALLOWED_SUBNET} 1;
+}
+
+server {
+    listen ${L2KINGDOM_FRONTEND_IP}:${L2KINGDOM_FRONTEND_PORT} default_server;
+    server_name ${L2KINGDOM_FRONTEND_IP};
+    root /usr/share/nginx/html;
+    server_tokens off;
+
+    if ($l2kingdom_allowed = 0) { return 403; }
+
+    add_header Cache-Control "no-store" always;
+    add_header Referrer-Policy "no-referrer" always;
+    add_header X-Content-Type-Options "nosniff" always;
+
+    proxy_http_version 1.1;
+    proxy_bind 127.0.0.1;
+    proxy_set_header Connection "";
+    proxy_set_header Host $http_host;
+    proxy_set_header Origin $http_origin;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For "";
+    proxy_set_header X-Forwarded-Host "";
+    proxy_set_header X-Forwarded-Proto "";
+    proxy_set_header Forwarded "";
+    proxy_hide_header Cache-Control;
+    proxy_hide_header Referrer-Policy;
+    proxy_hide_header X-Content-Type-Options;
+    proxy_cache off;
+    proxy_buffering off;
+    proxy_request_buffering off;
+    proxy_next_upstream off;
+    proxy_intercept_errors off;
+
+    # Only Nginx-generated failures use these handlers. Backend error bodies,
+    # statuses, cookies and validators pass through without interception.
+    error_page 400 = @error_400;
+    error_page 403 = @error_403;
+    error_page 404 = @error_404;
+    error_page 405 = @error_405;
+    error_page 408 = @error_408;
+    error_page 411 = @error_411;
+    error_page 413 = @error_413;
+    error_page 414 = @error_414;
+    error_page 429 = @error_429;
+    error_page 500 = @error_500;
+    error_page 501 = @error_501;
+    error_page 502 = @error_502;
+    error_page 503 = @error_503;
+    error_page 504 = @error_504;
+    error_page 505 = @error_505;
+
+    location = / { return 302 /observer/; }
+    location = /observer { return 302 /observer/; }
+
+    location = /observer/api {
+        default_type application/json;
+        return 404 '{"error":"Not found."}';
+    }
+    location ^~ /observer/api/bot-control {
+        default_type application/json;
+        return 403 '{"error":"Direct loopback bot-control access only."}';
+    }
+    location ^~ /observer/api/ {
+        proxy_pass http://127.0.0.1:${L2KINGDOM_BACKEND_PORT};
+    }
+    location ^~ /observer/item-icons/ {
+        proxy_pass http://127.0.0.1:${L2KINGDOM_BACKEND_PORT};
+    }
+
+    location = /_l2kingdom_session {
+        internal;
+        proxy_method GET;
+        proxy_pass_request_body off;
+        # Defining any proxy_set_header here replaces the parent's whole set.
+        # Keep identity/Host/Origin identical to ordinary proxy requests.
+        proxy_set_header Connection "";
+        proxy_set_header Host $http_host;
+        proxy_set_header Origin $http_origin;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For "";
+        proxy_set_header X-Forwarded-Host "";
+        proxy_set_header X-Forwarded-Proto "";
+        proxy_set_header Forwarded "";
+        proxy_set_header Cookie $http_cookie;
+        proxy_set_header Content-Length "";
+        proxy_set_header Transfer-Encoding "";
+        proxy_pass http://127.0.0.1:${L2KINGDOM_BACKEND_PORT}/observer/api/auth/session;
+    }
+
+    location ~ ^/observer/(?:login/?|auth\.js|login\.css|appearance\.js|l2kingdom-logo\.png)$ {
+        try_files $l2kingdom_file =404;
+    }
+    location /observer/ {
+        if ($l2kingdom_file = "") { return 404; }
+        auth_request /_l2kingdom_session;
+        error_page 401 = @sign_in;
+        error_page 500 = @error_500;
+        try_files $l2kingdom_file =404;
+    }
+    location @sign_in {
+        # The fragment carries the original path/query without unsafe query
+        # interpolation. auth.js validates it as a local destination.
+        if ($l2kingdom_document = 1) { return 302 "/observer/login#$request_uri"; }
+        default_type application/json;
+        return 401 '{"error":"Authentication required."}';
+    }
+    location / { return 404; }
+
+    location @error_400 { default_type application/json; return 400 '{"error":"Bad frontend request."}'; }
+    location @error_403 { default_type application/json; return 403 '{"error":"Frontend access denied."}'; }
+    location @error_404 { default_type application/json; return 404 '{"error":"Not found."}'; }
+    location @error_405 { default_type application/json; return 405 '{"error":"Method not allowed."}'; }
+    location @error_408 { default_type application/json; return 408 '{"error":"Frontend request timed out."}'; }
+    location @error_411 { default_type application/json; return 411 '{"error":"Content length required."}'; }
+    location @error_413 { default_type application/json; return 413 '{"error":"Request body too large."}'; }
+    location @error_414 { default_type application/json; return 414 '{"error":"Request URI too long."}'; }
+    location @error_429 { default_type application/json; return 429 '{"error":"Too many requests."}'; }
+    location @error_500 { default_type application/json; return 500 '{"error":"Frontend authorization or processing unavailable."}'; }
+    location @error_501 { default_type application/json; return 501 '{"error":"Request method not implemented."}'; }
+    location @error_502 { default_type application/json; return 502 '{"error":"Management upstream unavailable."}'; }
+    location @error_503 { default_type application/json; return 503 '{"error":"Frontend unavailable."}'; }
+    location @error_504 { default_type application/json; return 504 '{"error":"Management upstream timed out; action outcome may be uncertain."}'; }
+    location @error_505 { default_type application/json; return 505 '{"error":"HTTP version not supported."}'; }
+}

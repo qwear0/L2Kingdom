@@ -14,12 +14,12 @@ Read this when changing startup, effective configuration or shutdown behavior. S
 
 `npm start` listens for APIs at `[WorldObserver] hostname/port` (committed default `127.0.0.1:8088`). It opens `/observer/settings/server` at the separate `publicOrigin` only when that origin is configured and `L2NODE_NO_BROWSER` is not `1`; it logs the backend binding separately and does not check frontend availability. Empty `publicOrigin` disables proxy trust/auto-open, not API access. A configured origin requires management to bind `127.0.0.1`; port changes are not required by separation.
 
-Browser sources now live in `src/frontend/public/`; the independent frontend deployment artifact is not yet included. New parent processes do **not** serve pages, login HTML or frontend assets. Complete frontend packaging and separately authorized cutover before expecting a working browser entrypoint; this backend-only revision does not change existing running processes.
+Browser sources live in `src/frontend/public/`; `src/frontend/` owns independent Nginx/Docker/Compose packaging (service `frontend`, container `l2kingdom_frontend`). New parent processes do **not** serve pages, login HTML or frontend assets. Image build, listener/session checks and cutover require separate authorization; source changes do not change running processes. See [frontend configuration and operations](world-observer.md#frontend-configuration-and-independent-operations).
 
 Browser APIs require a personal admin-key session; create the first key with `npm run observer:key -- "User name"` using the same `L2NODE_RUNTIME_DIR` as management (default `tmp`). Login uses only the key, with a persistent 30-day cookie; see [observer authentication](world-observer.md#personal-keys-and-browser-sessions) and the [proxy/direct boundary](world-observer.md#lan-and-peer-sensitive-boundary). There is no launcher page/listener on 8090 and no legacy `/api/*` management namespace or launcher host/port/name flags.
 
 ```text
-required separate frontend (not packaged yet): browser pages/maps
+independent Nginx frontend: browser pages/maps (image/deployment separately authorized)
                        `-> management parent /observer/api/* and item-icons/*
 local MCP directly ------> |-- auth, Settings and all management actions
                            |-- sole local INI and preset JSON writer

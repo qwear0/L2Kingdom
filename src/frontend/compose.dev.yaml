@@ -1,0 +1,9 @@
+services:
+  frontend:
+    volumes:
+      - type: bind
+        source: ./public
+        target: /usr/share/nginx/html/observer
+        read_only: true
+        bind:
+          create_host_path: false

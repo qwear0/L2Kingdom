@@ -13,9 +13,50 @@ Read this before changing browser settings, lifecycle/data controls, map revisio
 
 ### L2Kingdom frontend sources and deployment boundary
 
-Browser HTML/CSS/JS, maps, atlas and icon catalogs live in `src/frontend/public/`. HTTP paths, browser globals/preferences and resource contents are unchanged by the relocation. Backend `WorldObserverServer.js` still imports `mapAtlas.js` metadata and reads item-icon catalogs from this tree; atlas/catalog/API changes require coordinated releases. Item-icon validation/delivery remains backend-owned. Standalone/private-child static routing and cache validators are retained, with filesystem paths retargeted to the moved tree; the child is never a frontend upstream.
+Browser HTML/CSS/JS, maps, atlas and icon catalogs live in `src/frontend/public/`. The visible frontend brand and tab titles are L2Kingdom; `l2kingdom-logo.png` retains the original artwork. HTTP paths, browser globals/preferences and shared resource contents are unchanged. Backend `WorldObserverServer.js` still imports `mapAtlas.js` metadata and reads item-icon catalogs from this tree; atlas/catalog/API changes require coordinated releases. Item-icon validation/delivery remains backend-owned. Standalone/private-child static routing and cache validators are retained, with filesystem paths retargeted to the moved tree; the child is never a frontend upstream.
 
-**Staged implementation:** the backend boundary/source relocation is implemented; the independent Nginx/Compose frontend artifact and deployment are not yet provided. A newly started parent is API-only, so this revision alone does not provide a working browser entrypoint. The required same-host frontend must serve pages/maps, authenticate protected static requests through `GET /observer/api/auth/session`, and proxy APIs/icons to persistent management, not to the IPC-selected child. Deployment/builds and browser acceptance are separate operations; no running service is changed by these source changes.
+`src/frontend/` now includes `Dockerfile`, its allowlist `Dockerfile.dockerignore`, `nginx.conf.template`, `compose.yaml` and `compose.dev.yaml`. Compose project `l2kingdom` has only service `frontend`, container `l2kingdom_frontend`, image `l2kingdom_frontend:local`. The digest-pinned official Nginx Alpine base provides template substitution; there is no Node runtime, backend dependency installation or application build step. The build context is only `src/frontend`; allowed inputs are the template, root browser assets and map tiles. Backend-owned `public/item-icons/` catalogs/files are excluded from the image and still delivered through management.
+
+**Source readiness is not deployment:** adding these files neither builds an image nor switches existing services. A new parent is API-only; prepare and verify the frontend, actual LAN bindings and backend configuration during separately authorized cutover. The frontend never targets the IPC-selected child.
+
+### Frontend configuration and independent operations
+
+Use Docker Engine/Compose on the same Linux host as native management. Host networking has no `ports:` mapping. Supply all four required environment inputs; no LAN addresses/subnets are guessed or read from backend INI:
+
+| Input | Required value / matching backend contract |
+| --- | --- |
+| `L2KINGDOM_FRONTEND_IP` | Exact server LAN IPv4 address, not a wildcard or loopback UI alias. |
+| `L2KINGDOM_FRONTEND_PORT` | Browser HTTP port; `publicOrigin` must equal this listener's HTTP origin. |
+| `L2KINGDOM_ALLOWED_SUBNET` | Actual trusted client CIDR, including the server's LAN address if it accesses its own frontend. Applies to login assets and redirects too. |
+| `L2KINGDOM_BACKEND_PORT` | Existing `[WorldObserver] port`; upstream and its source address are fixed to `127.0.0.1`. |
+
+Backend configuration remains separately owned: `[WorldObserver] hostname=127.0.0.1`, matching `port`, and `publicOrigin=http://<LAN-IP>:<frontend-port>`. Prefer retaining the backend port with distinct exact listener addresses; inspect conflicts/firewall first. Keep browser origin and backend port stable on later frontend updates to retain cookie identity and browser preferences. Nginx never writes INI or copies backend configuration/secrets into its image.
+
+From the repository root, with those inputs exported (or an explicitly selected local `--env-file`):
+
+```sh
+# Configuration rendering only; no image build or container/server operation.
+docker compose -f src/frontend/compose.yaml config --quiet
+docker compose -f src/frontend/compose.yaml -f src/frontend/compose.dev.yaml config --quiet
+
+# Only with separate build/container authorization; affects frontend only.
+docker compose -f src/frontend/compose.yaml build frontend
+docker compose -f src/frontend/compose.yaml up -d --no-deps --no-build --pull never --force-recreate frontend
+
+# Development alternative, using the same previously built image.
+docker compose -f src/frontend/compose.yaml -f src/frontend/compose.dev.yaml up -d --no-deps --no-build --pull never --force-recreate frontend
+```
+
+Production reads assets from the image. Development overlays only `src/frontend/public/` read-only; edit browser files and manually reload, with no watcher/HMR/bundler or backend restart. Template/Dockerfile changes still require an authorized frontend image rebuild/recreate. Do not use broad Compose shutdown or restart management/game for a frontend-only replacement. Initial builds, `nginx -t`/module availability, actual listeners, session continuity and unchanged game/management PID or generation still need separately authorized operational acceptance.
+
+### Frontend routes and response handling
+
+- Nginx uses the bounded document grammar from `ManagementStatic.js`: Settings → `settings.html`, market → `market.html`, database/item/NPC routes → `knowledge-base.html`, existing world/actor/clan/dungeon/ranking/raid routes → `index.html`. Trailing-slash forms remain. Unknown paths/assets fail, never a catch-all SPA response. Root paths redirect to `/observer/`.
+- `/observer/login[/]` and exactly `auth.js`, `login.css`, `appearance.js`, `l2kingdom-logo.png` are public within the allowed subnet. Protected documents/assets/maps use uncached `auth_request` to management's session endpoint with GET, cookies and no body/Content-Length. A 401 redirects documents to login, but returns JSON 401 for assets. Auth backend failure is an error, never a login redirect or successful page.
+- Document redirects carry the original path/query in the login URL fragment, avoiding unescaped query interpolation. `auth.js` accepts that fragment and legacy `?next=` links, validates a local `/observer/` destination and excludes login destinations. The login page probes the session and redirects already signed-in users; 401 leaves the form available, other failures show an inline availability error.
+- `/observer/api/*` and `/observer/item-icons/*` proxy directly to management without a second static-session check. Backend auth, icon validation and existing method semantics remain authoritative; no static icon fallback. The bot-control prefix is rejected by Nginx; local MCP stays direct.
+- Proxying preserves original Host including port, Origin, cookies, methods/bodies, queries, validators, content encoding and upstream statuses/bodies. It overwrites `X-Real-IP`, clears client forwarding-chain/protocol headers and disables caching, request/response buffering and retries. Nginx-generated API failures are JSON/non-success; backend errors are not intercepted. A timeout/disconnect is not proof that a mutation failed.
+- Frontend responses set `Cache-Control: no-store`, `Referrer-Policy: no-referrer` and `X-Content-Type-Options: nosniff` themselves, including errors. Static HEAD/conditional handling comes from Nginx, not an auth-subrequest header copy. Unhashed assets have no long-lived cache policy.
 
 ### LAN and peer-sensitive boundary
 
@@ -23,7 +64,7 @@ Direct requests retain socket-peer loopback/private-LAN checks (including privat
 
 The parent validates `publicOrigin` at startup as one absolute HTTP origin without credentials, non-root path, query or fragment; an optional root slash is normalized for comparisons/links. Setting it requires `hostname=127.0.0.1`. Only a request carrying one valid `X-Real-IP` from socket peer `127.0.0.1` (or its IPv4-mapped representation) selects proxy authority. Invalid/chain values or a header from another peer are rejected in proxy mode. The resolved client must still be private/loopback, and Host must match `publicOrigin`; unsafe methods check the **preserved browser Origin**, not a rewritten backend Origin. Without `X-Real-IP`, direct backend-binding checks still apply, preserving local MCP. With proxy mode disabled, forwarding headers grant no authority. `Forwarded`, `X-Forwarded-For` and forwarded protocol are never identity/scheme authority.
 
-The required frontend must overwrite `X-Real-IP` from its connection peer, preserve Host/Origin, and enforce the actual LAN subnet even on public login assets. Backend private-peer checks do not enforce that deployment-specific subnet. There is no permissive CORS, password login, role editor or per-device allowlist. Host/Origin do not identify users; personal-key sessions remain a separate boundary. Plain HTTP is only for the trusted home LAN, not Internet exposure; verify actual listener/firewall/subnet configuration separately.
+The Nginx template overwrites `X-Real-IP` from its connection peer, preserves Host/Origin, and uses a socket-peer `geo` gate for the selected LAN subnet even on public login assets and rewrite-phase redirects. Backend private-peer checks do not enforce that deployment-specific subnet. There is no permissive CORS, password login, role editor or per-device allowlist. Host/Origin do not identify users; personal-key sessions remain a separate boundary. Plain HTTP is only for the trusted home LAN, not Internet exposure; verify actual listener/firewall/subnet configuration separately.
 
 Clan-order/crest APIs validate their domain inputs but do not establish the browser as the clan's authenticated game-session leader. Diagnostics switches are not authorization. Raid teleport requires the **resolved client** to be loopback, checked **before** the parent forwards it to the child; a proxied LAN client cannot inherit the proxy's loopback privilege. The socket is not overwritten. Bot-control retains its independent socket/Host/token checks, and the parent additionally rejects proxied bot-control requests. No client forwarding headers are passed to the child as authority.
 
@@ -31,7 +72,7 @@ The proxy accepts only enumerated game API/icon families and the current IPC-rep
 
 ## Personal keys and browser sessions
 
-- `ObserverAuth.js` gates parent APIs and backend-owned item icons before Settings, lifecycle actions or game proxying; missing sessions return JSON 401. The parent uses `servePages: false`, including for login HTML. Standalone authentication retains its existing page/asset gate, login redirects and exact public login exceptions. The centered, compact form shows **Welcome to L2Kingdom** and a single key field with **Enter your key..**; submit with Enter or the inline arrow button. There is no user name, browser key generation or user administration. Errors appear only after a failed attempt.
+- `ObserverAuth.js` gates parent APIs and backend-owned item icons before Settings, lifecycle actions or game proxying; missing sessions return JSON 401. The parent uses `servePages: false`, including for login HTML. Standalone authentication retains its existing page/asset gate, login redirects and exact public login exceptions. The centered, compact form shows **Welcome to L2Kingdom** and a single key field with **Enter your key..**; submit with Enter or the inline arrow button. There is no user name, browser key generation or user administration. Failed attempts and session-availability failures appear inline; an unauthenticated session probe leaves the form blank.
 - Restarting gameplay via Settings does not reload the parent's HTTP routes. An older management process needs a separately authorized management restart to activate new API behavior; a frontend update alone cannot do so. The login document belongs to the separate frontend, not the new parent's route table. Missing auth API endpoints (404) produce an explicit management-restart message rather than an invalid-key error.
 - Run `npm run observer:key -- "User name"` to generate a cryptographically random 256-bit key. The name is required, unique, trimmed and limited to 80 characters; every key grants full `admin` access. The CLI prints the key once; the server stores only its SHA-256 hash. Losing a key requires issuing another key under a different name; there is no recovery of the original value. The CLI neither starts nor reloads the server; an existing management process sees newly issued keys immediately.
 - `ObserverAuthStore.js` owns separate SQLite tables in `tmp/observer-auth/auth.sqlite`, or `observer-auth/auth.sqlite` under `L2NODE_RUNTIME_DIR`. Use the same runtime directory/environment for key generation and management. Keys/sessions are independent of world/history saves, wipes and restores; protect the auth directory separately and do not commit it. New auth directories/files use owner-only permissions.

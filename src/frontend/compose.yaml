@@ -1,0 +1,16 @@
+name: l2kingdom
+
+services:
+  frontend:
+    container_name: l2kingdom_frontend
+    image: l2kingdom_frontend:local
+    build:
+      context: .
+      dockerfile: Dockerfile
+    network_mode: host
+    restart: unless-stopped
+    environment:
+      L2KINGDOM_FRONTEND_IP: ${L2KINGDOM_FRONTEND_IP:?Set the exact server LAN IPv4 address}
+      L2KINGDOM_FRONTEND_PORT: ${L2KINGDOM_FRONTEND_PORT:?Set the frontend HTTP port}
+      L2KINGDOM_ALLOWED_SUBNET: ${L2KINGDOM_ALLOWED_SUBNET:?Set the trusted client subnet in CIDR notation}
+      L2KINGDOM_BACKEND_PORT: ${L2KINGDOM_BACKEND_PORT:?Set the loopback management port}

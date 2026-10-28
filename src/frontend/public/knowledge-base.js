@@ -312,7 +312,7 @@ function showItemDirectory() {
     els.itemDirectory.hidden = false;
     els.catalogList.hidden = true;
     els.itemDirectoryReturn.hidden = true;
-    document.title = 'Items · Server Database';
+    document.title = 'Items · Server Database · L2Kingdom';
 }
 
 function shouldShowItemDirectory() {
@@ -465,7 +465,7 @@ async function loadDetail(kind, id) {
         if (request !== state.request) return;
         els.rateBadge.textContent = rateLabel(detail.rateProfile);
         els.detailView.innerHTML = kind === 'items' ? renderItemDetail(detail) : renderNpcDetail(detail);
-        document.title = `${detail.name} · Server Database`;
+        document.title = `${detail.name} · Server Database · L2Kingdom`;
         window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (error) {
         if (request !== state.request) return;
@@ -513,7 +513,7 @@ function applyRoute(route = Router.parse(`${window.location.pathname}${window.lo
         els.npcRaid.value = state.raid;
         syncNpcFilterControls();
     }
-    document.title = `${kind === 'items' ? 'Items' : 'NPCs'} · Server Database`;
+    document.title = `${kind === 'items' ? 'Items' : 'NPCs'} · Server Database · L2Kingdom`;
     refreshCatalogView();
 }
 
@@ -540,7 +540,7 @@ function openCatalog(kind, { updateRoute = true } = {}) {
         syncNpcFilterControls();
     }
     if (updateRoute) commitRoute(routeFor(kind));
-    document.title = `${kind === 'items' ? 'Items' : 'NPCs'} · Server Database`;
+    document.title = `${kind === 'items' ? 'Items' : 'NPCs'} · Server Database · L2Kingdom`;
     refreshCatalogView();
 }
 

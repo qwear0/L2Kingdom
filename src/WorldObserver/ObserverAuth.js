@@ -5,7 +5,7 @@ const { ObserverAuthStore, SESSION_SECONDS } = require('./ObserverAuthStore');
 const { readJson, sendJson } = require('./SettingsRoutes');
 const { sendFile } = require('./ManagementStatic');
 const { error } = require('../ConfigLoader');
-const PUBLIC = new Set(['/observer/auth.js', '/observer/login.css', '/observer/appearance.js', '/observer/world-observer-logo.png']);
+const PUBLIC = new Set(['/observer/auth.js', '/observer/login.css', '/observer/appearance.js', '/observer/l2kingdom-logo.png']);
 const LOGIN = '/observer/login';
 const API = '/observer/api/auth/';
 

@@ -25,10 +25,24 @@
     };
     const form = document.getElementById('observerLogin');
     if (!form) return;
+    const message = document.getElementById('loginMessage');
+    function nextTarget() {
+        // Nginx carries the untouched path/query in the fragment; keep legacy
+        // ?next= links too, but never navigate outside the observer or to login.
+        const next = new URLSearchParams(location.search).get('next') || location.hash.slice(1) || '/observer/';
+        let target;
+        try { target = new URL(next, location.origin); }
+        catch (_) { return '/observer/'; }
+        return target.origin === location.origin && target.pathname.startsWith('/observer/') && !/^\/observer\/login(?:\/|\.html)?$/.test(target.pathname) ? target.href : '/observer/';
+    }
+    originalFetch(`${API}session`).then(response => {
+        if (response.ok) location.replace(nextTarget());
+        else if (response.status === 404) throw new Error('Sign-in unavailable. Restart the management process.');
+        else if (response.status !== 401) throw new Error('Session could not load. Check management availability.');
+    }).catch(error => { message.textContent = error.message; });
     form.addEventListener('submit', async event => {
         event.preventDefault();
         const button = form.querySelector('button'), input = form.elements.key;
-        const message = document.getElementById('loginMessage');
         if (button.disabled) return;
         button.disabled = true; input.readOnly = true; message.textContent = '';
         form.setAttribute('aria-busy', 'true');
@@ -38,9 +52,7 @@
             const data = await response.json();
             if (!response.ok) throw new Error(data.error || 'Sign in failed.');
             input.value = '';
-            const next = new URLSearchParams(location.search).get('next') || '/observer/';
-            const target = new URL(next, location.origin);
-            location.replace(target.origin === location.origin && target.pathname.startsWith('/observer/') && !/^\/observer\/login\/?$/.test(target.pathname) ? target.href : '/observer/');
+            location.replace(nextTarget());
         } catch (error) { message.textContent = error.message; }
         finally { button.disabled = false; input.readOnly = false; form.removeAttribute('aria-busy'); }
     });

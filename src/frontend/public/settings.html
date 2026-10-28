@@ -3,10 +3,10 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Settings · World Observer</title>
+    <title>Settings · L2Kingdom</title>
     <script src="/observer/appearance.js"></script>
     <script src="/observer/auth.js"></script>
-    <link rel="icon" type="image/png" href="/observer/world-observer-logo.png">
+    <link rel="icon" type="image/png" href="/observer/l2kingdom-logo.png">
     <link rel="stylesheet" href="/observer/styles.css">
     <link rel="stylesheet" href="/observer/application.css">
     <link rel="stylesheet" href="/observer/settings.css">
@@ -26,12 +26,12 @@
         <section id="serverManagement" hidden aria-label="Server management actions">
             <section class="settings-card"><h2>Game server</h2><p id="serverStatus" role="status">Loading management status…</p><div class="settings-actions"><button type="button" id="startServer">Start</button><button type="button" id="stopServer">Stop</button><a id="openMap" class="app-button" href="/observer/">Open world map</a><a class="app-button" href="/observer/api/server/logs" target="_blank" rel="noopener">Open full log</a></div><p id="serverMeta"></p><p id="serverOperation" role="status"></p></section>
             <section class="settings-card"><h2>Next-start progression preset</h2><p>Separate from tab Save. Changes never alter a running child's environment.</p><p id="presetState"></p><form id="presetForm" class="settings-actions"><label for="preset">Preset</label><select id="preset"><option>x1</option><option>x10</option><option>x50</option></select><button type="submit" id="savePreset">Save next-start preset</button></form></section>
-            <section class="settings-card"><h2>Pending changes</h2><div id="pendingChanges"></div><p>Game restart: Stop → wait for confirmed exit → Start (clients disconnect). A management-service restart is external and temporarily removes this UI. Saved-but-unapplied live values have the same explicit Stop → Start recovery, not a hidden retry.</p></section>
+            <section class="settings-card"><h2>Pending changes</h2><div id="pendingChanges"></div><p>Game restart: Stop → wait for confirmed exit → Start (clients disconnect). A management-service restart is external and temporarily removes backend access; the frontend remains separate. Saved-but-unapplied live values have the same explicit Stop → Start recovery, not a hidden retry.</p></section>
             <section class="settings-card"><h2>Recent output</h2><p>Bounded tail. Autoscroll only while already at the bottom; the full log remains available while stopped.</p><pre id="serverLog" tabindex="0" aria-label="Recent game server output">No output yet.</pre></section>
             <section class="settings-card"><h2>LLM inference</h2><p id="inferenceDetails"></p><p id="inferenceState" role="status"></p><button type="button" id="testInference">Test inference</button><p>One explicit bounded synthetic provider call, available without the game. No private dialogue is sent by this check. Connectivity is not full gameplay-AI acceptance; loading or saving Settings never requests inference.</p></section>
             <section class="settings-card"><h2>Saved games</h2><p>Fully stopped game only. Saves include the world and paired history, not configuration or the preset store. Load overwrites current world/history, creates no automatic pre-load backup and does not start the game. Delete is permanent.</p><form id="createSaveForm" class="settings-actions"><label for="saveName">Optional name</label><input id="saveName" maxlength="120" autocomplete="off"><button type="submit" id="createSave">Create save</button></form><button type="button" id="refreshSaves">Refresh saves</button><p id="savesMessage" role="status"></p><div id="saveList"></div></section>
             <section class="settings-card settings-danger"><h2>Danger zone: permanent world reset</h2><p>Bots includes player-owned vassals. Partial wipes may be blocked by mixed bot/player trades. World deletion can commit before history cleanup fails; a failure is not proof of rollback. Protect unique data before proceeding.</p><form id="wipeForm"><div class="settings-actions"><label for="wipeScope">Scope</label><select id="wipeScope"><option value="bots">Bots (including owned vassals)</option><option value="players">Players</option><option value="all">All</option></select></div><label for="wipeConfirmation" id="wipePrompt">Type WIPE BOTS</label><input id="wipeConfirmation" autocomplete="off" spellcheck="false"><button type="submit" id="wipeWorld">Permanently wipe selected data</button></form></section>
-            <section class="settings-card"><h2>Service information</h2><p id="serviceInfo"></p><p>The persistent management UI uses the configured WorldObserver hostname/port. WorldObserver.enabled controls only the game observer API, not this UI. Bind and advertised client addresses are different settings.</p></section>
+            <section class="settings-card"><h2>Service information</h2><p id="serviceInfo"></p><p>L2Kingdom pages are served by the independent frontend at the browser origin. WorldObserver hostname/port identify the management backend; publicOrigin identifies the frontend. WorldObserver.enabled controls only the private game observer API. Bind and advertised client addresses are different settings.</p></section>
         </section>
     </main>
     <script src="/observer/spaRouter.js"></script>

@@ -8,7 +8,7 @@ Use this as a side-effect guide, not an instruction to run commands automaticall
 - Install dependencies only when setup is requested. `node_modules/` and `package-lock.json` are ignored; syntax checking does not require importing application dependencies.
 - The native client must speak Lineage II C4 protocol `656`; WorldObserver is not a replacement game client.
 - Defaults/examples live in `config/default.ini`/`config/local.example.ini`; private overrides use ignored `config/local.ini` or the selected override file.
-- The API-only management listener uses WorldObserver hostname/port (default loopback 8088), not the browser origin. A configured `publicOrigin` requires `hostname=127.0.0.1`; it enables only the selected same-host proxy contract. Browser sources are in `src/frontend/public/`, but the separate deployment artifact is not yet included. Do not treat a new parent start as a working UI deployment; see the [staged boundary](world-observer.md#l2kingdom-frontend-sources-and-deployment-boundary). Authentication/game TCP defaults still bind all interfaces. Host/Origin/private-peer checks and personal-key sessions are not permission for Internet exposure.
+- The API-only management listener uses WorldObserver hostname/port (default loopback 8088), not the browser origin. A configured `publicOrigin` requires `hostname=127.0.0.1`; it enables only the selected same-host proxy contract. Browser sources are in `src/frontend/public/`, with Nginx/Docker/Compose packaging in `src/frontend/`. Do not treat source readiness or a new parent start as a working UI deployment; see [frontend inputs and independent commands](world-observer.md#frontend-configuration-and-independent-operations). Authentication/game TCP defaults still bind all interfaces. Host/Origin/private-peer checks and personal-key sessions are not permission for Internet exposure.
 
 ## Command side effects
 
@@ -24,6 +24,9 @@ These are existing commands, not checks executed by creating this document.
 | `npm run generate:knowledge-base` | Regenerates the five committed `data/KnowledgeBase/` outputs. |
 | `npm run check:knowledge-base` | Rebuilds catalogue content in memory and compares outputs; not gameplay verification. |
 | `npm run check` | Existing Node `--check` traversal of JavaScript under `src/`, `scripts/`, `tests/`; syntax only, no application startup. |
+| `docker compose -f src/frontend/compose.yaml config --quiet` | Renders/checks Compose inputs only; all four `L2KINGDOM_*` inputs are required. Add `-f src/frontend/compose.dev.yaml` to inspect the read-only source-mount alternative. No build/start. |
+| `docker compose -f src/frontend/compose.yaml build frontend` | Separately authorized frontend-only image build; may download the pinned Nginx base. No backend dependency install/build or management/game restart. |
+| `docker compose -f src/frontend/compose.yaml up -d --no-deps --no-build --pull never --force-recreate frontend` | Separately authorized replacement of container `l2kingdom_frontend` only, using the built image. Requires agreed LAN/backend inputs and initial cutover; no broad Compose shutdown. |
 | `node scripts/profile-spawn-placement.js --output tmp/profiles/<new-run> [--cold] [--cache <file>] [--seed <uint32>]` | Explicit offline territory preparation/CPU profiling. Reads config, datapack and geodata; writes a CPU profile, summary and derived cache under `tmp/`. No database initialization, listeners, world population or game workers. Can consume substantial CPU/RAM; not a routine syntax check. |
 | `npm test` | Existing explicitly selected suite; not routinely authorized. |
 | `npm run test:geodata` | Prepares geodata before the selected suite, including installation side effects. |
