@@ -34,7 +34,7 @@ function open(session, listId = session.activeNpcTalk?.selfId) {
     session.dataSendToMe(Response.actionFailed());
 }
 
-async function exchange(session, listId, entryId, amount) {
+async function exchange(session, listId, entryId, amount, options = {}) {
     const npc = nearby(session), actor = session.actor, context = session.activeMultiSell;
     const recipe = Catalog.resolve(listId, entryId);
     if (session.multiSellPending || !context || context.actor !== actor || context.listId !== listId
@@ -58,8 +58,12 @@ async function exchange(session, listId, entryId, amount) {
             throw Error('multisell_weight_limit');
     };
     session.multiSellPending = true;
+    let committed = false;
     try {
+        options.operation?.begin();
         const result = await Database.exchangeLuxuryItems(actor.fetchId(), { listId, entryId, amount, validate });
+        committed = true;
+        options.operation?.applied({ listId, entryId, amount });
         for (const row of result.consumed) {
             if (row.remaining) actor.backpack.updateAmount(row.id, row.remaining);
             else actor.backpack.items = actor.backpack.items.filter(item => item.fetchId() !== row.id);
@@ -71,7 +75,11 @@ async function exchange(session, listId, entryId, amount) {
             session.dataSendToMe(Response.itemsList(actor.backpack.fetchItems()));
             ConsoleText.transmitPickup(session, recipe.result.selfId, result.products.length);
         }
+        options.operation?.complete({ listId, entryId, amount, products: result.products.length }, 'exchanged');
         return result;
+    } catch (error) {
+        if (!committed) options.operation?.rolledBack();
+        throw error;
     } finally { session.multiSellPending = false; }
 }
 

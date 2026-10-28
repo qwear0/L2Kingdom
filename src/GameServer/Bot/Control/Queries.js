@@ -54,10 +54,16 @@ function* properties(object) {
 }
 function collection(attachment, section) {
     const { actor, session } = attachment.record;
-    return section === 'inventory' ? actor.backpack.fetchItems() : section === 'skills' ? actor.skillset.fetchSkills()
+    return section === 'pet_inventory' ? actor.pet?.petData?.inventory : section === 'services' ? (require('./Offers').valid(session, session.mcpOffers) ? session.mcpOffers : null) : section === 'inventory' ? actor.backpack.fetchItems() : section === 'skills' ? actor.skillset.fetchSkills()
         : section === 'effects' ? actor.effects : section === 'quests' ? session.questStates : null;
 }
 function details(attachment, section) {
+    if (section === 'services') return require('./Offers').steps(attachment.record.session);
+    if (section === 'pet_inventory') return (attachment.record.actor.pet?.petData?.inventory || []).values();
+    if (section === 'recipes') return (function* () {
+        for (const type of ['common', 'dwarven']) for (const recipe of (attachment.record.actor.model || attachment.record.actor)[`${type}Recipes`] || [])
+            yield { type, recipe };
+    })();
     const { actor, session } = attachment.record;
     if (section === 'inventory') return actor.backpack.fetchItems().values();
     if (section === 'skills') return actor.skillset.fetchSkills().values();
@@ -78,6 +84,14 @@ function questVariables(variables) {
     return { values, partial: count > 8, source: 'loaded_native_state' };
 }
 function detailRow(value, section, actor) {
+    if (section === 'services') return require('./Offers').project(value);
+    if (section === 'pet_inventory') return { objectId: value.id, templateId: value.selfId, amount: value.amount, equipped: !!value.equipped };
+    if (section === 'recipes') {
+        const recipe = require('../../Items/C4RecipeItems').resolveByRecipeId(value.recipe.recipeId);
+        return recipe ? { recipeId: recipe.recipeId, type: value.type, level: recipe.level, productId: recipe.productId,
+            productCount: recipe.productCount, mpCost: recipe.mpCost, successRate: recipe.successRate, materials: recipe.materials.slice(0, 16),
+            partial: recipe.materials.length > 16, source: 'native_learned_recipe' } : null;
+    }
     if (section === 'inventory') return { objectId: value.fetchId(), templateId: value.fetchSelfId(),
         name: String(value.fetchName?.() || '').slice(0, 64), amount: value.fetchAmount(), equipped: value.fetchEquipped(), enchant: value.fetchEnchantLevel?.() ?? null };
     if (section === 'skills') return { skillId: value.fetchSelfId(), level: value.fetchLevel?.() ?? null,
@@ -108,10 +122,16 @@ function page(attachment, input, section = 'scene') {
         query = { id: randomUUID(), attachmentId: attachment.id, fingerprint, origin: point(actor), section,
             expiresAt: Date.now() + limits.queryTtlMs, sampledAt: Date.now() };
         query.source = collection(attachment, section);
+        if (section === 'recipes') {
+            const model = attachment.record.actor.model || attachment.record.actor;
+            query.recipeSources = [model.commonRecipes, model.dwarvenRecipes];
+        }
         query.iterator = section === 'scene' ? scene(query.origin, input.radius) : details(attachment, section);
         cursors.set(query.id, query);
     }
-    if (section !== 'scene' && query.source !== collection(attachment, section)) {
+    const model = attachment.record.actor.model || attachment.record.actor;
+    const recipeChanged = section === 'recipes' && (query.recipeSources[0] !== model.commonRecipes || query.recipeSources[1] !== model.dwarvenRecipes);
+    if (section !== 'scene' && (recipeChanged || query.source !== collection(attachment, section))) {
         cursors.delete(query.id); throw fault('detail_collection_changed', 409);
     }
     if (section === 'scene' && (Math.hypot(actor.fetchLocX() - query.origin.locX, actor.fetchLocY() - query.origin.locY) > 128
@@ -159,13 +179,14 @@ function inspect(attachment, input) {
     if (input.section === 'summon') {
         const summon = invoke('GameServer/Npc/SummonControl').activeSummon(actor);
         return { section: 'summon', sampledAt: Date.now(), summon: summon ? { ...row(summon, 'npc', point(actor), 'diagnostic'),
-            ownerId: summon.fetchOwnerId(), controlMode: summon.controlMode || null } : null };
+            ownerId: summon.fetchOwnerId(), controlMode: summon.controlMode || null,
+            skillActions: invoke('GameServer/Npc/SummonControl').skillActions(summon).map(({ skillId, target }) => ({ skillId, target, available: target !== 'corpse' })) } : null };
     }
     if (input.section === 'dialogue') {
         const current = session.activeNpcTalk, text = session.mcpObservation.dialogue;
         return { section: 'dialogue', sampledAt: Date.now(), context: current ? Journal.compact(current) : null,
             dialogue: current?.objectId === text?.objectId ? text : null, textCoverage: 'selected_native_html_publishers_only',
-            optionsUnavailable: 'P4_adapter_not_enabled', untrusted: true };
+            offers: require('./Offers').summary(session), untrusted: true };
     }
     return page(attachment, input, input.section);
 }

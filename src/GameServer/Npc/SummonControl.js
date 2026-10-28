@@ -347,7 +347,9 @@ function releaseAutoCommand(session, summon, owner) {
     summon.followOwner = false;
     summon.state.setHits(false);
     sendStopMove(session, summon);
-    owner.nativeEvent?.('native_cancelled');
+    // Accepted casts keep their native resource/effect/end tail. Clearing a
+    // follow/attack command must not release the handoff before cast_end.
+    if (summon.attack?.activeCast?.actionOwner !== owner) owner.nativeEvent?.('native_cancelled');
 }
 
 function attackTick(session, summon, target, owner = null, revision = summon.commandRevision) {
@@ -443,7 +445,7 @@ function restoreFromCold(session, actor, saved, now = Date.now()) {
         { hp: saved.hp, remainingLife: remaining * timeLostIdle(skill) / 1000 });
 }
 
-function unsummon(session, actor, summon) {
+function unsummon(session, actor, summon, options = {}) {
     if (actor.pet === summon && (actor.fetchMounted?.() || actor.mounted)) invoke('GameServer/Pets/PetMount').set(actor,false);
     stop(session, summon);
     clearLifetimeTimer(summon);
@@ -453,7 +455,10 @@ function unsummon(session, actor, summon) {
     if (summon.ownerSession && summon.petData?.version === 1) {
         const item = actor.backpack?.fetchItemRaw(summon.fetchPetControlItemObjectId());
         const saved = Promise.resolve(summon.inventoryTail).then(() => invoke('GameServer/Pets/PetRuntime').persist(summon, actor));
-        summon.teardownTail = saved.then(() => { if (item) item.petInUse = false; }).catch(() => {});
+        summon.teardownTail = saved.then(() => { if (item) item.petInUse = false; }).catch(error => {
+            options.operation?.uncertain('pet_persistence_failed');
+            if (options.operation) utils.infoWarn('Pet', 'controlled teardown failed: %s', error.message);
+        });
         summon.persistTail = summon.teardownTail;
     } else if (summon.fetchPetControlItemObjectId?.()) {
         const controlItem = actor.backpack?.fetchItemRaw?.(summon.fetchPetControlItemObjectId());
@@ -465,9 +470,13 @@ function unsummon(session, actor, summon) {
             currentFeed: summon.fetchCurrentFeed?.() ?? 0
         };
         controlItem?.setPetData?.(petData);
-        invoke('Database').updateItemPetData?.(actor.fetchId(), controlItem?.fetchId?.(), petData).catch?.((err) => {
+        const persist = invoke('Database').updateItemPetData?.(actor.fetchId(), controlItem?.fetchId?.(), petData);
+        if (!persist) options.operation?.uncertain('pet_persistence_unavailable');
+        summon.teardownTail = Promise.resolve(persist).catch(err => {
+            options.operation?.uncertain('pet_persistence_failed');
             utils.infoWarn('Pet', 'failed to persist pet state: %s', err.message);
         });
+        summon.persistTail = summon.teardownTail;
     }
     World.removeNpcFromGrid?.(summon);
     const spawnIndex = World.npc.spawns.indexOf(summon);
@@ -546,16 +555,18 @@ function resolveSkillTarget(actor, summon, config) {
     });
 }
 
-function useSkillAction(session, actor, summon, actionId) {
-    if (session.mcpControl) return false;
+function useSkillAction(session, actor, summon, actionId, options = {}) {
+    const owner = options.actionOwner;
+    if (session.mcpControl && owner?.source !== 'bot-mcp') return false;
     const generation = session.mcpControlGeneration, revision = summon.commandRevision;
     const current = () => session.actor === actor && activeSummon(actor) === summon
-        && session.mcpControlGeneration === generation && summon.commandRevision === revision;
+        && session.mcpControlGeneration === generation && summon.commandRevision === revision && (!owner || owner.isCurrent());
     const config = SummonSkillActions.get(Number(actionId));
     if (!config) return false;
 
     const skill = findSummonSkill(summon, config.skillId);
     if (!skill) {
+        owner?.nativeEvent?.('native_rejected', { reason: 'summon_skill_unavailable' });
         session.dataSendToMe(ServerResponse.actionFailed());
         utils.infoWarn(
             'SummonControl',
@@ -569,16 +580,19 @@ function useSkillAction(session, actor, summon, actionId) {
     }
 
     if (summon.canUseSkill?.(skill) === false) {
+        owner?.nativeEvent?.('native_rejected', { reason: 'summon_skill_reuse_or_condition' });
         session.dataSendToMe(ServerResponse.actionFailed());
         return true;
     }
 
-    resolveSkillTarget(actor, summon, config).then((target) => {
+    const pending = (options.target && config.target === 'selected' ? Promise.resolve(options.target) : resolveSkillTarget(actor, summon, config)).then((target) => {
         if (!current()) return;
-        if (!target) {
+        if (!target || owner && !owner.controller.legalActionTarget(target, skill)) {
+            owner?.nativeEvent?.('native_rejected', { reason: 'summon_skill_target_ineligible' });
             session.dataSendToMe(ServerResponse.actionFailed());
             return;
         }
+        owner?.nativeEvent?.('summon_commanded');
 
         const resumeFollow = summon.followOwner === true && summon.controlMode === 'follow';
         clearFollowTimer(summon);
@@ -586,14 +600,15 @@ function useSkillAction(session, actor, summon, actionId) {
         summon.attack?.clearTimers?.();
         summon.automation.abortAll(summon);
         summon.controlMode = 'cast';
+        if (owner) summon.autoFightCommandOwner = owner;
 
         summon.attack.remoteHit({
             actor: summon,
             dataSendToMe: (packet) => session.dataSendToMe(packet),
             dataSendToMeAndOthers: (packet) => session.dataSendToMeAndOthers(packet, summon)
-        }, target, skill);
+        }, target, skill, { actionOwner: owner });
 
-        if (resumeFollow) {
+        if (resumeFollow && !owner) {
             ensureTimerBag(summon);
             summon.timer.summonResume = setTimeout(() => {
                 summon.timer.summonResume = undefined;
@@ -604,7 +619,10 @@ function useSkillAction(session, actor, summon, actionId) {
             summon.timer.summonResume.unref?.();
         }
     });
-
+    if (owner) pending.catch(error => {
+        owner.nativeEvent?.(owner.run.nativeStarted ? 'native_settlement_failed' : 'native_rejected', { reason: 'summon_skill_dispatch_failed' });
+        utils.infoWarn('SummonControl', 'controlled skill failed: %s', error.message);
+    });
     return true;
 }
 
@@ -626,5 +644,7 @@ module.exports = {
     toggleFollowOwner,
     unsummon,
     revivePet,
-    useSkillAction
+    useSkillAction,
+    skillActions: summon => [...SummonSkillActions].filter(([, config]) => findSummonSkill(summon, config.skillId))
+        .map(([actionId, config]) => ({ actionId, ...config }))
 };

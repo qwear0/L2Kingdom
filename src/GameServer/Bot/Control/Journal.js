@@ -47,6 +47,7 @@ function unsubscribe(record, id) {
     if (!journal.subscribers.size) {
         journals.delete(journal); journal.events.clear(); journal.bytes = 0; journal.dialogue = null;
         record.session.mcpObservation = null;
+        require('./Offers').clear(record.session);
     }
 }
 function sample(session) {
@@ -94,7 +95,7 @@ function dialogue(session, objectId, html, source) {
     // Native text is untrusted data. Reading it never issues a selectable bypass.
     const text = String(html).slice(0, 8192).replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 2048);
     journal.dialogue = { objectId, revision: randomUUID(), at: Date.now(), text, untrusted: true, source,
-        choices: null, choicesUnavailable: 'P4_adapter_not_enabled' };
+        ...require('./Offers').capture(session, objectId, html) };
     journal.emit('dialogue', source, { objectId, revision: journal.dialogue.revision, text: text.slice(0, 512) });
 }
 function recent(journal, actionId = null, limit = 3) {

@@ -83,7 +83,15 @@ function teleportTo(session, actor, coords, options = {}) {
     if (actor.isDead()) {
         return false;
     }
-    session.mcpControl?.preempt('native_teleport');
+    if (options.actionOwner) {
+        const owner = options.actionOwner, run = owner.run;
+        // A consumed item's accepted native cast may land after revocation.
+        // Only its exact retained foreground can finish this settlement.
+        const settling = owner.source === 'bot-mcp' && run?.owner === owner && run.actor === actor && run.session === session
+            && session.mcpControl === run.state && run.state.foreground === run && !run.done && run.nativeStarted
+            && (run.nativePending || run.asyncPending);
+        if (!settling && !invoke('GameServer/Actor/PlayerActionOwner').current(session, actor, owner)) return false;
+    } else session.mcpControl?.preempt('native_teleport');
     actor.playerAutoFight?.dispose('teleported');
     if (!isBotSession(session)) invoke('GameServer/Bot/AI/BotRaidSafety').endPlayerPartyRaid(session);
 
@@ -102,8 +110,9 @@ function teleportTo(session, actor, coords, options = {}) {
     session.dataSendToMeAndOthers(ServerResponse.teleportToLocation(actor.fetchId(), coords), actor);
 
     // Turns out to be a viable solution
-    setTimeout(() => {
+    const arrive = () => {
         if (actor.teleportSequence !== teleportId || session.actor !== actor) {
+            options.onInterrupted?.('teleport_superseded_or_actor_changed');
             if (session.pendingActorTeleport === pendingTeleport) {
                 delete session.pendingActorTeleport;
                 invoke('GameServer/World/World').notifyUserStateChanged(session);
@@ -132,6 +141,14 @@ function teleportTo(session, actor, coords, options = {}) {
         if (session.aiActive) {
             const BotAI = invoke('GameServer/Bot/BotAI');
             BotAI.wakeup(session, { urgent: options.urgentWakeup === true });
+        }
+    };
+    setTimeout(() => {
+        try { arrive(); }
+        catch (error) {
+            if (!options.actionOwner) throw error;
+            options.onInterrupted?.('native_teleport_publication_failed');
+            utils.infoWarn('TeleportTo', 'controlled arrival failed actor=%s error=%s', actor.fetchId(), error.message);
         }
     }, 1000);
     return true;

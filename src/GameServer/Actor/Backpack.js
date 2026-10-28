@@ -194,7 +194,7 @@ class Backpack extends BackpackModel {
         return this.fetchAutoSpiritshot(actor)?.kind || null;
     }
 
-    dropItem(session, id, amount, locX, locY, locZ) {
+    dropItem(session, id, amount, locX, locY, locZ, onSpawn) {
         if (BeginnerShots.isRestricted(this.fetchItemRaw(id)?.fetchSelfId?.())) return;
         const petData = this.fetchItemRaw(id)?.fetchPetData?.();
         this.deleteItem(session, id, amount, (selfId) => {
@@ -203,7 +203,7 @@ class Backpack extends BackpackModel {
                 locY: locY,
                 locZ: locZ,
                 ...(petData ? { petData } : {})
-            });
+            }, item => onSpawn?.({ groundItemId: item.fetchId(), templateId: selfId, amount }));
         });
     }
 
@@ -214,7 +214,7 @@ class Backpack extends BackpackModel {
         });
     }
 
-    useItem(session, id, { onSkillResult } = {}) {
+    useItem(session, id, { onSkillResult, actionOwner } = {}) {
         this.fetchItem(id, (item) => {
             if (item.isWearable()) {
                 if (invoke('GameServer/Pets/PetInventory').gear[item.fetchSelfId()]) return;
@@ -249,6 +249,12 @@ class Backpack extends BackpackModel {
                     return;
                 }
 
+                if (actionOwner && (C4BeastItems.resolve(item.fetchSelfId()) || C4UtilityItems.resolve(item.fetchSelfId())
+                    || C4RecipeItems.resolve(item.fetchSelfId()) || C4MercTickets.resolve(item.fetchSelfId())
+                    || C4ExtractableItems.resolve(item.fetchSelfId()) || C4EnchantScrolls.resolve(item.fetchSelfId()))) {
+                    actionOwner.nativeEvent?.('native_rejected', { reason: 'item_handler_adapter_unavailable' });
+                    return;
+                }
                 const beastItem = C4BeastItems.resolve(item.fetchSelfId());
                 if (beastItem && this.useBeastItem(session, item, beastItem)) {
                     return;
@@ -280,7 +286,7 @@ class Backpack extends BackpackModel {
                 }
 
                 const itemSkill = C4ItemSkills.resolve(item.fetchSelfId());
-                if (itemSkill && this.useSkillItem(session, id, itemSkill, onSkillResult)) {
+                if (itemSkill && this.useSkillItem(session, id, itemSkill, onSkillResult, actionOwner)) {
                     return;
                 }
 
@@ -576,13 +582,20 @@ class Backpack extends BackpackModel {
         return candidates.find((filename) => utils.fileExists(filename));
     }
 
-    useSkillItem(session, id, itemSkill, onSkillResult) {
+    useSkillItem(session, id, itemSkill, onSkillResult, actionOwner = null) {
+        if (actionOwner && !invoke('GameServer/Actor/PlayerActionOwner').current(session, session.actor, actionOwner)) return true;
         const skill = this.buildItemSkill(itemSkill);
         if (!skill) {
             return false;
         }
 
+        if (actionOwner && (itemSkill.handler || [C4SkillRules.FEED_PET, C4SkillRules.DRAIN_SOUL, C4SkillRules.SOW, C4SkillRules.HARVEST]
+            .includes(skill.fetchSkillType()) || skill.fetchTargetKind() !== 'self')) {
+            actionOwner.nativeEvent?.('native_rejected', { reason: 'item_handler_adapter_unavailable' });
+            return true;
+        }
         if (session.actor.canUseSkill?.(skill) === false) {
+            actionOwner?.nativeEvent?.('native_rejected', { reason: 'native_item_reuse_or_condition' });
             session.dataSendToMe(ServerResponse.actionFailed());
             return true;
         }
@@ -619,58 +632,58 @@ class Backpack extends BackpackModel {
             return this.useTargetedCleanseItem(session, id, itemSkill, skill);
         }
 
-        if (skill.fetchTargetKind() !== 'self') {
-            return false;
-        }
-
-        if (session.actor.state.fetchCasts()) {
-            return true;
-        }
-
-        const castTime = skill.fetchHitTime() || 0;
-        session.actor.markSkillReuse?.(skill);
-        session.actor.state.setCasts(true);
-        session.dataSendToMeAndOthers(ServerResponse.skillStarted(session.actor, session.actor.fetchId(), skill), session.actor);
-        if (castTime > 0) {
-            session.dataSendToMe(ServerResponse.skillDurationBar(castTime));
-        }
-
+        if (skill.fetchTargetKind() !== 'self') return false;
+        if (session.actor.state.fetchCasts()) return true;
+        const actor = session.actor, castTime = skill.fetchHitTime() || 0;
+        // Join concrete native interruption tracking. After acceptance, the
+        // consumption/effect tail is settlement, not a new controller command.
+        const ownedCast = actionOwner ? { target: actor, skill, actionOwner } : null;
+        actor.markSkillReuse?.(skill);
+        actor.state.setCasts(true);
+        if (ownedCast) actor.attack.activeCast = ownedCast;
+        actionOwner?.nativeEvent?.('cast_started');
+        session.dataSendToMeAndOthers(ServerResponse.skillStarted(actor, actor.fetchId(), skill), actor);
+        if (castTime > 0) session.dataSendToMe(ServerResponse.skillDurationBar(castTime));
         const apply = () => {
-            session.actor.state.setCasts(false);
-            if (session.actor.isDead()) {
-                return;
+            if (ownedCast && actor.attack.activeCast !== ownedCast) return;
+            actor.state.setCasts(false);
+            if (session.actor !== actor || actor.isDead()) {
+                if (ownedCast) actor.attack.activeCast = null;
+                actionOwner?.nativeEvent?.('native_cancelled'); return;
             }
-
-            if (itemSkill.teleport === 'skillCoords') {
-                const coords = this.resolveItemTeleportCoords(session.actor, itemSkill, skill);
-                if (!coords) {
-                    return;
-                }
-                this.deleteItem(session, id, 1, () => {
-                    const TeleportTo = invoke('GameServer/Actor/Generics/TeleportTo');
-                    TeleportTo(session, session.actor, coords);
-                }, 'item_skill');
-                return;
-            }
-
-            if (itemSkill.consume) {
-                this.deleteItem(session, id, 1, () => {
+            try {
+                if (itemSkill.teleport === 'skillCoords') {
+                    const coords = this.resolveItemTeleportCoords(actor, itemSkill, skill);
+                    if (!coords) { actionOwner?.nativeEvent?.('native_failed', { reason: 'native_item_destination_unavailable' }); return; }
+                    this.deleteItem(session, id, 1, () => {
+                        actionOwner?.nativeEvent?.('item_teleport_started', { consumed: 1 });
+                        const accepted = invoke('GameServer/Actor/Generics/TeleportTo')(session, actor, coords, { actionOwner,
+                            onArrival: destination => actionOwner?.nativeEvent?.('item_teleport_arrived', { destination }),
+                            onInterrupted: reason => actionOwner?.nativeEvent?.('native_settlement_failed', { reason }) });
+                        if (!accepted) actionOwner?.nativeEvent?.('native_settlement_failed', { reason: 'item_teleport_refused_after_consumption' });
+                    }, 'item_skill');
+                } else if (itemSkill.consume) {
+                    this.deleteItem(session, id, 1, () => {
+                        const outcome = this.applySelfItemSkill(session, skill);
+                        onSkillResult?.(outcome);
+                    }, 'potion');
+                } else {
                     const outcome = this.applySelfItemSkill(session, skill);
                     onSkillResult?.(outcome);
-                }, 'potion');
-                return;
+                }
+            } catch (error) {
+                if (!actionOwner) throw error;
+                actionOwner.nativeEvent?.('native_settlement_failed', { reason: 'item_settlement_failed' });
+                utils.infoWarn('Backpack', 'controlled item settlement failed: %s', error.message);
+            } finally {
+                if (ownedCast && actor.attack.activeCast === ownedCast) actor.attack.activeCast = null;
+                actionOwner?.nativeEvent?.('cast_end');
             }
-
-            const outcome = this.applySelfItemSkill(session, skill);
-            onSkillResult?.(outcome);
         };
-
         if (castTime > 0) {
-            setTimeout(apply, castTime);
-        } else {
-            apply();
-        }
-
+            if (actionOwner) actor.attack.queueTimer(apply, castTime);
+            else setTimeout(apply, castTime);
+        } else apply();
         return true;
     }
 

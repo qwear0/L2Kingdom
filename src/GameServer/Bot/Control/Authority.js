@@ -54,6 +54,7 @@ function revoke(state, reason = 'explicit_revoke') {
     state.lease = null;
     state.session.mcpControlGeneration = Number(state.session.mcpControlGeneration || 0) + 1;
     state.reason = reason;
+    if (state.session.mcpOffers) require('./Offers').clear(state.session);
     if (state.session.mcpObservation) state.session.mcpObservation.emit('lease_revoked', 'control', { reason, generation: state.session.mcpControlGeneration });
     stopFuture(state);
     state.foreground?.cancel(reason);
@@ -113,6 +114,7 @@ function acquire(attachment, actorRef) {
     states.set(session, state);
     session.mcpControl = state;
     session.mcpControlGeneration = Number(session.mcpControlGeneration || 0) + 1;
+    if (session.mcpOffers) require('./Offers').clear(session);
     state.preempt = reason => { revoke(state, reason); return !hasHolds(state); };
     if (!timer) { timer = setInterval(sweep, 250); timer.unref(); }
     try {

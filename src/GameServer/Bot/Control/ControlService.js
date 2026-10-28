@@ -129,14 +129,19 @@ function publicReceipt(entry) {
     return value;
 }
 function status() {
-    return { runtimeEpoch, phase: 'running', capabilities: { phase: 'P3', readOnlyAttachment: true,
+    return { runtimeEpoch, phase: 'running', capabilities: { phase: 'P4', readOnlyAttachment: true,
         discovery: true, selfObservation: true, localScene: true, semanticEvents: true,
         detailPages: true, boundedWait: true, diagnostics: true,
         manualControl: true, gameplayActions: true,
         supported: ['move', 'approach', 'stop', 'target', 'attack:first_swing/target_dead/bounded', 'cast:learned_native',
-            'state:seated/walking', 'item:shots/instant_self', 'equip', 'pickup:in_native_range', 'summon:follow/stop/one_swing'],
-        notImplemented: ['npc_service_actions', 'quest_actions', 'dialogue_choices', 'social_actions', 'travel',
-            'corpse_and_utility_skills', 'timed_or_handler_items', 'summon_skills/unsummon/mount', 'pvp_attack'] }, limits,
+            'state:seated/walking', 'item:shots/native_self/timed_self/native_skill_coords', 'equip', 'pickup:in_native_range', 'drop:at_self',
+            'cast:spoil/sweep', 'interact:live_npc', 'service:issued_choice', 'service:npc_buy/sell', 'service:personal/clan_warehouse',
+            'service:luxury_multisell', 'service:gatekeeper', 'service:quest', 'craft:learned_recipe', 'chat:local/clan_no_commands',
+            'party:live_invite/accept/leave/kick/distribution', 'summon:follow/stop/one_swing/mapped_skill/unsummon/mount', 'pet_inventory:transfer/use'],
+        notImplemented: ['selected_trainer_purchase', 'owner_only_castellan', 'unregistered_npc_services', 'private_store/trade',
+            'item_handlers/non_self_items', 'destroy_item', 'ground/corpse_offensive_skills', 'summon_corpse_skill', 'pvp_attack'],
+        unavailableReasons: { selected_trainer_purchase: 'Only autonomous reconciliation exists; no selected native trainer/cost/rank ingress.',
+            unregistered_npc_services: 'Only issued allowlisted native menu families are adapted; never raw bypass dispatch.' } }, limits,
         usage: { sessions: sessions.size, attachments: attachments.size, observedBots: observed.size, ...Authority.usage(), pendingActions: Actions.pendingCount(), ...Journal.usage(), ...Queries.usage(), ...Waiters.usage() } };
 }
 function dispatch(action, raw) {

@@ -77,7 +77,7 @@ function basicAction(session, actor, data) {
             if (actor.fetchMounted?.() === true || actor.mounted === true || !pet || pet.fetchIsPet?.() !== true || pet.state?.fetchDead?.() === true || pet.isDead?.() === true || hungry) {
                 session.dataSendToMe(ServerResponse.actionFailed());
             } else {
-                SummonControl.unsummon(session, actor, pet);
+                SummonControl.unsummon(session, actor, pet, { operation: data.controlOperation });
             }
         }
         break;
@@ -85,7 +85,7 @@ function basicAction(session, actor, data) {
     case 0x26: // Strider mount / dismount
         {
             const mount = invoke('GameServer/Pets/PetMount');
-            const ok = actor.fetchMounted?.() || actor.mounted ? mount.dismount(session,actor) : mount.mount(session,actor);
+            const ok = actor.fetchMounted?.() || actor.mounted ? mount.dismount(session,actor,false,{operation:data.controlOperation}) : mount.mount(session,actor);
             if (!ok) session.dataSendToMe(ServerResponse.actionFailed());
         }
         break;
@@ -104,7 +104,7 @@ function basicAction(session, actor, data) {
     case 0x34: // Servitor unsummon
         {
             const summon = SummonControl.activeSummon(actor);
-            summon ? SummonControl.unsummon(session, actor, summon) : session.dataSendToMe(ServerResponse.actionFailed());
+            summon ? SummonControl.unsummon(session, actor, summon, { operation: data.controlOperation }) : session.dataSendToMe(ServerResponse.actionFailed());
         }
         break;
 

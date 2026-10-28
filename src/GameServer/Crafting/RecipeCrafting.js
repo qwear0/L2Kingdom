@@ -103,6 +103,7 @@ async function craftSelf(session, recipeId, random = Math.random, options = {}) 
     let command = null, committed = null;
     try {
         await CharacterWriteQueue.flushCharacter(actorId);
+        options.operation?.check();
         if (bot) {
             const state = invoke('GameServer/Bot/Population/BotLifeState').cachedState(actorId);
             if (!state) throw Error('economy_owner_missing');
@@ -110,6 +111,7 @@ async function craftSelf(session, recipeId, random = Math.random, options = {}) 
             command = admitted.command;
             if (Object.isExtensible(options)) options.economyCommand = command;
         }
+        options.operation?.begin();
         const drawn = bot ? true : recipe.successRate >= 100 || (Number(random()) * 100) < recipe.successRate;
         const result = await Database.craftInventoryItems(actorId, {
             materials: (consumed || []).map(({ item, amount }) => ({ id: item.fetchId(), selfId: item.fetchSelfId(), amount })),
@@ -123,6 +125,7 @@ async function craftSelf(session, recipeId, random = Math.random, options = {}) 
             } : null
         });
         committed = result;
+        options.operation?.applied({ success: result.success, committed: result.committed, replayed: result.replayed, product: result.product, mp: result.mp });
         const success = bot ? result.success : drawn;
         if (result.coldLifeRow) Commit.acceptRow(result.coldLifeRow);
         if (result.replayed) {
@@ -139,9 +142,15 @@ async function craftSelf(session, recipeId, random = Math.random, options = {}) 
         actor.automation?.replenishVitals?.(actor);
         session.dataSendToMe?.(ServerResponse.itemsList(actor.backpack.fetchItems()));
         sendMakeInfo(session, recipe, success ? 1 : 0);
+        options.operation?.complete({ recipeId: recipe.recipeId, success, product: result.product, mp: result.mp,
+            consumed: result.sources.map(row => ({ objectId: row.id, remaining: row.amount })) }, success ? 'crafted' : 'failed_roll');
         return success;
     } catch (error) {
         utils.infoWarn('Crafting', 'craft rejected: %s', error.message || error);
+        if (options.operation) {
+            if (!committed?.committed) options.operation.rolledBack();
+            throw error;
+        }
         if (committed?.committed) return !!committed.success;
         return fail(session, recipe);
     } finally {

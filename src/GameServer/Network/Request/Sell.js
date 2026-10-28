@@ -153,9 +153,9 @@ async function consumeMerchant(session, list, { native = false } = {}) {
     }
 }
 
-async function sellToNpcShop(session, list) {
-    const shop = session.activeNpcSellShop;
-    if (!shop) {
+async function sellToNpcShop(session, list, options = {}) {
+    const shop = session.activeNpcSellShop, actor = session.actor;
+    if (!shop || !actor) {
         session.dataSendToMe(ServerResponse.actionFailed());
         return;
     }
@@ -163,7 +163,7 @@ async function sellToNpcShop(session, list) {
     try {
         const sold = [];
         for (const line of list) {
-            const item = session.actor.backpack.fetchItems().find((ob) => ob.fetchId() === line.objectId);
+            const item = actor.backpack.fetchItems().find((ob) => ob.fetchId() === line.objectId);
             const offered = shop.items.get(line.objectId);
             const amount = Number(line.amount);
             if (!NpcSellRules.canSell(item) || !offered ||
@@ -173,26 +173,30 @@ async function sellToNpcShop(session, list) {
             const payout = offered.price * amount;
             if (!Number.isSafeInteger(payout) || payout < 0) continue;
 
+            options.operation?.begin();
             if (amount === item.fetchAmount()) {
-                await Database.deleteItem(session.actor.fetchId(), item.fetchId());
-                session.actor.backpack.items = session.actor.backpack.items.filter((ob) => ob.fetchId() !== item.fetchId());
+                await Database.deleteItem(actor.fetchId(), item.fetchId());
+                actor.backpack.items = actor.backpack.items.filter((ob) => ob.fetchId() !== item.fetchId());
             } else {
-                await Database.updateItemAmount(session.actor.fetchId(), item.fetchId(), item.fetchAmount() - amount);
+                await Database.updateItemAmount(actor.fetchId(), item.fetchId(), item.fetchAmount() - amount);
                 item.setAmount(item.fetchAmount() - amount);
             }
             sold.push({ payout });
+            options.operation?.applied({ objectId: item.fetchId(), soldAmount: amount, payoutPending: payout });
         }
 
+        // Payment belongs to the actor whose goods were removed, even if the
+        // session retires or selects another actor while the native write waits.
         const payout = sold.reduce((total, line) => total + line.payout, 0);
         if (payout > 0) {
-            const backpack = session.actor.backpack;
+            const backpack = actor.backpack;
             const adena = backpack.fetchItemFromSelfId(57);
             if (adena) {
                 const total = adena.fetchAmount() + payout;
-                await Database.updateItemAmount(session.actor.fetchId(), adena.fetchId(), total);
+                await Database.updateItemAmount(actor.fetchId(), adena.fetchId(), total);
                 adena.setAmount(total);
             } else {
-                const packet = await Database.setItem(session.actor.fetchId(), {
+                const packet = await Database.setItem(actor.fetchId(), {
                     selfId: 57,
                     name: 'Adena',
                     amount: payout,
@@ -203,24 +207,25 @@ async function sellToNpcShop(session, list) {
             }
         }
 
-        const rows = NpcSellRules.rows(session.actor);
-        shop.items = new Map(rows.map((row) => [row.item.fetchId(), {
-            selfId: row.item.fetchSelfId(),
-            price: row.price
-        }]));
-
-        session.dataSendToMe(ServerResponse.userInfo(session.actor));
-        session.dataSendToMe(ServerResponse.itemsList(session.actor.backpack.fetchItems()));
-        session.dataSendToMe(ServerResponse.sellList(
-            rows,
-            session.actor.backpack.fetchTotalAdena()
-        ));
+        if (session.actor === actor) {
+            const rows = NpcSellRules.rows(actor);
+            shop.items = new Map(rows.map((row) => [row.item.fetchId(), {
+                selfId: row.item.fetchSelfId(),
+                price: row.price
+            }]));
+            session.dataSendToMe(ServerResponse.userInfo(actor));
+            session.dataSendToMe(ServerResponse.itemsList(actor.backpack.fetchItems()));
+            session.dataSendToMe(ServerResponse.sellList(rows, actor.backpack.fetchTotalAdena()));
+        }
+        if (sold.length) options.operation?.complete({ soldLines: sold.length, receivedAdena: payout }, 'sold');
     } catch (err) {
+        if (options.operation) throw err;
         utils.infoWarn('Sell', 'NPC shop sell error: %s', err.message || err);
         session.dataSendToMe(ServerResponse.actionFailed());
     }
 }
 
 module.exports = sell;
+module.exports.sellToNpcShop = sellToNpcShop;
 module.exports.consumeMerchant = consumeMerchant;
 module.exports.merchantSellRows = merchantSellRows;

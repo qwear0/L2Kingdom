@@ -36,7 +36,7 @@ A vassal belongs to one **character**, with an original `boundClanId`. Another c
 
 `Network/Request/CharDelete.js`, `Database.deleteCharacter` and the owner foreign-key restriction prevent deleting a Lord who still owns vassals.
 
-The optional [MCP interface](bot-mcp.md) observes existing vassals read-only unless an explicit manual lease is acquired. It grants no lord impersonation or direct duty writes. Authorized duty/party/trade commands preempt manual authority at their native ingress; pending native settlement/publication still returns busy rather than being discarded. Returning to AI uses the current valid duty, never a copied pre-takeover order.
+The optional [MCP interface](bot-mcp.md) observes existing vassals read-only unless an explicit manual lease is acquired. It grants no lord impersonation or direct duty writes. Authorized duty/party/trade commands preempt manual authority at their native ingress; pending native settlement/publication still returns busy rather than being discarded. Returning to AI uses the current valid duty, never a copied pre-takeover order. P4 typed party/service actions retain native ownership and membership checks; a vassal does not become its lord, and owner-only Castellan services remain unavailable. Reading an issued choice is not permission to execute it, and accepted economic settlement survives authority loss.
 
 ## Duties and party interruption
 

@@ -14,7 +14,7 @@ const INTERACTION_RADIUS = 300;
 function isWarehouseNpc(session) {
     const active = session.activeNpcTalk;
     const actor = session.actor;
-    const npc = (World.npc?.spawns || []).find((entry) => Number(entry.fetchId?.()) === Number(active?.objectId));
+    const npc = require('../World/NpcObjectIndex').find(World, Number(active?.objectId));
     if (!npc || !actor) return false;
     const Castellan = require('../Lord/CastellanAccess');
     if (Number(npc.fetchSelfId?.()) === Castellan.npcId) {
@@ -95,7 +95,7 @@ function validateLines(lines, items) {
     });
 }
 
-async function deposit(session, lines) {
+async function deposit(session, lines, options = {}) {
     if (!isWarehouseNpc(session)) throw new Error('warehouse NPC is no longer active');
     if (Limits.isPlayer(session)) return playerTransfer(session, lines, 'deposit');
     const actor = session.actor;
@@ -112,10 +112,12 @@ async function deposit(session, lines) {
             item.fetchStackable?.() && Number(item.fetchSelfId()) === Number(source.fetchSelfId())
         ));
 
+        options.operation?.begin();
         const transferred = await Database.transferInventoryToWarehouse(actor.fetchId(), {
             id: source.fetchId(), selfId: source.fetchSelfId(), name: source.fetchName?.(), amount,
             stackable: source.fetchStackable?.(), petData: source.fetchPetData?.(), enchant: source.fetchEnchantLevel?.()
         });
+        options.operation?.applied({ sourceItemId: source.fetchId(), amount, warehouseId: transferred.warehouseId });
         if (target) {
             target.setAmount(transferred.warehouseAmount);
         } else {
@@ -132,10 +134,11 @@ async function deposit(session, lines) {
             source.setAmount(transferred.inventoryAmount);
         }
     }
+    options.operation?.complete({ mode: 'deposit', lines: lines.length }, 'warehouse_deposited');
     return stored;
 }
 
-async function withdraw(session, lines) {
+async function withdraw(session, lines, options = {}) {
     if (!isWarehouseNpc(session)) throw new Error('warehouse NPC is no longer active');
     if (Limits.isPlayer(session)) return playerTransfer(session, lines, 'withdraw');
     const actor = session.actor;
@@ -151,10 +154,12 @@ async function withdraw(session, lines) {
             item.fetchStackable?.() && Number(item.fetchSelfId()) === Number(source.fetchSelfId())
         ));
 
+        options.operation?.begin();
         const transferred = await Database.transferWarehouseToInventory(actor.fetchId(), {
             id: source.fetchId(), selfId: source.fetchSelfId(), name: source.fetchName?.(), amount,
             stackable: source.fetchStackable?.()
         });
+        options.operation?.applied({ sourceItemId: source.fetchId(), amount, inventoryId: transferred.inventoryId });
         if (target) {
             target.setAmount(transferred.inventoryAmount);
         } else {
@@ -171,6 +176,7 @@ async function withdraw(session, lines) {
             source.setAmount(transferred.warehouseAmount);
         }
     }
+    options.operation?.complete({ mode: 'withdraw', lines: lines.length }, 'warehouse_withdrawn');
     return stored;
 }
 

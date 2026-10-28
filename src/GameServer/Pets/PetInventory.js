@@ -44,13 +44,15 @@ function active(session) {
     if (session.activeTrade || session.trade || session.botTrade || session.actor.fetchPrivateStoreType?.() || session.actor.fetchStoreType?.()) return null;
     return pet;
 }
-async function apply(pet, command) {
+async function apply(pet, command, options = {}) {
     const session = pet.ownerSession;
     const actor = session?.actor;
     if (!actor || actor.pet !== pet || pet.petData.dead || pet.petData.expired) throw new Error('Pet inventory unavailable');
     if (session.persistenceMode === 'ephemeral') throw new Error('Pet inventory is unavailable in ephemeral encounters');
+    options.operation?.begin();
     await runtime().persist(pet);
     const result = await Database.transferPetInventory(actor.fetchId(), pet.fetchPetControlItemObjectId(), command);
+    options.operation?.applied({ direction: command.direction, itemId: command.itemId, amount: command.amount });
     pet.petData.inventory = result.inventory;
     if (result.currentFeed !== undefined) pet.setCurrentFeed(result.currentFeed);
     const row = result.playerItem;
@@ -66,9 +68,10 @@ async function apply(pet, command) {
     publish(pet);
     session.dataSendToMe?.(Response.itemsList(actor.backpack.fetchItems()));
     runtime().publish(pet);
+    options.operation?.complete({ direction: command.direction, itemId: command.itemId, amount: command.amount }, 'pet_inventory_applied');
     return result;
 }
-function transfer(session, itemId, amount, direction) {
+function transfer(session, itemId, amount, direction, options = {}) {
     const pet = active(session);
     if (!pet) return Promise.reject(new Error('No active pet'));
     return queue(pet, async () => {
@@ -77,7 +80,7 @@ function transfer(session, itemId, amount, direction) {
         if (!item || !Number.isSafeInteger(amount) || amount < 1 || amount > item.fetchAmount() || (!item.fetchStackable() && amount !== 1)) throw new Error('Invalid item transfer');
         if (item.fetchKind().includes('Quest') || Rules.TYPES[item.fetchSelfId()] || item.fetchEquipped()) throw new Error('Item cannot be transferred');
         if (direction === 'deposit' && items(pet).reduce((sum, entry) => sum + entry.fetchMass() * entry.fetchAmount(), 0) + item.fetchMass() * amount > Rules.POLICY.inventoryWeight) throw new Error('Pet weight limit');
-        return apply(pet, { direction, itemId, amount, stackable: item.fetchStackable() });
+        return apply(pet, { direction, itemId, amount, stackable: item.fetchStackable() }, options);
     });
 }
 function foodValue(itemId) {
@@ -88,26 +91,26 @@ function foodValue(itemId) {
     const Skill = invoke('GameServer/Model/Skill');
     return Number(new Skill({ ...utils.crushOb(template), ...template.levels[0] }).fetchSemantic().feed) || 0;
 }
-async function consumeFood(pet, item) {
+async function consumeFood(pet, item, options = {}) {
     const feed = foodValue(item.fetchSelfId());
     if (feed <= 0) throw new Error('Unknown pet food');
     // The transfer writes the feed with the food; apply sets it in memory.
-    await apply(pet, { direction: 'consume', itemId: item.fetchId(), amount: 1, feed });
+    await apply(pet, { direction: 'consume', itemId: item.fetchId(), amount: 1, feed }, options);
     pet.ownerSession.dataSendToMe?.(Response.consoleText(1527, [{ kind: 3, value: item.fetchSelfId() }]));
     runtime().publish(pet);
 }
-function use(session, itemId) {
+function use(session, itemId, options = {}) {
     const pet = active(session);
     if (!pet) return Promise.reject(new Error('No active pet'));
     return queue(pet, async () => {
         if (active(session) !== pet) throw new Error('Pet changed');
         const item = items(pet).find(item => item.fetchId() === itemId);
         if (!item) throw new Error('Pet item missing');
-        if (Rules.typeForNpc(pet.fetchSelfId()).food.includes(item.fetchSelfId())) return consumeFood(pet, item);
+        if (Rules.typeForNpc(pet.fetchSelfId()).food.includes(item.fetchSelfId())) return consumeFood(pet, item, options);
         const entry = gear[item.fetchSelfId()];
         if (!entry || !compatible(pet, entry)) throw new Error('Incompatible pet equipment');
         return apply(pet, { direction: 'equip', itemId, amount: 1, equipped: !item.fetchEquipped(),
-            equipIds: Object.keys(gear).filter(id => gear[id].slot === entry.slot).map(Number) });
+            equipIds: Object.keys(gear).filter(id => gear[id].slot === entry.slot).map(Number) }, options);
     });
 }
 function autoFeed(pet) {

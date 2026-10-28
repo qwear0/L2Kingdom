@@ -31,12 +31,15 @@ function nativeOwner(run) {
     const Summons = invoke('GameServer/Npc/SummonControl');
     const legalTarget = value => value && (value.fetchAttackable?.() === true || value.fetchIsSummon?.() === true)
         && require('../../World/NpcObjectIndex').find(World, value.fetchId()) === value
+        && distance(position(actor), position(value)) <= 6000
         && Summons.isValidEnemyTarget(actor, value);
     const Spoil = invoke('GameServer/Npc/SpoilSweep');
-    const allowsSkill = skill => ['self', 'party', 'ally', 'pet', 'friendly', 'enemy'].includes(skill.fetchTargetKind())
-        && !['recall', 'escape', 'teleport'].includes(String(skill.fetchSkillType?.()).toLowerCase())
-        && !Spoil.isSpoilSkill(skill.fetchSelfId()) && !Spoil.isSpoilFestivalSkill(skill.fetchSelfId()) && !Spoil.isSweepSkill(skill.fetchSelfId());
+    const allowsSkill = skill => (['self', 'party', 'ally', 'pet', 'friendly', 'enemy'].includes(skill.fetchTargetKind()) || Spoil.isSweepSkill(skill.fetchSelfId()))
+        && !['recall', 'escape', 'teleport'].includes(String(skill.fetchSkillType?.()).toLowerCase());
     const legalActionTarget = (value, skill) => {
+        if (skill && Spoil.isSweepSkill(skill.fetchSelfId())) return !!value && value.isDead?.()
+            && Spoil.isSweepable(value) && (!value.model.spoil.spoilerId || value.model.spoil.spoilerId === actor.fetchId())
+            && require('../../World/NpcObjectIndex').find(World, value.fetchId()) === value;
         if (!value || value.isDead?.() || value.fetchIsOnline?.() === false) return false;
         if (!skill) return legalTarget(value);
         const kind = skill.fetchTargetKind();
@@ -123,10 +126,20 @@ function createRun(input, lease, key, fingerprint) {
                 receipt.executionOutcome = 'partial';
                 receipt.sideEffects.nativeResourcesMayBeConsumed = true;
             }
+            if (event === 'item_teleport_started') { run.asyncPending = true; receipt.sideEffects.consumed = details.consumed; }
+            if (event === 'item_teleport_arrived') {
+                run.asyncPending = false; receipt.evidence.itemTravel = details; receipt.gameplayOutcome = 'native_teleport_arrived';
+                queueMicrotask(() => run.poll());
+            }
             if (event === 'summon_commanded') { run.lookupPending = false; receipt.phase = 'summon_approaching'; }
             if (event === 'native_queued') receipt.phase = 'native_queued';
             if (event === 'native_rejected') { run.fail(details.reason, 'native'); return; }
             if (event === 'native_failed') run.nativeFailure = details.reason;
+            if (event === 'native_settlement_failed') {
+                run.nativePending = false; run.publicationBlocked = true;
+                Object.assign(receipt, { status: 'unknown', phase: 'publication_blocked', publicationState: 'unknown',
+                    reasonCode: details.reason || 'native_settlement_uncertain', reasonSource: 'native' });
+            }
             if (event === 'cast_resources') { receipt.sideEffects.mpConsumed = details.mpCost; receipt.executionOutcome = 'applied'; }
             if (event === 'pickup_committing') { run.asyncPending = true; receipt.phase = 'claim_and_award'; }
             if (['swing_impact', 'cast_effect', 'summon_impact'].includes(event)) {
@@ -198,9 +211,15 @@ function createRun(input, lease, key, fingerprint) {
                 else if (run.target.isDead()) run.finish(run.swings ? 'succeeded' : 'failed', 'target_dead');
                 else if (input.command.until === 'bounded' && Date.now() - now >= input.command.durationMs) run.finish('succeeded', 'bounded_attack_finished');
                 else invoke(path.actor).attackRequest(session, actor, { id: run.target.fetchId(), actionOwner: run.owner });
-            } else if (input.command.kind === 'cast' || input.command.kind === 'summon') {
+            } else if (['cast', 'summon', 'item'].includes(input.command.kind)) {
                 if (run.summonOwner && !run.swings && run.summon.autoFightCommandOwner === run.summonOwner
                     && run.summon.controlMode === 'attack') return;
+                if (input.command.kind === 'item') {
+                    const after = actor.backpack.fetchItemRaw(run.itemId)?.fetchAmount() || 0;
+                    receipt.evidence.item = { itemId: run.itemId, before: run.itemBefore, after };
+                    receipt.sideEffects.consumed = Math.max(0, run.itemBefore - after);
+                    receipt.publicationState = 'live_applied_persistence_queued';
+                }
                 if (run.swings) run.finish('succeeded', run.impacts ? 'native_execution_finished' : 'native_finished_no_effect_measured', 'native');
                 else run.fail('native_action_not_started', 'native');
             }
@@ -217,6 +236,7 @@ function createRun(input, lease, key, fingerprint) {
 function start(run) {
     const { input, actor, session, receipt, owner } = run;
     const command = input.command, Generics = invoke(path.actor), Restrictions = invoke('GameServer/Effects/EffectRestrictions');
+    if (require('./Services').start(run)) return;
     if (command.kind === 'move') run.navigate(command.to, command.tolerance);
     else if (command.kind === 'approach') {
         const value = target(command.targetId);
@@ -270,8 +290,16 @@ function start(run) {
             const itemSkill = require('../../Items/C4ItemSkills').resolve(item.fetchSelfId());
             const shot = require('../../Inventory/ShotStock').kindForSelfId(item.fetchSelfId());
             const skill = itemSkill && actor.backpack.buildItemSkill(itemSkill);
-            if (item.isWearable() || !shot && (!skill || !itemSkill.consume || itemSkill.handler || itemSkill.teleport || skill.fetchTargetKind() !== 'self'
-                || skill.fetchHitTime() > 0)) throw fault('item_adapter_unavailable', 409);
+            if (item.isWearable() || !shot && (!skill || itemSkill.handler || itemSkill.teleport && itemSkill.teleport !== 'skillCoords'
+                || skill.fetchTargetKind() !== 'self')) throw fault('item_adapter_unavailable', 409);
+            if (!shot) {
+                run.itemBefore = item.fetchAmount(); run.itemId = command.itemId;
+                actor.backpack.useItem(session, command.itemId, { actionOwner: owner, onSkillResult(outcome) {
+                    owner.nativeEvent('cast_effect', { effective: invoke('GameServer/Bot/AI/BotActionFeedback').effective(outcome),
+                        heal: outcome.heal || 0, mpRestore: outcome.mpRestore || 0, effect: Boolean(outcome.effect) });
+                } });
+                run.poll(); return;
+            }
             const before = item.fetchAmount();
             let effect = null;
             actor.backpack.useItem(session, command.itemId, { onSkillResult(outcome) {

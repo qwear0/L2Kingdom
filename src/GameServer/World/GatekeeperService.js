@@ -48,7 +48,7 @@ function teleport(session, options) {
             return;
         }
         const accepted = invoke('GameServer/Actor/Generics/TeleportTo')(session, actor, destination, {
-            onArrival: options.onArrival, urgentWakeup: true
+            onArrival: options.onArrival, onInterrupted: options.onInterrupted, actionOwner: options.actionOwner, urgentWakeup: true
         });
         result.status = accepted ? 'accepted' : 'failed';
         result.reason = accepted ? null : 'dispatch_refused';

@@ -35,6 +35,12 @@ Retained clan gear planning pools personal inventory with available clan warehou
 
 Recipes, skills, item definitions and catalogue descriptions must agree; see [content](content.md).
 
+## Optional MCP native economy adapters
+
+[Bot MCP P4](bot-mcp.md#issued-choices-and-native-service-outcomes) selects one issued live NPC buy/sell, personal/clan warehouse or multisell line, or a learned self-craft. Native owners above remain authoritative: no free/admin shop, caller price, fabricated transaction or universal inventory revision is introduced. Purchase retains its delayed award after debit; sale binds payout to the original actor. Storage remains native per-line/batch as documented. Craft receipts distinguish committed failed-roll consumption from rejection, and multisell tracks postcommit publication separately. The optional operation hooks are concrete caller-owned evidence, not a session-global current action ID.
+
+The foreground hold spans accepted native mutation/publication even after revoke/disconnect; uncertainty is visible and cannot authorize replay with a fresh key, refunds or conflicting AI work. DB results, live application and queued persistence are not interchangeable. Each enabled economic contract still needs deployed acceptance; a successful gatekeeper teleport does not validate shop/storage/craft/exchange behavior.
+
 ## Retained clan market errands
 
 `Bot/Economy/ColdMarketService.js` rejects an arrived clan errand when the buyer's clan snapshot differs from its tag: it saves removal of that errand before `Clan/ClanPurchaseCredit.js` attempts to return unused tagged treasury credit to the original clan. Save and refund are separate operations; a rejected refund does not restore the errand or create a debt/retry record. This branch does not itself close `GoalState` or recheck membership inside the money transaction. It does not enable autonomous clan execution under owned-only startup.

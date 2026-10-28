@@ -90,7 +90,7 @@ function castUtilitySkill(session, actor, target, skill, effect, offensiveTarget
 
     // Utility casts bypass Attack.remoteHit. Admit/register offensive recipients
     // before entering casting state; Sweep needs tracking, not a live-target claim.
-    const cast = autoFight || actionOwner ? { target, skill, autoFightTargets: offensiveTargets || [] } : null;
+    const cast = autoFight || actionOwner ? { target, skill, actionOwner, autoFightTargets: offensiveTargets || [] } : null;
     if (autoFight) autoFight.acceptTargets(offensiveTargets);
 
     skill.setCalculatedHitTime(skill.fetchHitTime());
@@ -100,22 +100,26 @@ function castUtilitySkill(session, actor, target, skill, effect, offensiveTarget
     if (!actor.attack.queue.name || actor.attack.queue.name === 'skill') actor.attack.queue.resumeAttack = resumeAttack;
     HotPartyCastTracker.begin(session, actor, target, skill);
     if (cast) actor.attack.activeCast = cast;
+    actionOwner?.nativeEvent?.('cast_started');
 
     actor.attack.queueTimer(() => {
         if (cast && actor.attack.activeCast !== cast) return;
         if (cast) actor.attack.activeCast = null;
         HotPartyCastTracker.clear(actor);
         actor.state.setCasts(false);
-        if (actor.isDead()) {
+        if (actor.isDead() || session.actor !== actor || !spendSkillMp(session, actor, skill)) {
+            actionOwner?.nativeEvent?.('native_cancelled');
             return;
         }
-        if (!spendSkillMp(session, actor, skill)) {
-            return;
-        }
-        effect();
-        if (resumeAttack && (actor.attack.queue.name || actor.attack.queue.resumeAttack)) {
-            actor.attack.dequeueEvent(session);
-        }
+        actionOwner?.nativeEvent?.('cast_resources', { mpCost: skill.fetchConsumedMp() });
+        Promise.resolve().then(effect).then(outcome => {
+            actionOwner?.nativeEvent?.('cast_effect', { targetId: target.fetchId(), skillId: skill.fetchSelfId(), ...outcome });
+            actionOwner?.nativeEvent?.('cast_end');
+            if (resumeAttack && (actor.attack.queue.name || actor.attack.queue.resumeAttack)) actor.attack.dequeueEvent(session);
+        }).catch(error => {
+            actionOwner?.nativeEvent?.('native_settlement_failed', { reason: 'utility_cast_settlement_failed' });
+            utils.infoWarn('SpoilSweep', 'native utility settlement failed: %s', error.message);
+        });
     }, skill.fetchCalculatedHitTime());
 }
 
@@ -212,6 +216,7 @@ const SpoilSweep = {
             .map((npc) => [npc.fetchId?.(), npc]))].map(([, npc]) => npc)
             .filter((npc) => npc.fetchAttackable?.() && !npc.isDead?.() && hasSpoils(npc) && !npc.model?.spoil?.spoiled);
         if (eligible.length === 0) {
+            actionOwner?.nativeEvent?.('native_rejected', { reason: 'no_spoilable_targets' });
             session.dataSendToMe(ServerResponse.actionFailed());
             return;
         }
@@ -237,6 +242,7 @@ const SpoilSweep = {
                 .catch(error => utils.infoWarn('Quest', 'skill callback failed: %s', error.message));
             if (invoke('GameServer/Bot/Population/PopulationConfig').developerDiagnostics === true) console.info('SpoilSweep :: %s spoiled %d of %d targets with %s', actor.fetchName(), landed, spoiled.length, skill.fetchName());
             if (landed > 0) ConsoleText.transmit(session, ConsoleText.caption.spoilActivated);
+            return { effective: landed > 0, spoiled: landed, eligible: spoiled.length };
         }, eligible, actionOwner, resumeAttack);
     },
 
@@ -245,23 +251,26 @@ const SpoilSweep = {
         const expiredBotCorpse = () => String(session?.accountId || '').startsWith('bot_')
             && (npc.corpseDecayState === 'removed'
                 || Number(npc.corpseDecayAt || Infinity) <= Date.now());
-        if (expiredBotCorpse()) return;
+        if (expiredBotCorpse()) { actionOwner?.nativeEvent?.('native_rejected', { reason: 'corpse_expired' }); return; }
         if (!npc.isDead()) {
+            actionOwner?.nativeEvent?.('native_rejected', { reason: 'corpse_required' });
             session.dataSendToMe(ServerResponse.actionFailed());
             return;
         }
 
         if (!this.isSweepable(npc)) {
+            actionOwner?.nativeEvent?.('native_rejected', { reason: 'not_sweepable' });
             session.dataSendToMe(ServerResponse.actionFailed());
             return;
         }
 
         if (npc.model.spoil?.spoilerId && npc.model.spoil.spoilerId !== actor.fetchId()) {
+            actionOwner?.nativeEvent?.('native_rejected', { reason: 'not_spoiler' });
             session.dataSendToMe(ServerResponse.actionFailed());
             return;
         }
 
-        castUtilitySkill(session, actor, npc, skill, () => {
+        castUtilitySkill(session, actor, npc, skill, async () => {
             if (expiredBotCorpse() || !this.isSweepable(npc)) {
                 session.dataSendToMe(ServerResponse.actionFailed());
                 return;
@@ -270,12 +279,13 @@ const SpoilSweep = {
             const awarded = rollSpoils(npc);
             npc.model.spoil.swept = true;
 
+            const settlements = [];
             if (awarded.length === 0) {
                 session.dataSendToMe(ServerResponse.actionFailed());
             } else {
                 awarded.forEach((item) => {
                     const recipientSession = spoilRecipientSession(session, npc, item.selfId);
-                    invoke('GameServer/World/World').purchaseItem(recipientSession, item.selfId, item.amount);
+                    settlements.push(invoke('GameServer/World/World').purchaseItem(recipientSession, item.selfId, item.amount));
                     const textName = { kind: ConsoleText.kind.item, value: item.selfId };
                     const textAmount = { kind: ConsoleText.kind.number, value: item.amount };
                     item.amount > 1
@@ -289,6 +299,10 @@ const SpoilSweep = {
             const World = invoke('GameServer/World/World');
             NpcObjectIndex.remove(World, npc);
             World.npc.spawns = World.npc.spawns.filter((ob) => ob.fetchId() !== npc.fetchId());
+            const results = await Promise.all(settlements);
+            if (results.some(result => result.status !== 'awarded')) throw Error('sweep_award_uncertain');
+            return { effective: awarded.length > 0, awarded: awarded.map(item => ({ templateId: item.selfId, amount: item.amount })),
+                recipients: results.length };
         }, null, actionOwner, resumeAttack);
     }
 };

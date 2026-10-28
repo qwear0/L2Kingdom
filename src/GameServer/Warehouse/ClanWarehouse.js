@@ -80,7 +80,7 @@ function resolveKey(clanId, characterId, operation) {
     return `player:${operation}:${clanId}:${characterId}:${Date.now()}:${transferSequence}`;
 }
 
-async function deposit(session, lines) {
+async function deposit(session, lines, options = {}) {
     const clan = assertActive(session, 'deposit');
     const actor = session.actor;
     const backpack = actor.backpack;
@@ -103,11 +103,13 @@ async function deposit(session, lines) {
             resolveKey: resolveKey(clan.id, actor.fetchId(), 'deposit')
         };
     });
+    options.operation?.begin();
     const results = await Database.transferPlayerInventoryBatchToClanWarehouse({
         clanId: clan.id,
         characterId: actor.fetchId(),
         transfers
     });
+    options.operation?.applied({ clanId: clan.id, lines: results.length });
     results.forEach((transferred) => {
         const source = inventory.find((item) => Number(item.fetchId()) === Number(transferred.sourceItemId));
         if (!source) return;
@@ -119,11 +121,16 @@ async function deposit(session, lines) {
     });
     await invoke('GameServer/Clan/ClanWarehouseEquipmentService').resolveClan(clan.id, {
         preferredIds: results.flatMap((result) => result.warehouseIds || [result.warehouseId])
-    }).catch((error) => utils.infoWarn('ClanGear', 'exchange deferred: %s', error.message));
-    return list(clan.id);
+    }).catch((error) => {
+        options.operation?.uncertain('clan_equipment_publication_failed');
+        utils.infoWarn('ClanGear', 'exchange deferred: %s', error.message);
+    });
+    const stored = await list(clan.id);
+    options.operation?.complete({ clanId: clan.id, lines: lines.length, mode: 'deposit' }, 'clan_warehouse_deposited');
+    return stored;
 }
 
-async function withdraw(session, lines) {
+async function withdraw(session, lines, options = {}) {
     const clan = assertActive(session, 'withdraw');
     if (!canWithdraw(session, clan)) throw new Error('only the clan leader may withdraw');
     const actor = session.actor;
@@ -140,6 +147,7 @@ async function withdraw(session, lines) {
             && Number(item.fetchSelfId()) === Number(source.fetchSelfId())
             && Number(item.fetchEnchantLevel?.() || 0) === Number(source.fetchEnchantLevel?.() || 0)
         ));
+        options.operation?.begin();
         const transferred = await Database.transferClanWarehouseToPlayerInventory({
             clanId: clan.id,
             characterId: actor.fetchId(),
@@ -152,6 +160,7 @@ async function withdraw(session, lines) {
             amount,
             resolveKey: resolveKey(clan.id, actor.fetchId(), 'withdraw')
         });
+        options.operation?.applied({ clanId: clan.id, sourceItemId: source.fetchId(), inventoryId: transferred.inventoryId, amount });
         if (target) {
             target.setAmount(transferred.inventoryAmount);
         } else {
@@ -165,7 +174,9 @@ async function withdraw(session, lines) {
             if (added) backpack.items.push(added);
         }
     }
-    return list(clan.id);
+    const remaining = await list(clan.id);
+    options.operation?.complete({ clanId: clan.id, lines: lines.length, mode: 'withdraw' }, 'clan_warehouse_withdrawn');
+    return remaining;
 }
 
 module.exports = { clanFor, canView, canWithdraw, list, deposit, withdraw };

@@ -28,12 +28,12 @@ function mount(session,actor) {
     publish(session,actor);
     return true;
 }
-function dismount(session,actor,force=false) {
+function dismount(session,actor,force=false,options={}) {
     const pet=actor.pet;
     if(!pet || (!force && (busy(actor,pet) || pet.fetchCurrentFeed()<pet.fetchMaxFeed()*0.55))) return false;
     session.dataSendToMeAndOthers(Response.ride(actor,false),actor);
     set(actor,false);
-    Control.unsummon(session,actor,pet);
+    Control.unsummon(session,actor,pet,options);
     publish(session,actor);
     return true;
 }

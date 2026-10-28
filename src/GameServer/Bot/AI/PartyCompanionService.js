@@ -1229,11 +1229,14 @@ const PartyCompanionService = {
     async attach(leaderSession, companionSession, options = {}) {
         const leader = leaderSession?.actor;
         const bot = companionSession?.actor;
-        if (!leader || !bot || leader.isDead?.() || bot.isDead?.() || leader.fetchIsOnline?.() === false) return false;
+        if (!leader || !bot || leader.isDead?.() || bot.isDead?.() || leader.fetchIsOnline?.() === false
+            || options.isCurrent && !options.isCurrent()) return false;
         const Registry = require('../../Lord/VassalService');
         const owned = Registry.find(bot.fetchId());
         if (owned && Registry.owns(leader.fetchId(), bot.fetchId())
-            && companionSession.mcpControl && !companionSession.mcpControl.preempt('owner_party_admission')) return false;
+            && companionSession.mcpControl && !(options.actionOwner?.source === 'bot-mcp'
+                && options.actionOwner.run?.session === companionSession && options.actionOwner.isCurrent())
+            && !companionSession.mcpControl.preempt('owner_party_admission')) return false;
         if (owned && (!Registry.owns(leader.fetchId(), bot.fetchId()) || !require('./VassalOrders').clanEligible(companionSession)
             || companionSession.vassalAdmission
             || companionSession.vassalOperation || companionSession.vassalReceipt || companionSession.activeTrade
@@ -1247,6 +1250,7 @@ const PartyCompanionService = {
         if (!hasCapacity(leaderSession, companionSession, reservation)) return false;
         if (owned) {
             const valid = () => {
+                if (options.isCurrent && !options.isCurrent()) throw Error('party_authority_changed');
                 if (leaderSession.actor !== leader || companionSession.actor !== bot || leader.isDead() || bot.isDead()
                     || leader.fetchIsOnline?.() === false || companionSession.partyCompanion || companionSession.followPlayerSession
                     || companionSession.vassalOperation || companionSession.activeTrade || companionSession.trade

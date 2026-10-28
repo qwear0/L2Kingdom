@@ -724,7 +724,11 @@ const World = {
         }
 
         const attachCompanion = async (withdrawal = null) => {
-            const attachOptions = {};
+            if (options.isCurrent && !options.isCurrent()) {
+                PartyCompanionService.releaseCapacity(session, capacityReservation);
+                return false;
+            }
+            const attachOptions = { isCurrent: options.isCurrent, actionOwner: options.actionOwner };
             // A delayed invite must not overwrite a newer client setting.
             if (!session.clientPartyLootDistributionKnown && distribution !== undefined && distribution !== null) {
                 attachOptions.distribution = distribution;
@@ -995,7 +999,7 @@ const World = {
         });
     },
 
-    answerForTeamUp(session, actor, data) {
+    answerForTeamUp(session, actor, data, options = {}) {
         const pending = session.pendingPartyInvite;
         session.pendingPartyInvite = null;
 
@@ -1014,7 +1018,8 @@ const World = {
             pending.requestorActor,
             session,
             pending.distribution,
-            pending.source || 'invite'
+            pending.source || 'invite',
+            options
         );
     },
 

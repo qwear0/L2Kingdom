@@ -1,6 +1,8 @@
 const ServerResponse = invoke('GameServer/Network/Response');
 
-function npcTalk(session, npc) {
+function npcTalk(session, npc, options = {}) {
+    options.operation?.check();
+    if (session.mcpObservation) require('../../Bot/Control/Offers').clear(session);
     const title = npc.fetchTitle?.() || '';
 
     session.activeNpcShop = null;
@@ -27,8 +29,10 @@ function npcTalk(session, npc) {
 
     const ClanHallNpc = require('../../ClanHall/Npc');
     if (ClanHallNpc.handles(npc.fetchSelfId())) {
-        ClanHallNpc.render(session).catch(error => utils.infoWarn('ClanHall', 'NPC dialog failed: %s', error.message));
-        return;
+        return ClanHallNpc.render(session).catch(error => {
+            if (options.operation) throw error;
+            utils.infoWarn('ClanHall', 'NPC dialog failed: %s', error.message);
+        });
     }
 
     if (Number(npc.fetchSelfId()) === require('../GiranCrystallizationStation').npcId) {
@@ -69,9 +73,11 @@ function npcTalk(session, npc) {
         // A gatekeeper can simultaneously be a quest NPC.  Do not let quest
         // progress replace travel: offer the player both branches first.
         const QuestService = invoke('GameServer/Quest/QuestService');
-        QuestService.hasTalk(session, npc).then((hasQuest) => {
+        return QuestService.hasTalk(session, npc).then((hasQuest) => {
+            options.operation?.check();
             showGatekeeperTalk(session, npc, hasQuest);
         }).catch((error) => {
+            if (options.operation) throw error;
             utils.infoWarn('Quest', 'failed to inspect gatekeeper quests: %s', error.message);
             showGatekeeperTalk(session, npc, false);
         });
@@ -97,9 +103,11 @@ function npcTalk(session, npc) {
         });
         return;
     }
-    QuestService.onTalk(session, npc).then((handled) => {
+    return QuestService.onTalk(session, npc, options).then((handled) => {
+        options.operation?.check();
         if (!handled) showDefaultTalk(session, npc);
     }).catch((error) => {
+        if (options.operation) throw error;
         utils.infoWarn('Quest', 'failed to open NPC quest dialog: %s', error.message);
         showDefaultTalk(session, npc);
     });
@@ -107,10 +115,9 @@ function npcTalk(session, npc) {
 
 function showGatekeeperTalk(session, npc, hasQuest) {
     const C4GatekeeperTeleports = invoke('GameServer/World/C4GatekeeperTeleports');
-    session.dataSendToMe(ServerResponse.npcHtml(
-        npc.fetchId(),
-        C4GatekeeperTeleports.menu(npc.fetchSelfId(), hasQuest)
-    ));
+    const html = C4GatekeeperTeleports.menu(npc.fetchSelfId(), hasQuest);
+    if (session.mcpObservation) require('../../Bot/Control/Journal').dialogue(session, npc.fetchId(), html, 'native_gatekeeper_menu');
+    session.dataSendToMe(ServerResponse.npcHtml(npc.fetchId(), html));
     session.dataSendToMe(ServerResponse.actionFailed());
 }
 
@@ -126,7 +133,7 @@ function showDefaultTalk(session, npc, options = {}) {
             '<a action="bypass -h warehouse clan-deposit">Deposit item</a><br>',
             '<a action="bypass -h warehouse clan-withdraw">Withdraw item</a>'
         ] : [];
-        session.dataSendToMe(ServerResponse.npcHtml(npc.fetchId(), [
+        const html = [
             '<html><body><center><br>Personal Warehouse<br><br>',
             '<a action="bypass -h warehouse deposit">Deposit item</a><br>',
             '<a action="bypass -h warehouse withdraw">Withdraw item</a>',
@@ -135,7 +142,9 @@ function showDefaultTalk(session, npc, options = {}) {
                 ? ['<br><a action="bypass -h second-profession">Second profession trials</a><br>'] : []),
             ...(options.questLink ? [`<a action="bypass -h html ${npc.fetchSelfId()}-quest">Quest</a><br>`] : []),
             '</center></body></html>'
-        ].join('')));
+        ].join('');
+        if (session.mcpObservation) require('../../Bot/Control/Journal').dialogue(session, npc.fetchId(), html, 'native_warehouse_menu');
+        session.dataSendToMe(ServerResponse.npcHtml(npc.fetchId(), html));
         session.dataSendToMe(ServerResponse.actionFailed());
         return;
     }

@@ -27,6 +27,8 @@ function purchaseItems(session, items, purchaseOptions = {}) {
         return;
     }
 
+    if (purchaseOptions.operation) return trackedPurchase.call(this, session, items, totalCost, purchaseOptions.operation);
+
     // Deduct Adena if needed
     if (totalCost > 0) {
         const adenaItem = backpack.fetchItemFromSelfId(57);
@@ -53,4 +55,34 @@ function purchaseItems(session, items, purchaseOptions = {}) {
     }
 }
 
+// The tracked ingress is one selected line. A debit owns its delayed grant:
+// losing authority after payment cannot discard that required settlement.
+function trackedPurchase(session, items, cost, operation) {
+    if (items.length !== 1) throw Error('tracked_purchase_requires_one_line');
+    operation.check();
+    const actor = session.actor, backpack = actor.backpack;
+    return new Promise((resolve, reject) => {
+        let dispatched = false;
+        const grant = () => {
+            dispatched = true;
+            operation.applied({ paidAdena: cost }, 'live_applied_persistence_queued');
+            setTimeout(() => {
+                if (session.actor !== actor) { operation.uncertain('purchase_actor_changed_after_debit'); resolve(); return; }
+                Promise.resolve(this.purchaseItem(session, items[0].selfId, items[0].amount)).then(result => {
+                    if (result.status !== 'awarded') operation.uncertain('purchase_award_uncertain');
+                    else operation.complete({ paidAdena: cost, itemId: items[0].selfId, amount: items[0].amount,
+                        presentationFailed: !!result.presentationFailed }, 'purchased', 'live_applied_persistence_queued');
+                    resolve();
+                }).catch(reject);
+            }, 100);
+        };
+        operation.begin();
+        if (cost > 0) {
+            const adena = backpack.fetchItemFromSelfId(57);
+            if (!adena || adena.fetchPetLocked?.() || adena.fetchAmount() < cost) { operation.rolledBack(); resolve(); return; }
+            backpack.deleteItem(session, adena.fetchId(), cost, grant);
+            if (!dispatched) { operation.rolledBack(); resolve(); }
+        } else grant();
+    });
+}
 module.exports = purchaseItems;

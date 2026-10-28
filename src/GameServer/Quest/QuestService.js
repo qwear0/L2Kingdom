@@ -145,24 +145,33 @@ function transmitItemReceived(session, selfId, amount) {
   }
 }
 
-async function onTalk(session, npc) {
+function transitionSnapshot(state) {
+  return { questId: state.quest.id, state: state.state, condition: state.getInt('cond'), revision: state.getInt('revision') };
+}
+
+async function onTalk(session, npc, options = {}) {
   // Work queued for one character is dropped once the connection selected another.
   const actor = session.actor;
   return mutate(session, async () => {
     if (session.actor !== actor) return false;
     await ensureLoaded(session);
     if (session.actor !== actor) return false;
+    options.operation?.check();
     const quest = questForNpc(npc, session);
     if (!quest) return false;
     const state = stateFor(session, quest);
     const choices = talkQuests(npc, session).filter(quest => !stateFor(session, quest).isCompleted());
     if (!state.isStarted() && choices.length > 1) {
+      options.operation?.begin();
       const html = `<html><body>Available quests:<br><br>${choices.map((quest) => `<a action="bypass -h quest ${quest.id} ${stateFor(session, quest).isStarted() ? 'show_quest' : 'start'}">${quest.name}</a><br>`).join("")}</body></html>`;
       render(session, npc, html);
       return true;
     }
     const before = activeQuestSnapshot(session);
+    options.operation?.begin();
+    const nativeBefore = options.operation && transitionSnapshot(state);
     let html = await quest.onTalk(state, npc);
+    options.operation?.feedback({ before: nativeBefore, after: transitionSnapshot(state), scope: 'selected_live_quest_state_not_reward_receipt' });
     if (!html) return false;
     const alternatives = choices.filter(choice => choice !== quest);
     if (alternatives.length) html = html.replace(/<\/body>/i, '<br>Other quests:<br>'
@@ -173,13 +182,14 @@ async function onTalk(session, npc) {
   });
 }
 
-async function onEvent(session, event) {
+async function onEvent(session, event, options = {}) {
   // Work queued for one character is dropped once the connection selected another.
   const actor = session.actor;
   return mutate(session, async () => {
     if (session.actor !== actor) return false;
     await ensureLoaded(session);
     if (session.actor !== actor) return false;
+    options.operation?.check();
     const quest = byId.get(Number(event.questId));
     const npc = session.activeNpcTalk;
     const eventName = String(event.name);
@@ -193,7 +203,10 @@ async function onEvent(session, event) {
     if (eventName === 'show_quest') {
       if (!talkQuests(target, session).includes(quest)) return false;
       const before = activeQuestSnapshot(session);
-      const html = await quest.onTalk(stateFor(session, quest), target);
+      options.operation?.begin();
+      const state = stateFor(session, quest), nativeBefore = options.operation && transitionSnapshot(state);
+      const html = await quest.onTalk(state, target);
+      options.operation?.feedback({ before: nativeBefore, after: transitionSnapshot(state), scope: 'selected_live_quest_state_not_reward_receipt' });
       if (!html) return false;
       if (before !== activeQuestSnapshot(session)) syncActiveQuests(session);
       render(session, target, html);
@@ -205,7 +218,10 @@ async function onEvent(session, event) {
     if (!permitted) return false;
     const state = stateFor(session, quest);
     const before = activeQuestSnapshot(session);
+    options.operation?.begin();
+    const nativeBefore = options.operation && transitionSnapshot(state);
     const html = await quest.onEvent(state, eventName);
+    options.operation?.feedback({ before: nativeBefore, after: transitionSnapshot(state), scope: 'selected_live_quest_state_not_reward_receipt' });
     if (!html) return false;
     if (before !== activeQuestSnapshot(session)) syncActiveQuests(session);
     render(session, { fetchId: () => npc.objectId }, html);

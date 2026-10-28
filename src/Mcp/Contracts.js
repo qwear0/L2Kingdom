@@ -32,7 +32,14 @@ const command = z.discriminatedUnion('kind', [
     z.strictObject({ kind: z.literal('item'), itemId: ID }),
     z.strictObject({ kind: z.literal('equip'), itemId: ID, equipped: z.boolean() }),
     z.strictObject({ kind: z.literal('pickup'), groundItemId: ID }),
-    z.strictObject({ kind: z.literal('summon'), command: z.enum(['follow', 'stop', 'attack']), targetId: ID.optional() })
+    z.strictObject({ kind: z.literal('summon'), command: z.enum(['follow', 'stop', 'attack', 'skill', 'unsummon', 'mount', 'dismount']), targetId: ID.optional(), skillId: ID.optional() }),
+    z.strictObject({ kind: z.literal('interact'), npc: entityHandle }),
+    z.strictObject({ kind: z.literal('service'), revision: uuid, offerId: uuid, amount: ID.max(5000).default(1) }),
+    z.strictObject({ kind: z.literal('craft'), recipeId: ID }),
+    z.strictObject({ kind: z.literal('drop'), itemId: ID, amount: ID.max(5000) }),
+    z.strictObject({ kind: z.literal('pet_inventory'), operation: z.enum(['deposit', 'withdraw', 'use']), itemId: ID, amount: ID.max(5000).default(1) }),
+    z.strictObject({ kind: z.literal('chat'), channel: z.enum(['local', 'clan']), text: z.string().trim().min(1).max(256) }),
+    z.strictObject({ kind: z.literal('party'), operation: z.enum(['leave', 'invite', 'accept', 'kick', 'distribution']), target: entityHandle.optional(), distribution: z.number().int().min(0).max(4).optional() })
 ]);
 const schemas = Object.freeze({
     status: z.strictObject({}),
@@ -42,7 +49,7 @@ const schemas = Object.freeze({
     observe: z.strictObject({ ...namespace, attachmentId: uuid, view: z.enum(['perception', 'diagnostic']).default('diagnostic'),
         radius: ID.max(6000).default(1500), limit: ID.max(50).default(20), cursor: uuid.optional() }),
     inspect: z.strictObject({ ...namespace, attachmentId: uuid,
-        section: z.enum(['self', 'inventory', 'skills', 'effects', 'quests', 'party', 'summon', 'dialogue', 'entity']),
+        section: z.enum(['self', 'inventory', 'skills', 'effects', 'quests', 'party', 'summon', 'dialogue', 'entity', 'services', 'recipes', 'pet_inventory']),
         limit: ID.max(50).default(20), cursor: uuid.optional(), handle: entityHandle.optional() }),
     events: z.strictObject({ ...namespace, attachmentId: uuid, cursor: eventCursor.optional(), limit: ID.max(100).default(20) }),
     diagnose: z.strictObject({ ...namespace, attachmentId: uuid, kind: z.enum(['movement', 'combat', 'ai', 'evidence']),
