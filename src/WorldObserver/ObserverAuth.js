@@ -72,7 +72,7 @@ class ObserverAuth {
         if (url.pathname === LOGIN || url.pathname === `${LOGIN}/`) {
             if (!['GET', 'HEAD'].includes(request.method)) { response.setHeader('Allow', 'GET, HEAD'); throw error('Method not allowed.', 405); }
             if (user) { response.writeHead(302, { Location: '/observer/' }); response.end(); }
-            else sendFile(request, response, path.join(__dirname, 'public', 'login.html'));
+            else sendFile(request, response, path.join(__dirname, '..', 'frontend', 'public', 'login.html'));
             return true;
         }
         if (!user) {

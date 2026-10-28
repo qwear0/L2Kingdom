@@ -1,6 +1,6 @@
 const assert = require('assert');
-const MapViewport = require('../src/WorldObserver/public/mapViewport');
-const MapClusters = require('../src/WorldObserver/public/mapClusters');
+const MapViewport = require('../src/frontend/public/mapViewport');
+const MapClusters = require('../src/frontend/public/mapClusters');
 
 const viewport = { x: 1000, y: 2000, width: 4000, height: 4000 };
 const wide = MapViewport.metrics(viewport, { left: 200, top: 100, width: 1200, height: 400 });

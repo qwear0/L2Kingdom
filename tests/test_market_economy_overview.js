@@ -6,7 +6,7 @@ const path = require('path');
 const { Worker } = require('worker_threads');
 const HistoryStore = require('../src/HistoryStore');
 const Overview = require('../src/MarketEconomyOverview');
-const MarketModel = require('../src/WorldObserver/public/marketModel');
+const MarketModel = require('../src/frontend/public/marketModel');
 
 async function main() {
     const directory = fs.mkdtempSync(path.join(process.cwd(), 'tmp', 'test-market-economy-'));

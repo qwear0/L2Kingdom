@@ -9,7 +9,7 @@ const DataCache = invoke('GameServer/DataCache');
 const Database = invoke('Database');
 DataCache.init();
 const Observer = invoke('WorldObserver/WorldObserverServer');
-const observerApp = fs.readFileSync(path.join(__dirname, '..', 'src', 'WorldObserver', 'public', 'app.js'), 'utf8');
+const observerApp = fs.readFileSync(path.join(__dirname, '..', 'src', 'frontend', 'public', 'app.js'), 'utf8');
 assert.match(observerApp, /const crestAvailable = Number\(clan\.level \|\| 0\) >= 3/,
     'the clan manager must only expose crest selection from clan level 3');
 assert.match(observerApp, /Clan crest locked/,
@@ -390,7 +390,7 @@ async function clanOrderUiChecks() {
         uiIcon: (name) => `<svg data-icon="${name}"></svg>`, roleLabel: (role) => role, uiLabel: (kind, label) => label,
         activityLabel: value => value,
         readableToken: (value) => value || '', compactNumber: (value) => String(value),
-        WorldObserverFormat: require('../src/WorldObserver/public/format'),
+        WorldObserverFormat: require('../src/frontend/public/format'),
         fetch: null
     });
     for (const name of ['escapeHtml', 'text', 'number', 'clanGoalSummary', 'clanAutomaticGoalMarkup', 'resetClanOrderDraft', 'clanOrderDraft',

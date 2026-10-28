@@ -34,7 +34,7 @@ assert.deepStrictEqual(sword.stats, {
     consumedMp: 0
 }, 'observer equipment should expose item-level combat stats for the tooltip');
 
-const observerApp = fs.readFileSync(path.join(__dirname, '..', 'src', 'WorldObserver', 'public', 'app.js'), 'utf8');
+const observerApp = fs.readFileSync(path.join(__dirname, '..', 'src', 'frontend', 'public', 'app.js'), 'utf8');
 assert.match(observerApp, /Router\.href\(\{ name: 'knowledge-items', id: itemId \}\)/,
     'paperdoll items should link to their knowledge-base detail route');
 assert.match(observerApp, /const tag = href \? 'a' : 'div'/,

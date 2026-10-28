@@ -6,7 +6,7 @@ const Life = invoke('GameServer/Bot/Population/BotLifeState');
 const Manager = invoke('GameServer/Bot/BotManager');
 const DB = invoke('Database');
 const Api = invoke('WorldObserver/Relationships');
-const Ui = require('../src/WorldObserver/public/relationships');
+const Ui = require('../src/frontend/public/relationships');
 const original = [], patch = (o, k, v) => { const old = o[k]; original.push(() => { o[k] = old; }); o[k] = v; };
 
 async function run() {
@@ -54,7 +54,7 @@ async function run() {
     assert(Ui.render(richer, { filter: 'friendly' }).includes('No remembered relationships in this group'));
 
     // Exercise the actual card loader against deferred responses and selection changes.
-    const app = fs.readFileSync('src/WorldObserver/public/app.js', 'utf8');
+    const app = fs.readFileSync('src/frontend/public/app.js', 'utf8');
     const code = app.slice(app.indexOf('function resetRelationships()'), app.indexOf('function relationshipContent('));
     let calls = [], rendered = 0;
     const state = { selectedId: { id: 1, kind: 'bot' }, live: true };

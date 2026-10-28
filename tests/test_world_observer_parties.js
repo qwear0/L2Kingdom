@@ -2,7 +2,7 @@ const assert = require('assert');
 require('../src/Global');
 const Observer = invoke('WorldObserver/WorldObserverServer');
 const World = invoke('GameServer/World/World');
-const Pages = require('../src/WorldObserver/public/playerPages');
+const Pages = require('../src/frontend/public/playerPages');
 const originalUser = World.user;
 const actor = {
     fetchId: () => 7, fetchName: () => 'Player leader', fetchClassId: () => 0, fetchRace: () => 0,
@@ -29,7 +29,7 @@ try {
     assert.strictEqual(background.party.id, 'autonomous');
 } finally { World.user = originalUser; }
 console.log('Observer party identities: player leaders, companions, autonomous parties and solo players passed');
-const Atlas = require('../src/WorldObserver/public/mapAtlas');
+const Atlas = require('../src/frontend/public/mapAtlas');
 const Areas = invoke('GameServer/World/WorldAreaCatalog');
 for (const area of Areas.AREAS) {
     const anchor = area.mapAnchor;

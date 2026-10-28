@@ -2,7 +2,7 @@ const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
 
-const Filters = require('../src/WorldObserver/public/actorFilters');
+const Filters = require('../src/frontend/public/actorFilters');
 
 const actors = [
     { id: 1, name: 'Starter', level: 1, classId: 0, className: 'Human Fighter' },
@@ -70,7 +70,7 @@ assert.strictEqual(Filters.normalizeLevel(0), 1);
 assert.strictEqual(Filters.normalizeLevel(99), 80);
 assert.strictEqual(Filters.normalizeLevel(''), null);
 
-const observerApp = fs.readFileSync(path.join(__dirname, '..', 'src', 'WorldObserver', 'public', 'app.js'), 'utf8');
+const observerApp = fs.readFileSync(path.join(__dirname, '..', 'src', 'frontend', 'public', 'app.js'), 'utf8');
 assert(observerApp.includes('population.active ?? Math.max(0, Number(population.hot || 0) - services)'),
     'population summary must exclude merchant services from the active field count');
 assert(observerApp.includes("{ key: 'services', label: 'Services'"),

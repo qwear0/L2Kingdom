@@ -162,9 +162,9 @@ try {
         { locX: 20, locY: 30, minZ: -40, maxZ: -20 }
     ] } }), [{ locX: 10, locY: 20, locZ: -20, source: 'zone', zoneId: 'test' }]);
 
-    const html = fs.readFileSync(path.join(__dirname, '..', 'src', 'WorldObserver', 'public', 'knowledge-base.html'), 'utf8');
-    const app = fs.readFileSync(path.join(__dirname, '..', 'src', 'WorldObserver', 'public', 'knowledge-base.js'), 'utf8');
-    const mapHtml = fs.readFileSync(path.join(__dirname, '..', 'src', 'WorldObserver', 'public', 'index.html'), 'utf8');
+    const html = fs.readFileSync(path.join(__dirname, '..', 'src', 'frontend', 'public', 'knowledge-base.html'), 'utf8');
+    const app = fs.readFileSync(path.join(__dirname, '..', 'src', 'frontend', 'public', 'knowledge-base.js'), 'utf8');
+    const mapHtml = fs.readFileSync(path.join(__dirname, '..', 'src', 'frontend', 'public', 'index.html'), 'utf8');
     assert.match(html, /Aden Archives/);
     assert.match(html, /data-kind="items"/);
     assert.match(html, /data-kind="npcs"/);

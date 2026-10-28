@@ -5,7 +5,7 @@ const fs = require('fs');
 const path = require('path');
 const BotControlRoutes = require('./BotControlRoutes');
 
-const PUBLIC_DIR = path.join(__dirname, 'public');
+const PUBLIC_DIR = path.join(__dirname, '..', 'frontend', 'public');
 const ITEM_ICON_CATALOG_DIR = path.join(PUBLIC_DIR, 'item-icons');
 const ITEM_ICON_MANIFEST_PATH = path.join(ITEM_ICON_CATALOG_DIR, 'index.json');
 const KNOWLEDGE_BASE_DIR = path.join(__dirname, '..', '..', 'data', 'KnowledgeBase');
@@ -71,7 +71,7 @@ const WORLD_BOUNDS = {
     maxY: 262144
 };
 
-const MAP_TILES = require('./public/mapAtlas').metadata;
+const MAP_TILES = require('../frontend/public/mapAtlas').metadata;
 
 const REGION_LABELS = [
     { name: 'Talking Island', locX: -84318, locY: 244579, kind: 'town' },

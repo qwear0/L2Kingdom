@@ -5,7 +5,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 const { createRequire } = require('node:module');
 const Progression = require('../src/GameServer/ClassProgression');
-const Filters = require('../src/WorldObserver/public/actorFilters');
+const Filters = require('../src/frontend/public/actorFilters');
 
 const stringRow = { classId: '0', template: { class: 'String first', race: 1 } };
 const numericRow = { classId: 0, template: { class: 'Numeric second', race: 2 } };

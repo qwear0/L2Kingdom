@@ -1,7 +1,7 @@
 const assert = require('assert');
-const { groupParties, filterCharacters, paginate } = require('../src/WorldObserver/public/playerPages');
-const Router = require('../src/WorldObserver/public/spaRouter');
-const Atlas = require('../src/WorldObserver/public/mapAtlas');
+const { groupParties, filterCharacters, paginate } = require('../src/frontend/public/playerPages');
+const Router = require('../src/frontend/public/spaRouter');
+const Atlas = require('../src/frontend/public/mapAtlas');
 
 const actors = [
     { id: 11, kind: 'bot', name: 'Leader', level: 40, classId: 0, area: { id: 'cruma', name: 'Cruma Tower' }, party: { id: 'p1', leaderId: 11 } },

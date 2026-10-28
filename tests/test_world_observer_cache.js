@@ -86,13 +86,13 @@ function requestAsset(headers = {}) {
         Observer.sendFile(
             { headers },
             response,
-            path.join(__dirname, '..', 'src', 'WorldObserver', 'public', 'worldState.js')
+            path.join(__dirname, '..', 'src', 'frontend', 'public', 'worldState.js')
         );
     });
 }
 
 (async () => {
-    const assetPath = path.join(__dirname, '..', 'src', 'WorldObserver', 'public', 'worldState.js');
+    const assetPath = path.join(__dirname, '..', 'src', 'frontend', 'public', 'worldState.js');
     const asset = await requestAsset();
     assert.strictEqual(asset.status, 200);
     assert(asset.headers.ETag, 'static observer assets must expose a validator');

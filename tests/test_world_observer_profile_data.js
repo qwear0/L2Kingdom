@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict');
 const { project } = require('../src/WorldObserver/ActorEconomyProjection');
 const { createActorCollections } = require('../src/WorldObserver/ActorCollections');
-const UI = require('../src/WorldObserver/public/profileData');
+const UI = require('../src/frontend/public/profileData');
 const itemFor = id => ({ selfId: id, name: id === 673 ? 'Avadon Shield' : `Item ${id}` });
 const network = { decisionSeq: 7, activityLeaf: 123, activity: {
     rootKey: 'power:673:8', nodeKey: 'item:1872', activity: 'hunting', kind: 'drop', itemId: 1872,
@@ -72,7 +72,7 @@ assert.match(UI.renderEconomy(economy), /Amounts are priorities only/);
     assert.match(UI.renderCollection('warehouse', warehouse), /Next|Previous/);
 
     const fs = require('node:fs'), vm = require('node:vm');
-    const app = fs.readFileSync(require.resolve('../src/WorldObserver/public/app.js'), 'utf8');
+    const app = fs.readFileSync(require.resolve('../src/frontend/public/app.js'), 'utf8');
     const pending = [], browserState = { live: true, selectedId: { id: 1, kind: 'bot' },
         profileTab: 'inventory', profileCollections: {}, profileCollectionRequest: null };
     const browser = vm.createContext({ state: browserState, AbortController, Date,

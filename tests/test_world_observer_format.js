@@ -5,7 +5,7 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 
-const publicDir = path.join(__dirname, '..', 'src', 'WorldObserver', 'public');
+const publicDir = path.join(__dirname, '..', 'src', 'frontend', 'public');
 const sharedPath = path.join(publicDir, 'format.js');
 
 function load(file, names) {
