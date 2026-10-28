@@ -8,7 +8,7 @@ const SAMPLE_ATTEMPTS = 512;
 const PATH_NODES = 20000;
 const ANCHOR_RADIUS = 32768;
 const BUCKET_SIZE = 8192;
-const LIMITS = Object.freeze({ wallMs: 900000, targetMs: 90000, rssBytes: 1536 * 1024 * 1024,
+const LIMITS = Object.freeze({ wallMs: 900000, targetMs: 90000, rssBytes: 3072 * 1024 * 1024,
     searches: 4096, nodeAllowance: 16000000, walks: 250000, transitions: 64000000,
     decodedLayers: 16000000, deterministicCells: 2000000, targetSearches: 24,
     targetNodeAllowance: 300000, targetWalks: 4096, targetTransitions: 1000000,

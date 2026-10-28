@@ -64,7 +64,7 @@ Preparation enforces these non-configurable limits. Time/RSS and capacity limits
 | Work | Whole preparation / renewable work window | One random shared pool / fixed normalized-cell target |
 | --- | ---: | ---: |
 | Elapsed time | 900,000 ms wall for the whole preparation, including identity/cache work | 90,000 ms active work |
-| Observed process RSS | 1,536 MiB hard stop for the whole preparation | Shared process limit |
+| Observed process RSS | 3,072 MiB hard stop for the whole preparation | Shared process limit |
 | Native searches | 4,096 | 24 (initial random allowance 12) |
 | Reserved node expansions | 16,000,000 | 300,000 |
 | Strict walks / cardinal transitions | 250,000 / 64,000,000 | 4,096 / 1,000,000 |
