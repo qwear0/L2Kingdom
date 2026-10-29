@@ -7674,6 +7674,33 @@
             "raidMinion": false
           },
           "groupIndexes": [
+            1
+          ],
+          "mobId": 1101,
+          "mobLevel": 24,
+          "mobName": "Langk Lizardman Shaman",
+          "rateProfiles": {
+            "x1": {
+              "chancePercent": 0.1066,
+              "expectedAmountPerKill": 0.001066
+            },
+            "x10": {
+              "chancePercent": 1.066,
+              "expectedAmountPerKill": 0.01066
+            },
+            "x50": {
+              "chancePercent": 5.33,
+              "expectedAmountPerKill": 0.0533
+            }
+          }
+        },
+        {
+          "availability": {
+            "directSpawn": true,
+            "knownReachable": true,
+            "raidMinion": false
+          },
+          "groupIndexes": [
             0
           ],
           "mobId": 1130,
@@ -10039,6 +10066,33 @@
             "x50": {
               "chancePercent": 2.445,
               "expectedAmountPerKill": 0.02445
+            }
+          }
+        },
+        {
+          "availability": {
+            "directSpawn": true,
+            "knownReachable": true,
+            "raidMinion": false
+          },
+          "groupIndexes": [
+            1
+          ],
+          "mobId": 1101,
+          "mobLevel": 24,
+          "mobName": "Langk Lizardman Shaman",
+          "rateProfiles": {
+            "x1": {
+              "chancePercent": 0.1066,
+              "expectedAmountPerKill": 0.001066
+            },
+            "x10": {
+              "chancePercent": 1.066,
+              "expectedAmountPerKill": 0.01066
+            },
+            "x50": {
+              "chancePercent": 5.33,
+              "expectedAmountPerKill": 0.0533
             }
           }
         },
@@ -30212,6 +30266,60 @@
             "x50": {
               "chancePercent": 100,
               "expectedAmountPerKill": 127610
+            }
+          }
+        },
+        {
+          "availability": {
+            "directSpawn": true,
+            "knownReachable": true,
+            "raidMinion": false
+          },
+          "groupIndexes": [
+            0
+          ],
+          "mobId": 1100,
+          "mobLevel": 19,
+          "mobName": "Langk Lizardman Sentinel",
+          "rateProfiles": {
+            "x1": {
+              "chancePercent": 70,
+              "expectedAmountPerKill": 118.3
+            },
+            "x10": {
+              "chancePercent": 100,
+              "expectedAmountPerKill": 1183
+            },
+            "x50": {
+              "chancePercent": 100,
+              "expectedAmountPerKill": 5915
+            }
+          }
+        },
+        {
+          "availability": {
+            "directSpawn": true,
+            "knownReachable": true,
+            "raidMinion": false
+          },
+          "groupIndexes": [
+            0
+          ],
+          "mobId": 1101,
+          "mobLevel": 24,
+          "mobName": "Langk Lizardman Shaman",
+          "rateProfiles": {
+            "x1": {
+              "chancePercent": 70,
+              "expectedAmountPerKill": 147.35
+            },
+            "x10": {
+              "chancePercent": 100,
+              "expectedAmountPerKill": 1473.5
+            },
+            "x50": {
+              "chancePercent": 100,
+              "expectedAmountPerKill": 7367.5
             }
           }
         },
@@ -124901,6 +125009,33 @@
               "expectedAmountPerKill": 0.055333902211
             }
           }
+        },
+        {
+          "availability": {
+            "directSpawn": true,
+            "knownReachable": true,
+            "raidMinion": false
+          },
+          "groupIndexes": [
+            1
+          ],
+          "mobId": 1100,
+          "mobLevel": 19,
+          "mobName": "Langk Lizardman Sentinel",
+          "rateProfiles": {
+            "x1": {
+              "chancePercent": 0.0886000934,
+              "expectedAmountPerKill": 0.000886000934
+            },
+            "x10": {
+              "chancePercent": 0.886000934,
+              "expectedAmountPerKill": 0.00886000934
+            },
+            "x50": {
+              "chancePercent": 4.43000467,
+              "expectedAmountPerKill": 0.0443000467
+            }
+          }
         }
       ],
       "spoils": [
@@ -129080,6 +129215,33 @@
               "expectedAmountPerKill": 0.083094004163
             }
           }
+        },
+        {
+          "availability": {
+            "directSpawn": true,
+            "knownReachable": true,
+            "raidMinion": false
+          },
+          "groupIndexes": [
+            1
+          ],
+          "mobId": 1100,
+          "mobLevel": 19,
+          "mobName": "Langk Lizardman Sentinel",
+          "rateProfiles": {
+            "x1": {
+              "chancePercent": 0.1329998628,
+              "expectedAmountPerKill": 0.001329998628
+            },
+            "x10": {
+              "chancePercent": 1.329998628,
+              "expectedAmountPerKill": 0.01329998628
+            },
+            "x50": {
+              "chancePercent": 6.64999314,
+              "expectedAmountPerKill": 0.0664999314
+            }
+          }
         }
       ],
       "spoils": []
@@ -132949,6 +133111,33 @@
             "x50": {
               "chancePercent": 4.133712517646,
               "expectedAmountPerKill": 0.041337125176
+            }
+          }
+        },
+        {
+          "availability": {
+            "directSpawn": true,
+            "knownReachable": true,
+            "raidMinion": false
+          },
+          "groupIndexes": [
+            1
+          ],
+          "mobId": 1100,
+          "mobLevel": 19,
+          "mobName": "Langk Lizardman Sentinel",
+          "rateProfiles": {
+            "x1": {
+              "chancePercent": 0.0662000438,
+              "expectedAmountPerKill": 0.000662000438
+            },
+            "x10": {
+              "chancePercent": 0.662000438,
+              "expectedAmountPerKill": 0.00662000438
+            },
+            "x50": {
+              "chancePercent": 3.31000219,
+              "expectedAmountPerKill": 0.0331000219
             }
           }
         }
@@ -187801,6 +187990,33 @@
           "groupIndexes": [
             0
           ],
+          "mobId": 1100,
+          "mobLevel": 19,
+          "mobName": "Langk Lizardman Sentinel",
+          "rateProfiles": {
+            "x1": {
+              "chancePercent": 8.3774,
+              "expectedAmountPerKill": 0.083774
+            },
+            "x10": {
+              "chancePercent": 8.3774,
+              "expectedAmountPerKill": 0.83774
+            },
+            "x50": {
+              "chancePercent": 8.3774,
+              "expectedAmountPerKill": 4.1887
+            }
+          }
+        },
+        {
+          "availability": {
+            "directSpawn": true,
+            "knownReachable": true,
+            "raidMinion": false
+          },
+          "groupIndexes": [
+            0
+          ],
           "mobId": 1125,
           "mobLevel": 19,
           "mobName": "Northern Trimden",
@@ -191364,6 +191580,33 @@
             "x50": {
               "chancePercent": 9.327636086467,
               "expectedAmountPerKill": 0.093276360865
+            }
+          }
+        },
+        {
+          "availability": {
+            "directSpawn": true,
+            "knownReachable": true,
+            "raidMinion": false
+          },
+          "groupIndexes": [
+            2
+          ],
+          "mobId": 1100,
+          "mobLevel": 19,
+          "mobName": "Langk Lizardman Sentinel",
+          "rateProfiles": {
+            "x1": {
+              "chancePercent": 0.78700015419,
+              "expectedAmountPerKill": 0.007870001542
+            },
+            "x10": {
+              "chancePercent": 5.65329,
+              "expectedAmountPerKill": 0.0565329
+            },
+            "x50": {
+              "chancePercent": 12.864946594274,
+              "expectedAmountPerKill": 0.128649465943
             }
           }
         }
@@ -198937,6 +199180,33 @@
             "raidMinion": false
           },
           "groupIndexes": [
+            2
+          ],
+          "mobId": 1100,
+          "mobLevel": 19,
+          "mobName": "Langk Lizardman Sentinel",
+          "rateProfiles": {
+            "x1": {
+              "chancePercent": 7.8690966704,
+              "expectedAmountPerKill": 0.078690966704
+            },
+            "x10": {
+              "chancePercent": 56.5264,
+              "expectedAmountPerKill": 0.565264
+            },
+            "x50": {
+              "chancePercent": 32.693631699514,
+              "expectedAmountPerKill": 1.28634674175
+            }
+          }
+        },
+        {
+          "availability": {
+            "directSpawn": true,
+            "knownReachable": true,
+            "raidMinion": false
+          },
+          "groupIndexes": [
             1
           ],
           "mobId": 1108,
@@ -205579,6 +205849,33 @@
             "raidMinion": false
           },
           "groupIndexes": [
+            2
+          ],
+          "mobId": 1101,
+          "mobLevel": 24,
+          "mobName": "Langk Lizardman Shaman",
+          "rateProfiles": {
+            "x1": {
+              "chancePercent": 3.932500028,
+              "expectedAmountPerKill": 0.03932500028
+            },
+            "x10": {
+              "chancePercent": 28.16351689811,
+              "expectedAmountPerKill": 0.281635168981
+            },
+            "x50": {
+              "chancePercent": 24.492999152865,
+              "expectedAmountPerKill": 0.481593310316
+            }
+          }
+        },
+        {
+          "availability": {
+            "directSpawn": true,
+            "knownReachable": true,
+            "raidMinion": false
+          },
+          "groupIndexes": [
             1
           ],
           "mobId": 1109,
@@ -207866,6 +208163,33 @@
             "x50": {
               "chancePercent": 83.5787,
               "expectedAmountPerKill": 208.94675
+            }
+          }
+        },
+        {
+          "availability": {
+            "directSpawn": true,
+            "knownReachable": true,
+            "raidMinion": false
+          },
+          "groupIndexes": [
+            0
+          ],
+          "mobId": 1101,
+          "mobLevel": 24,
+          "mobName": "Langk Lizardman Shaman",
+          "rateProfiles": {
+            "x1": {
+              "chancePercent": 33.2824,
+              "expectedAmountPerKill": 0.332824
+            },
+            "x10": {
+              "chancePercent": 33.2824,
+              "expectedAmountPerKill": 3.32824
+            },
+            "x50": {
+              "chancePercent": 33.2824,
+              "expectedAmountPerKill": 16.6412
             }
           }
         },
@@ -233902,6 +234226,33 @@
             "raidMinion": false
           },
           "groupIndexes": [
+            2
+          ],
+          "mobId": 1100,
+          "mobLevel": 19,
+          "mobName": "Langk Lizardman Sentinel",
+          "rateProfiles": {
+            "x1": {
+              "chancePercent": 3.9346040196,
+              "expectedAmountPerKill": 0.039346040196
+            },
+            "x10": {
+              "chancePercent": 28.2636,
+              "expectedAmountPerKill": 0.282636
+            },
+            "x50": {
+              "chancePercent": 32.693631699514,
+              "expectedAmountPerKill": 0.643182473501
+            }
+          }
+        },
+        {
+          "availability": {
+            "directSpawn": true,
+            "knownReachable": true,
+            "raidMinion": false
+          },
+          "groupIndexes": [
             1
           ],
           "mobId": 1108,
@@ -239437,6 +239788,33 @@
             "raidMinion": false
           },
           "groupIndexes": [
+            2
+          ],
+          "mobId": 1101,
+          "mobLevel": 24,
+          "mobName": "Langk Lizardman Shaman",
+          "rateProfiles": {
+            "x1": {
+              "chancePercent": 3.932500028,
+              "expectedAmountPerKill": 0.03932500028
+            },
+            "x10": {
+              "chancePercent": 28.16351689811,
+              "expectedAmountPerKill": 0.281635168981
+            },
+            "x50": {
+              "chancePercent": 24.492999152865,
+              "expectedAmountPerKill": 0.481593310316
+            }
+          }
+        },
+        {
+          "availability": {
+            "directSpawn": true,
+            "knownReachable": true,
+            "raidMinion": false
+          },
+          "groupIndexes": [
             1
           ],
           "mobId": 1109,
@@ -241400,6 +241778,33 @@
             "x50": {
               "chancePercent": 16.5778,
               "expectedAmountPerKill": 8.2889
+            }
+          }
+        },
+        {
+          "availability": {
+            "directSpawn": true,
+            "knownReachable": true,
+            "raidMinion": false
+          },
+          "groupIndexes": [
+            1
+          ],
+          "mobId": 1101,
+          "mobLevel": 24,
+          "mobName": "Langk Lizardman Shaman",
+          "rateProfiles": {
+            "x1": {
+              "chancePercent": 33.2824,
+              "expectedAmountPerKill": 0.332824
+            },
+            "x10": {
+              "chancePercent": 33.2824,
+              "expectedAmountPerKill": 3.32824
+            },
+            "x50": {
+              "chancePercent": 33.2824,
+              "expectedAmountPerKill": 16.6412
             }
           }
         },
@@ -284500,6 +284905,33 @@
             "raidMinion": false
           },
           "groupIndexes": [
+            2
+          ],
+          "mobId": 1100,
+          "mobLevel": 19,
+          "mobName": "Langk Lizardman Sentinel",
+          "rateProfiles": {
+            "x1": {
+              "chancePercent": 0.39349938104,
+              "expectedAmountPerKill": 0.00393499381
+            },
+            "x10": {
+              "chancePercent": 2.82664,
+              "expectedAmountPerKill": 0.0282664
+            },
+            "x50": {
+              "chancePercent": 6.432461918854,
+              "expectedAmountPerKill": 0.064324619189
+            }
+          }
+        },
+        {
+          "availability": {
+            "directSpawn": true,
+            "knownReachable": true,
+            "raidMinion": false
+          },
+          "groupIndexes": [
             1
           ],
           "mobId": 1108,
@@ -308533,6 +308965,33 @@
               "expectedAmountPerKill": 0.970245405964
             }
           }
+        },
+        {
+          "availability": {
+            "directSpawn": true,
+            "knownReachable": true,
+            "raidMinion": false
+          },
+          "groupIndexes": [
+            2
+          ],
+          "mobId": 1100,
+          "mobLevel": 19,
+          "mobName": "Langk Lizardman Sentinel",
+          "rateProfiles": {
+            "x1": {
+              "chancePercent": 0.93689977477,
+              "expectedAmountPerKill": 0.009368997748
+            },
+            "x10": {
+              "chancePercent": 6.73007,
+              "expectedAmountPerKill": 0.0673007
+            },
+            "x50": {
+              "chancePercent": 15.315328087844,
+              "expectedAmountPerKill": 0.153153280878
+            }
+          }
         }
       ],
       "spoils": [
@@ -308722,6 +309181,33 @@
             "x50": {
               "chancePercent": 12.0139,
               "expectedAmountPerKill": 6.00695
+            }
+          }
+        },
+        {
+          "availability": {
+            "directSpawn": true,
+            "knownReachable": true,
+            "raidMinion": false
+          },
+          "groupIndexes": [
+            1
+          ],
+          "mobId": 1100,
+          "mobLevel": 19,
+          "mobName": "Langk Lizardman Sentinel",
+          "rateProfiles": {
+            "x1": {
+              "chancePercent": 6.3429,
+              "expectedAmountPerKill": 0.063429
+            },
+            "x10": {
+              "chancePercent": 6.3429,
+              "expectedAmountPerKill": 0.63429
+            },
+            "x50": {
+              "chancePercent": 6.3429,
+              "expectedAmountPerKill": 3.17145
             }
           }
         },
@@ -309073,6 +309559,33 @@
             "x50": {
               "chancePercent": 2.2414,
               "expectedAmountPerKill": 1.1207
+            }
+          }
+        },
+        {
+          "availability": {
+            "directSpawn": true,
+            "knownReachable": true,
+            "raidMinion": false
+          },
+          "groupIndexes": [
+            2
+          ],
+          "mobId": 1101,
+          "mobLevel": 24,
+          "mobName": "Langk Lizardman Shaman",
+          "rateProfiles": {
+            "x1": {
+              "chancePercent": 3.4188,
+              "expectedAmountPerKill": 0.034188
+            },
+            "x10": {
+              "chancePercent": 3.4188,
+              "expectedAmountPerKill": 0.34188
+            },
+            "x50": {
+              "chancePercent": 3.4188,
+              "expectedAmountPerKill": 1.7094
             }
           }
         },
@@ -317477,6 +317990,33 @@
           "groupIndexes": [
             2
           ],
+          "mobId": 1100,
+          "mobLevel": 19,
+          "mobName": "Langk Lizardman Sentinel",
+          "rateProfiles": {
+            "x1": {
+              "chancePercent": 8.5936,
+              "expectedAmountPerKill": 0.085936
+            },
+            "x10": {
+              "chancePercent": 8.5936,
+              "expectedAmountPerKill": 0.85936
+            },
+            "x50": {
+              "chancePercent": 8.5936,
+              "expectedAmountPerKill": 4.2968
+            }
+          }
+        },
+        {
+          "availability": {
+            "directSpawn": true,
+            "knownReachable": true,
+            "raidMinion": false
+          },
+          "groupIndexes": [
+            2
+          ],
           "mobId": 1125,
           "mobLevel": 19,
           "mobName": "Northern Trimden",
@@ -319272,6 +319812,33 @@
             "x50": {
               "chancePercent": 38.565,
               "expectedAmountPerKill": 0.38565
+            }
+          }
+        },
+        {
+          "availability": {
+            "directSpawn": true,
+            "knownReachable": true,
+            "raidMinion": false
+          },
+          "groupIndexes": [
+            2
+          ],
+          "mobId": 1101,
+          "mobLevel": 24,
+          "mobName": "Langk Lizardman Shaman",
+          "rateProfiles": {
+            "x1": {
+              "chancePercent": 1.68059972436,
+              "expectedAmountPerKill": 0.016805997244
+            },
+            "x10": {
+              "chancePercent": 12.036007221604,
+              "expectedAmountPerKill": 0.120360072216
+            },
+            "x50": {
+              "chancePercent": 20.581451463647,
+              "expectedAmountPerKill": 0.205814514636
             }
           }
         },
@@ -545405,7 +545972,35 @@
     "kind": "Other.Recipe",
     "name": "Recipe: Blessed Spiritshot (D) Compressed Package (100%)",
     "sources": {
-      "drops": [],
+      "drops": [
+        {
+          "availability": {
+            "directSpawn": true,
+            "knownReachable": true,
+            "raidMinion": false
+          },
+          "groupIndexes": [
+            2
+          ],
+          "mobId": 1101,
+          "mobLevel": 24,
+          "mobName": "Langk Lizardman Shaman",
+          "rateProfiles": {
+            "x1": {
+              "chancePercent": 0.15730000112,
+              "expectedAmountPerKill": 0.001573000011
+            },
+            "x10": {
+              "chancePercent": 1.126540675924,
+              "expectedAmountPerKill": 0.011265406759
+            },
+            "x50": {
+              "chancePercent": 1.926373241264,
+              "expectedAmountPerKill": 0.019263732413
+            }
+          }
+        }
+      ],
       "spoils": [
         {
           "availability": {
@@ -607773,6 +608368,33 @@
           "groupIndexes": [
             2
           ],
+          "mobId": 1101,
+          "mobLevel": 24,
+          "mobName": "Langk Lizardman Shaman",
+          "rateProfiles": {
+            "x1": {
+              "chancePercent": 0.32770019052,
+              "expectedAmountPerKill": 0.003277001905
+            },
+            "x10": {
+              "chancePercent": 2.346901408141,
+              "expectedAmountPerKill": 0.023469014081
+            },
+            "x50": {
+              "chancePercent": 4.013177836493,
+              "expectedAmountPerKill": 0.040131778365
+            }
+          }
+        },
+        {
+          "availability": {
+            "directSpawn": true,
+            "knownReachable": true,
+            "raidMinion": false
+          },
+          "groupIndexes": [
+            2
+          ],
           "mobId": 1127,
           "mobLevel": 21,
           "mobName": "Northern Goblin",
@@ -627039,6 +627661,33 @@
               "expectedAmountPerKill": 0.66866711121
             }
           }
+        },
+        {
+          "availability": {
+            "directSpawn": true,
+            "knownReachable": true,
+            "raidMinion": false
+          },
+          "groupIndexes": [
+            2
+          ],
+          "mobId": 1101,
+          "mobLevel": 24,
+          "mobName": "Langk Lizardman Shaman",
+          "rateProfiles": {
+            "x1": {
+              "chancePercent": 3.932500028,
+              "expectedAmountPerKill": 0.03932500028
+            },
+            "x10": {
+              "chancePercent": 28.16351689811,
+              "expectedAmountPerKill": 0.281635168981
+            },
+            "x50": {
+              "chancePercent": 24.492999152865,
+              "expectedAmountPerKill": 0.481593310316
+            }
+          }
         }
       ],
       "spoils": []
@@ -638187,6 +638836,131 @@
         "kind": "Other.Quest",
         "mass": 0,
         "name": "Blood of Saint",
+        "price": 0
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 7173,
+    "kind": "Other.Quest",
+    "name": "Feather Ornament",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": false,
+        "stackable": true
+      },
+      "selfId": 7173,
+      "template": {
+        "class1": 4,
+        "class2": 3,
+        "kind": "Other.Quest",
+        "mass": 0,
+        "name": "Feather Ornament",
+        "price": 0
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 7174,
+    "kind": "Other.Quest",
+    "name": "Tooth of Totem",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": false,
+        "stackable": true
+      },
+      "selfId": 7174,
+      "template": {
+        "class1": 4,
+        "class2": 3,
+        "kind": "Other.Quest",
+        "mass": 0,
+        "name": "Tooth of Totem",
+        "price": 0
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 7175,
+    "kind": "Other.Quest",
+    "name": "Tooth of Dragon",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": false,
+        "stackable": true
+      },
+      "selfId": 7175,
+      "template": {
+        "class1": 4,
+        "class2": 3,
+        "kind": "Other.Quest",
+        "mass": 0,
+        "name": "Tooth of Dragon",
+        "price": 0
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 7176,
+    "kind": "Other.Quest",
+    "name": "Letter of Iris",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": false,
+        "stackable": true
+      },
+      "selfId": 7176,
+      "template": {
+        "class1": 4,
+        "class2": 3,
+        "kind": "Other.Quest",
+        "mass": 0,
+        "name": "Letter of Iris",
+        "price": 0
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 7177,
+    "kind": "Other.Quest",
+    "name": "Letter of Rohmer",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": false,
+        "stackable": true
+      },
+      "selfId": 7177,
+      "template": {
+        "class1": 4,
+        "class2": 3,
+        "kind": "Other.Quest",
+        "mass": 0,
+        "name": "Letter of Rohmer",
         "price": 0
       }
     }

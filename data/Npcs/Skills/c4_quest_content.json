@@ -1,0 +1,8 @@
+[
+  { "npcId": 1100, "skillId": 4295, "level": 1 },
+  { "npcId": 1101, "skillId": 4295, "level": 1 },
+  { "npcId": 1101, "skillId": 4076, "level": 1 },
+  { "npcId": 1101, "skillId": 4152, "level": 2 },
+  { "npcId": 1101, "skillId": 4160, "level": 2 },
+  { "npcId": 1101, "skillId": 4414, "level": 3 }
+]

@@ -540059,6 +540059,344 @@
     }
   },
   {
+    "id": "spawn-1100-86e1d436adb9",
+    "mobId": 1100,
+    "period": "always",
+    "possibleLocations": [
+      {
+        "head": 27775,
+        "locX": -52961,
+        "locY": 202061,
+        "locZ": -3566
+      },
+      {
+        "head": 37726,
+        "locX": -51812,
+        "locY": 196817,
+        "locZ": -3725
+      },
+      {
+        "head": 8403,
+        "locX": -51745,
+        "locY": 198237,
+        "locZ": -3637
+      },
+      {
+        "head": 11684,
+        "locX": -51408,
+        "locY": 199660,
+        "locZ": -3529
+      },
+      {
+        "head": 12228,
+        "locX": -51184,
+        "locY": 200145,
+        "locZ": -3426
+      },
+      {
+        "head": 0,
+        "locX": -50350,
+        "locY": 199303,
+        "locZ": -3792
+      },
+      {
+        "head": 11539,
+        "locX": -49990,
+        "locY": 200154,
+        "locZ": -3423
+      },
+      {
+        "head": 21585,
+        "locX": -48637,
+        "locY": 207016,
+        "locZ": -3702
+      },
+      {
+        "head": 63889,
+        "locX": -48558,
+        "locY": 199837,
+        "locZ": -3632
+      },
+      {
+        "head": 14076,
+        "locX": -47868,
+        "locY": 203324,
+        "locZ": -3587
+      },
+      {
+        "head": 0,
+        "locX": -47537,
+        "locY": 200557,
+        "locZ": -3808
+      },
+      {
+        "head": 0,
+        "locX": -46934,
+        "locY": 200913,
+        "locZ": -3808
+      },
+      {
+        "head": 6420,
+        "locX": -46087,
+        "locY": 199767,
+        "locZ": -3499
+      },
+      {
+        "head": 0,
+        "locX": -44918,
+        "locY": 204979,
+        "locZ": -3801
+      },
+      {
+        "head": 0,
+        "locX": -44606,
+        "locY": 207634,
+        "locZ": -3413
+      },
+      {
+        "head": 0,
+        "locX": -44203,
+        "locY": 207990,
+        "locZ": -3413
+      },
+      {
+        "head": 4068,
+        "locX": -43781,
+        "locY": 204010,
+        "locZ": -3593
+      },
+      {
+        "head": 0,
+        "locX": -40085,
+        "locY": 203015,
+        "locZ": -2939
+      },
+      {
+        "head": 0,
+        "locX": -39784,
+        "locY": 203193,
+        "locZ": -2939
+      },
+      {
+        "head": 0,
+        "locX": -37146,
+        "locY": 205491,
+        "locZ": -3495
+      },
+      {
+        "head": 0,
+        "locX": -36844,
+        "locY": 206025,
+        "locZ": -3495
+      },
+      {
+        "head": 0,
+        "locX": -20539,
+        "locY": 213291,
+        "locZ": -3704
+      },
+      {
+        "head": 830,
+        "locX": -18218,
+        "locY": 213876,
+        "locZ": -3704
+      }
+    ],
+    "randomBiasSeconds": 0,
+    "respawnSeconds": 20,
+    "sourceIndex": 61,
+    "total": 1,
+    "zone": {
+      "bounds": [],
+      "id": "c4_quest_content",
+      "sourceIndex": 3983
+    }
+  },
+  {
+    "id": "spawn-1101-66c4e7eb4a5f",
+    "mobId": 1101,
+    "period": "always",
+    "possibleLocations": [
+      {
+        "head": 31413,
+        "locX": -54102,
+        "locY": 211622,
+        "locZ": -2663
+      },
+      {
+        "head": 40537,
+        "locX": -53952,
+        "locY": 210939,
+        "locZ": -2598
+      },
+      {
+        "head": 0,
+        "locX": -51611,
+        "locY": 210744,
+        "locZ": -3600
+      },
+      {
+        "head": 65247,
+        "locX": -51479,
+        "locY": 211761,
+        "locZ": -2991
+      },
+      {
+        "head": 0,
+        "locX": -50705,
+        "locY": 209854,
+        "locZ": -3600
+      },
+      {
+        "head": 18635,
+        "locX": -49282,
+        "locY": 204885,
+        "locZ": -3732
+      },
+      {
+        "head": 62103,
+        "locX": -49275,
+        "locY": 211251,
+        "locZ": -3108
+      },
+      {
+        "head": 60243,
+        "locX": -47763,
+        "locY": 210332,
+        "locZ": -3321
+      },
+      {
+        "head": 39510,
+        "locX": -47642,
+        "locY": 204991,
+        "locZ": -3646
+      },
+      {
+        "head": 35415,
+        "locX": -47633,
+        "locY": 211662,
+        "locZ": -3330
+      },
+      {
+        "head": 0,
+        "locX": -46674,
+        "locY": 211628,
+        "locZ": -3376
+      },
+      {
+        "head": 0,
+        "locX": -46609,
+        "locY": 205483,
+        "locZ": -3670
+      },
+      {
+        "head": 0,
+        "locX": -46574,
+        "locY": 211094,
+        "locZ": -3376
+      },
+      {
+        "head": 23678,
+        "locX": -46191,
+        "locY": 210097,
+        "locZ": -3389
+      },
+      {
+        "head": 12559,
+        "locX": -45832,
+        "locY": 211180,
+        "locZ": -3372
+      },
+      {
+        "head": 14071,
+        "locX": -44924,
+        "locY": 213852,
+        "locZ": -3324
+      },
+      {
+        "head": 0,
+        "locX": -42854,
+        "locY": 211530,
+        "locZ": -3533
+      },
+      {
+        "head": 0,
+        "locX": -42350,
+        "locY": 211708,
+        "locZ": -3608
+      },
+      {
+        "head": 0,
+        "locX": -42148,
+        "locY": 210640,
+        "locZ": -3344
+      },
+      {
+        "head": 0,
+        "locX": -42047,
+        "locY": 210818,
+        "locZ": -3344
+      },
+      {
+        "head": 0,
+        "locX": -41177,
+        "locY": 211429,
+        "locZ": -3560
+      },
+      {
+        "head": 0,
+        "locX": -41076,
+        "locY": 211607,
+        "locZ": -3560
+      },
+      {
+        "head": 27132,
+        "locX": -39144,
+        "locY": 213652,
+        "locZ": -3707
+      },
+      {
+        "head": 0,
+        "locX": -39020,
+        "locY": 208901,
+        "locZ": -3676
+      },
+      {
+        "head": 0,
+        "locX": -38517,
+        "locY": 208723,
+        "locZ": -3696
+      },
+      {
+        "head": 61678,
+        "locX": -35585,
+        "locY": 213715,
+        "locZ": -3720
+      },
+      {
+        "head": 2457,
+        "locX": -34456,
+        "locY": 211577,
+        "locZ": -3704
+      },
+      {
+        "head": 63255,
+        "locX": -32063,
+        "locY": 212116,
+        "locZ": -3700
+      }
+    ],
+    "randomBiasSeconds": 0,
+    "respawnSeconds": 20,
+    "sourceIndex": 62,
+    "total": 1,
+    "zone": {
+      "bounds": [],
+      "id": "c4_quest_content",
+      "sourceIndex": 3983
+    }
+  },
+  {
     "id": "spawn-1108-e7cea0e8953f",
     "mobId": 1108,
     "period": "always",

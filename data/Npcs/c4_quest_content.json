@@ -3133,5 +3133,51 @@
         "equipment": { "weapon": 0, "shield": 0, "reuseTime": 500 },
         "clan": { "clanName": "", "helpRadius": 300 },
         "rewards": { "exp": 0, "sp": 0 }
+    },
+    {
+        "selfId": 1100,
+        "template": { "kind": "Monster", "name": "Langk Lizardman Sentinel", "title": "", "level": 19, "hostile": false },
+        "traits": { "race": "humanoid", "undead": false },
+        "base": { "str": 40, "dex": 30, "con": 43, "int": 21, "wit": 20, "men": 10 },
+        "stats": {
+            "pAtk": 40.96915,
+            "pAtkRnd": 30,
+            "pDef": 84.07638,
+            "mAtk": 27.97662,
+            "mDef": 55.9790056860875,
+            "accur": 4.75,
+            "atkSpd": 253,
+            "castSpd": 333,
+            "atkRadius": 40
+        },
+        "speed": { "walk": 43, "run": 130 },
+        "vitals": { "maxHp": 321.63954, "maxMp": 183.28, "revHp": 2.5, "revMp": 1.2, "corpseTime": 7000 },
+        "collision": { "radius": 10, "size": 23 },
+        "equipment": { "weapon": 2, "shield": 0, "reuseTime": 0 },
+        "clan": { "clanName": "lizardman_clan", "helpRadius": 300 },
+        "rewards": { "exp": 1.914127423823, "sp": 31 }
+    },
+    {
+        "selfId": 1101,
+        "template": { "kind": "Monster", "name": "Langk Lizardman Shaman", "title": "", "level": 24, "hostile": false },
+        "traits": { "race": "humanoid", "undead": false },
+        "base": { "str": 40, "dex": 30, "con": 43, "int": 21, "wit": 20, "men": 10 },
+        "stats": {
+            "pAtk": 60.19687,
+            "pAtkRnd": 50,
+            "pDef": 98.70919,
+            "mAtk": 41.10666,
+            "mDef": 65.7216907961494,
+            "accur": 9,
+            "atkSpd": 253,
+            "castSpd": 333,
+            "atkRadius": 40
+        },
+        "speed": { "walk": 43, "run": 130 },
+        "vitals": { "maxHp": 435.34437, "maxMp": 245.52, "revHp": 3.5, "revMp": 1.5, "corpseTime": 7000 },
+        "collision": { "radius": 10, "size": 29 },
+        "equipment": { "weapon": 6, "shield": 0, "reuseTime": 0 },
+        "clan": { "clanName": "lizardman_clan", "helpRadius": 300 },
+        "rewards": { "exp": 1.623263888889, "sp": 46 }
     }
 ]

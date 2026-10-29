@@ -1,6 +1,5 @@
 const disabledReasons = new Map([
-  [38, "Required NPC templates are absent: 1100, 1101"],
-  [39, "Required NPC template 925 is absent"],
+  [39, "Quest proof/reward templates and native fishing reward support are absent"],
 ]);
 
 const entries = [

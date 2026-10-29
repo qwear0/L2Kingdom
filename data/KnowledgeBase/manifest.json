@@ -39,17 +39,17 @@
     ]
   },
   "counts": {
-    "dropEntries": 14948,
-    "items": 5738,
-    "knownReachableMobs": 1814,
+    "dropEntries": 14966,
+    "items": 5743,
+    "knownReachableMobs": 1816,
     "knownReachableSourcedItems": 1720,
-    "mobs": 2214,
-    "mobsWithDirectSpawns": 1443,
-    "skills": 1047,
+    "mobs": 2216,
+    "mobsWithDirectSpawns": 1445,
+    "skills": 1048,
     "sourcedItems": 1723,
-    "spawnDefinitions": 13467,
-    "spawnLocations": 18551,
-    "spoilEntries": 2876,
+    "spawnDefinitions": 13469,
+    "spawnLocations": 18602,
+    "spoilEntries": 2882,
     "unresolvedMobAvailability": 400
   },
   "deterministic": true,
@@ -113,9 +113,9 @@
   },
   "schemaVersion": 1,
   "sha256": {
-    "items.json": "69e65e329bb4ef0cfc7dd9f35fc2f959440b674b72f53c06b6253f8694575cbd",
-    "mobs.json": "62ebd26cf99fcf6c47cabbd0aee54e05ec911c30ef5cdfabc549878e87609cc6",
-    "skills.json": "7a86a8d2ca79f1d3b614917a5692da86a331b27155bd16fc54be84321eb814b3",
-    "spawns.json": "0ae7b50f88e0b4a6f4217bace869544671046ef0c2c1663448f547c3916f9fdb"
+    "items.json": "b48f0179a290fc35f48bea763ec4d1d090792992cdebfd49f35638fc3957a0ed",
+    "mobs.json": "5fa838869a9037e9dadd5d05c6c8a6798bc892956894acb925250888ebb18cf6",
+    "skills.json": "02a3bbd1f01241fe797b398f6ab39dd555654046b5e39c5f5832eb84e7b87530",
+    "spawns.json": "256233382d652687cca028151f063440c78643cda49a53343d22ea527e1c2e5a"
   }
 }

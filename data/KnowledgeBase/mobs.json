@@ -343768,6 +343768,824 @@
     }
   },
   {
+    "aiType": "fighter",
+    "availability": {
+      "directSpawn": true,
+      "knownReachable": true,
+      "raidMinion": false
+    },
+    "defaultEffectiveStats": {
+      "accuracy": 56.61335345031,
+      "attackSpeed": 253,
+      "castSpeed": 333,
+      "evasion": 51.86335345031,
+      "mAtk": 28,
+      "mDef": 56,
+      "maxHp": 322,
+      "maxMp": 183.28,
+      "pAtk": 41,
+      "pDef": 84,
+      "runSpeed": 130,
+      "walkSpeed": 43
+    },
+    "drops": [
+      {
+        "groupIndex": 0,
+        "items": [
+          {
+            "baseChancePercent": 70,
+            "itemId": 57,
+            "maxAmount": 213,
+            "minAmount": 125,
+            "rateProfiles": {
+              "x1": {
+                "chancePercent": 70,
+                "expectedAmountPerKill": 118.3
+              },
+              "x10": {
+                "chancePercent": 100,
+                "expectedAmountPerKill": 1183
+              },
+              "x50": {
+                "chancePercent": 100,
+                "expectedAmountPerKill": 5915
+              }
+            },
+            "selectionWeightPercent": 100,
+            "sourceName": "Adena"
+          }
+        ],
+        "overallChancePercent": 70
+      },
+      {
+        "groupIndex": 1,
+        "items": [
+          {
+            "baseChancePercent": 0.0886000934,
+            "itemId": 845,
+            "maxAmount": 1,
+            "minAmount": 1,
+            "rateProfiles": {
+              "x1": {
+                "chancePercent": 0.0886000934,
+                "expectedAmountPerKill": 0.000886000934
+              },
+              "x10": {
+                "chancePercent": 0.886000934,
+                "expectedAmountPerKill": 0.00886000934
+              },
+              "x50": {
+                "chancePercent": 4.43000467,
+                "expectedAmountPerKill": 0.0443000467
+              }
+            },
+            "selectionWeightPercent": 30.7853,
+            "sourceName": "Cat's Eye Earring"
+          },
+          {
+            "baseChancePercent": 0.1329998628,
+            "itemId": 877,
+            "maxAmount": 1,
+            "minAmount": 1,
+            "rateProfiles": {
+              "x1": {
+                "chancePercent": 0.1329998628,
+                "expectedAmountPerKill": 0.001329998628
+              },
+              "x10": {
+                "chancePercent": 1.329998628,
+                "expectedAmountPerKill": 0.01329998628
+              },
+              "x50": {
+                "chancePercent": 6.64999314,
+                "expectedAmountPerKill": 0.0664999314
+              }
+            },
+            "selectionWeightPercent": 46.2126,
+            "sourceName": "Ring of Wisdom"
+          },
+          {
+            "baseChancePercent": 0.0662000438,
+            "itemId": 908,
+            "maxAmount": 1,
+            "minAmount": 1,
+            "rateProfiles": {
+              "x1": {
+                "chancePercent": 0.0662000438,
+                "expectedAmountPerKill": 0.000662000438
+              },
+              "x10": {
+                "chancePercent": 0.662000438,
+                "expectedAmountPerKill": 0.00662000438
+              },
+              "x50": {
+                "chancePercent": 3.31000219,
+                "expectedAmountPerKill": 0.0331000219
+              }
+            },
+            "selectionWeightPercent": 23.0021,
+            "sourceName": "Necklace of Wisdom"
+          }
+        ],
+        "overallChancePercent": 0.2878
+      },
+      {
+        "groupIndex": 2,
+        "items": [
+          {
+            "baseChancePercent": 0.93689977477,
+            "itemId": 1897,
+            "maxAmount": 1,
+            "minAmount": 1,
+            "rateProfiles": {
+              "x1": {
+                "chancePercent": 0.93689977477,
+                "expectedAmountPerKill": 0.009368997748
+              },
+              "x10": {
+                "chancePercent": 6.73007,
+                "expectedAmountPerKill": 0.0673007
+              },
+              "x50": {
+                "chancePercent": 15.315328087844,
+                "expectedAmountPerKill": 0.153153280878
+              }
+            },
+            "selectionWeightPercent": 6.73007,
+            "sourceName": "Necklace of Wisdom Chain"
+          },
+          {
+            "baseChancePercent": 0.78700015419,
+            "itemId": 1817,
+            "maxAmount": 1,
+            "minAmount": 1,
+            "rateProfiles": {
+              "x1": {
+                "chancePercent": 0.78700015419,
+                "expectedAmountPerKill": 0.007870001542
+              },
+              "x10": {
+                "chancePercent": 5.65329,
+                "expectedAmountPerKill": 0.0565329
+              },
+              "x50": {
+                "chancePercent": 12.864946594274,
+                "expectedAmountPerKill": 0.128649465943
+              }
+            },
+            "selectionWeightPercent": 5.65329,
+            "sourceName": "Recipe: Cord"
+          },
+          {
+            "baseChancePercent": 7.8690966704,
+            "itemId": 1864,
+            "maxAmount": 1,
+            "minAmount": 1,
+            "rateProfiles": {
+              "x1": {
+                "chancePercent": 7.8690966704,
+                "expectedAmountPerKill": 0.078690966704
+              },
+              "x10": {
+                "chancePercent": 56.5264,
+                "expectedAmountPerKill": 0.565264
+              },
+              "x50": {
+                "chancePercent": 32.693631699514,
+                "expectedAmountPerKill": 1.28634674175
+              }
+            },
+            "selectionWeightPercent": 56.5264,
+            "sourceName": "Stem"
+          },
+          {
+            "baseChancePercent": 3.9346040196,
+            "itemId": 1869,
+            "maxAmount": 1,
+            "minAmount": 1,
+            "rateProfiles": {
+              "x1": {
+                "chancePercent": 3.9346040196,
+                "expectedAmountPerKill": 0.039346040196
+              },
+              "x10": {
+                "chancePercent": 28.2636,
+                "expectedAmountPerKill": 0.282636
+              },
+              "x50": {
+                "chancePercent": 32.693631699514,
+                "expectedAmountPerKill": 0.643182473501
+              }
+            },
+            "selectionWeightPercent": 28.2636,
+            "sourceName": "Iron Ore"
+          },
+          {
+            "baseChancePercent": 0.39349938104,
+            "itemId": 1880,
+            "maxAmount": 1,
+            "minAmount": 1,
+            "rateProfiles": {
+              "x1": {
+                "chancePercent": 0.39349938104,
+                "expectedAmountPerKill": 0.00393499381
+              },
+              "x10": {
+                "chancePercent": 2.82664,
+                "expectedAmountPerKill": 0.0282664
+              },
+              "x50": {
+                "chancePercent": 6.432461918854,
+                "expectedAmountPerKill": 0.064324619189
+              }
+            },
+            "selectionWeightPercent": 2.82664,
+            "sourceName": "Steel"
+          }
+        ],
+        "overallChancePercent": 13.9211
+      }
+    ],
+    "effectiveStatsContext": "daytime spawn defaults with permanent passive skills and no temporary effects",
+    "id": 1100,
+    "kind": "Monster",
+    "level": 19,
+    "minionOf": [],
+    "minions": [],
+    "name": "Langk Lizardman Sentinel",
+    "progression": {
+      "baseExp": 691.000000000103,
+      "baseSp": 31,
+      "expModifier": 1.914127423823
+    },
+    "raidBoss": false,
+    "skillIds": [
+      "4295:1"
+    ],
+    "spawnIds": [
+      "spawn-1100-86e1d436adb9"
+    ],
+    "spoils": [
+      {
+        "groupIndex": 0,
+        "items": [
+          {
+            "baseChancePercent": 8.3774,
+            "itemId": 1800,
+            "maxAmount": 1,
+            "minAmount": 1,
+            "rateProfiles": {
+              "x1": {
+                "chancePercent": 8.3774,
+                "expectedAmountPerKill": 0.083774
+              },
+              "x10": {
+                "chancePercent": 8.3774,
+                "expectedAmountPerKill": 0.83774
+              },
+              "x50": {
+                "chancePercent": 8.3774,
+                "expectedAmountPerKill": 4.1887
+              }
+            },
+            "selectionWeightPercent": 8.3774,
+            "sourceName": "Recipe: Piece Bone Breastplate"
+          }
+        ],
+        "overallChancePercent": 100
+      },
+      {
+        "groupIndex": 1,
+        "items": [
+          {
+            "baseChancePercent": 6.3429,
+            "itemId": 1897,
+            "maxAmount": 1,
+            "minAmount": 1,
+            "rateProfiles": {
+              "x1": {
+                "chancePercent": 6.3429,
+                "expectedAmountPerKill": 0.063429
+              },
+              "x10": {
+                "chancePercent": 6.3429,
+                "expectedAmountPerKill": 0.63429
+              },
+              "x50": {
+                "chancePercent": 6.3429,
+                "expectedAmountPerKill": 3.17145
+              }
+            },
+            "selectionWeightPercent": 6.3429,
+            "sourceName": "Necklace of Wisdom Chain"
+          }
+        ],
+        "overallChancePercent": 100
+      },
+      {
+        "groupIndex": 2,
+        "items": [
+          {
+            "baseChancePercent": 8.5936,
+            "itemId": 1924,
+            "maxAmount": 1,
+            "minAmount": 1,
+            "rateProfiles": {
+              "x1": {
+                "chancePercent": 8.5936,
+                "expectedAmountPerKill": 0.085936
+              },
+              "x10": {
+                "chancePercent": 8.5936,
+                "expectedAmountPerKill": 0.85936
+              },
+              "x50": {
+                "chancePercent": 8.5936,
+                "expectedAmountPerKill": 4.2968
+              }
+            },
+            "selectionWeightPercent": 8.5936,
+            "sourceName": "Leather Helmet Design"
+          }
+        ],
+        "overallChancePercent": 100
+      }
+    ],
+    "template": {
+      "base": {
+        "con": 43,
+        "dex": 30,
+        "int": 21,
+        "men": 10,
+        "str": 40,
+        "wit": 20
+      },
+      "clan": {
+        "clanName": "lizardman_clan",
+        "helpRadius": 300
+      },
+      "collision": {
+        "radius": 10,
+        "size": 23
+      },
+      "equipment": {
+        "reuseTime": 0,
+        "shield": 0,
+        "weapon": 2
+      },
+      "rewards": {
+        "exp": 1.914127423823,
+        "sp": 31
+      },
+      "selfId": 1100,
+      "speed": {
+        "run": 130,
+        "walk": 43
+      },
+      "stats": {
+        "accur": 4.75,
+        "atkRadius": 40,
+        "atkSpd": 253,
+        "castSpd": 333,
+        "mAtk": 27.97662,
+        "mDef": 55.979005686087,
+        "pAtk": 40.96915,
+        "pAtkRnd": 30,
+        "pDef": 84.07638
+      },
+      "template": {
+        "ai": "FIGHTER",
+        "hostile": false,
+        "kind": "Monster",
+        "level": 19,
+        "name": "Langk Lizardman Sentinel",
+        "title": ""
+      },
+      "traits": {
+        "race": "humanoid",
+        "undead": false
+      },
+      "vitals": {
+        "corpseTime": 7000,
+        "maxHp": 321.63954,
+        "maxMp": 183.28,
+        "revHp": 2.5,
+        "revMp": 1.2
+      }
+    }
+  },
+  {
+    "aiType": "balanced",
+    "availability": {
+      "directSpawn": true,
+      "knownReachable": true,
+      "raidMinion": false
+    },
+    "defaultEffectiveStats": {
+      "accuracy": 65.86335345031,
+      "attackSpeed": 253,
+      "castSpeed": 333,
+      "evasion": 66.86335345031,
+      "mAtk": 41,
+      "mDef": 66,
+      "maxHp": 435,
+      "maxMp": 245.52,
+      "pAtk": 60,
+      "pDef": 84,
+      "runSpeed": 130,
+      "walkSpeed": 43
+    },
+    "drops": [
+      {
+        "groupIndex": 0,
+        "items": [
+          {
+            "baseChancePercent": 70,
+            "itemId": 57,
+            "maxAmount": 273,
+            "minAmount": 148,
+            "rateProfiles": {
+              "x1": {
+                "chancePercent": 70,
+                "expectedAmountPerKill": 147.35
+              },
+              "x10": {
+                "chancePercent": 100,
+                "expectedAmountPerKill": 1473.5
+              },
+              "x50": {
+                "chancePercent": 100,
+                "expectedAmountPerKill": 7367.5
+              }
+            },
+            "selectionWeightPercent": 100,
+            "sourceName": "Adena"
+          }
+        ],
+        "overallChancePercent": 70
+      },
+      {
+        "groupIndex": 1,
+        "items": [
+          {
+            "baseChancePercent": 0.1066,
+            "itemId": 39,
+            "maxAmount": 1,
+            "minAmount": 1,
+            "rateProfiles": {
+              "x1": {
+                "chancePercent": 0.1066,
+                "expectedAmountPerKill": 0.001066
+              },
+              "x10": {
+                "chancePercent": 1.066,
+                "expectedAmountPerKill": 0.01066
+              },
+              "x50": {
+                "chancePercent": 5.33,
+                "expectedAmountPerKill": 0.0533
+              }
+            },
+            "selectionWeightPercent": 50,
+            "sourceName": "Boots"
+          },
+          {
+            "baseChancePercent": 0.1066,
+            "itemId": 51,
+            "maxAmount": 1,
+            "minAmount": 1,
+            "rateProfiles": {
+              "x1": {
+                "chancePercent": 0.1066,
+                "expectedAmountPerKill": 0.001066
+              },
+              "x10": {
+                "chancePercent": 1.066,
+                "expectedAmountPerKill": 0.01066
+              },
+              "x50": {
+                "chancePercent": 5.33,
+                "expectedAmountPerKill": 0.0533
+              }
+            },
+            "selectionWeightPercent": 50,
+            "sourceName": "Bracer"
+          }
+        ],
+        "overallChancePercent": 0.2132
+      },
+      {
+        "groupIndex": 2,
+        "items": [
+          {
+            "baseChancePercent": 1.680598716,
+            "itemId": 1930,
+            "maxAmount": 1,
+            "minAmount": 1,
+            "rateProfiles": {
+              "x1": {
+                "chancePercent": 1.68059972436,
+                "expectedAmountPerKill": 0.016805997244
+              },
+              "x10": {
+                "chancePercent": 12.036007221604,
+                "expectedAmountPerKill": 0.120360072216
+              },
+              "x50": {
+                "chancePercent": 20.581451463647,
+                "expectedAmountPerKill": 0.205814514636
+              }
+            },
+            "selectionWeightPercent": 12.036,
+            "sourceName": "Boot Lining"
+          },
+          {
+            "baseChancePercent": 3.9324976685,
+            "itemId": 1865,
+            "maxAmount": 1,
+            "minAmount": 1,
+            "rateProfiles": {
+              "x1": {
+                "chancePercent": 3.932500028,
+                "expectedAmountPerKill": 0.03932500028
+              },
+              "x10": {
+                "chancePercent": 28.16351689811,
+                "expectedAmountPerKill": 0.281635168981
+              },
+              "x50": {
+                "chancePercent": 24.492999152865,
+                "expectedAmountPerKill": 0.481593310316
+              }
+            },
+            "selectionWeightPercent": 28.1635,
+            "sourceName": "Varnish"
+          },
+          {
+            "baseChancePercent": 3.9324976685,
+            "itemId": 1870,
+            "maxAmount": 1,
+            "minAmount": 1,
+            "rateProfiles": {
+              "x1": {
+                "chancePercent": 3.932500028,
+                "expectedAmountPerKill": 0.03932500028
+              },
+              "x10": {
+                "chancePercent": 28.16351689811,
+                "expectedAmountPerKill": 0.281635168981
+              },
+              "x50": {
+                "chancePercent": 24.492999152865,
+                "expectedAmountPerKill": 0.481593310316
+              }
+            },
+            "selectionWeightPercent": 28.1635,
+            "sourceName": "Coal"
+          },
+          {
+            "baseChancePercent": 0.15729990674,
+            "itemId": 5163,
+            "maxAmount": 1,
+            "minAmount": 1,
+            "rateProfiles": {
+              "x1": {
+                "chancePercent": 0.15730000112,
+                "expectedAmountPerKill": 0.001573000011
+              },
+              "x10": {
+                "chancePercent": 1.126540675924,
+                "expectedAmountPerKill": 0.011265406759
+              },
+              "x50": {
+                "chancePercent": 1.926373241264,
+                "expectedAmountPerKill": 0.019263732413
+              }
+            },
+            "selectionWeightPercent": 1.12654,
+            "sourceName": "Recipe: Blessed Spiritshot (D) Compressed Package (100%)"
+          },
+          {
+            "baseChancePercent": 0.3276999939,
+            "itemId": 6035,
+            "maxAmount": 1,
+            "minAmount": 1,
+            "rateProfiles": {
+              "x1": {
+                "chancePercent": 0.32770019052,
+                "expectedAmountPerKill": 0.003277001905
+              },
+              "x10": {
+                "chancePercent": 2.346901408141,
+                "expectedAmountPerKill": 0.023469014081
+              },
+              "x50": {
+                "chancePercent": 4.013177836493,
+                "expectedAmountPerKill": 0.040131778365
+              }
+            },
+            "selectionWeightPercent": 2.3469,
+            "sourceName": "Magic Haste Potion"
+          },
+          {
+            "baseChancePercent": 3.9324976685,
+            "itemId": 6666,
+            "maxAmount": 1,
+            "minAmount": 1,
+            "rateProfiles": {
+              "x1": {
+                "chancePercent": 3.932500028,
+                "expectedAmountPerKill": 0.03932500028
+              },
+              "x10": {
+                "chancePercent": 28.16351689811,
+                "expectedAmountPerKill": 0.281635168981
+              },
+              "x50": {
+                "chancePercent": 24.492999152865,
+                "expectedAmountPerKill": 0.481593310316
+              }
+            },
+            "selectionWeightPercent": 28.1635,
+            "sourceName": "Deluxe Chest Key - Grade 2"
+          }
+        ],
+        "overallChancePercent": 13.9631
+      }
+    ],
+    "effectiveStatsContext": "daytime spawn defaults with permanent passive skills and no temporary effects",
+    "id": 1101,
+    "kind": "Monster",
+    "level": 24,
+    "minionOf": [],
+    "minions": [],
+    "name": "Langk Lizardman Shaman",
+    "progression": {
+      "baseExp": 935.000000000064,
+      "baseSp": 46,
+      "expModifier": 1.623263888889
+    },
+    "raidBoss": false,
+    "skillIds": [
+      "4076:1",
+      "4152:2",
+      "4160:2",
+      "4295:1",
+      "4414:3"
+    ],
+    "spawnIds": [
+      "spawn-1101-66c4e7eb4a5f"
+    ],
+    "spoils": [
+      {
+        "groupIndex": 0,
+        "items": [
+          {
+            "baseChancePercent": 33.2824,
+            "itemId": 1865,
+            "maxAmount": 1,
+            "minAmount": 1,
+            "rateProfiles": {
+              "x1": {
+                "chancePercent": 33.2824,
+                "expectedAmountPerKill": 0.332824
+              },
+              "x10": {
+                "chancePercent": 33.2824,
+                "expectedAmountPerKill": 3.32824
+              },
+              "x50": {
+                "chancePercent": 33.2824,
+                "expectedAmountPerKill": 16.6412
+              }
+            },
+            "selectionWeightPercent": 33.2824,
+            "sourceName": "Varnish"
+          }
+        ],
+        "overallChancePercent": 100
+      },
+      {
+        "groupIndex": 1,
+        "items": [
+          {
+            "baseChancePercent": 33.2824,
+            "itemId": 1870,
+            "maxAmount": 1,
+            "minAmount": 1,
+            "rateProfiles": {
+              "x1": {
+                "chancePercent": 33.2824,
+                "expectedAmountPerKill": 0.332824
+              },
+              "x10": {
+                "chancePercent": 33.2824,
+                "expectedAmountPerKill": 3.32824
+              },
+              "x50": {
+                "chancePercent": 33.2824,
+                "expectedAmountPerKill": 16.6412
+              }
+            },
+            "selectionWeightPercent": 33.2824,
+            "sourceName": "Coal"
+          }
+        ],
+        "overallChancePercent": 100
+      },
+      {
+        "groupIndex": 2,
+        "items": [
+          {
+            "baseChancePercent": 3.4188,
+            "itemId": 1898,
+            "maxAmount": 1,
+            "minAmount": 1,
+            "rateProfiles": {
+              "x1": {
+                "chancePercent": 3.4188,
+                "expectedAmountPerKill": 0.034188
+              },
+              "x10": {
+                "chancePercent": 3.4188,
+                "expectedAmountPerKill": 0.34188
+              },
+              "x50": {
+                "chancePercent": 3.4188,
+                "expectedAmountPerKill": 1.7094
+              }
+            },
+            "selectionWeightPercent": 3.4188,
+            "sourceName": "Blue Diamond Necklace Gem"
+          }
+        ],
+        "overallChancePercent": 100
+      }
+    ],
+    "template": {
+      "base": {
+        "con": 43,
+        "dex": 30,
+        "int": 21,
+        "men": 10,
+        "str": 40,
+        "wit": 20
+      },
+      "clan": {
+        "clanName": "lizardman_clan",
+        "helpRadius": 300
+      },
+      "collision": {
+        "radius": 10,
+        "size": 29
+      },
+      "equipment": {
+        "reuseTime": 0,
+        "shield": 0,
+        "weapon": 6
+      },
+      "rewards": {
+        "exp": 1.623263888889,
+        "sp": 46
+      },
+      "selfId": 1101,
+      "speed": {
+        "run": 130,
+        "walk": 43
+      },
+      "stats": {
+        "accur": 9,
+        "atkRadius": 40,
+        "atkSpd": 253,
+        "castSpd": 333,
+        "mAtk": 41.10666,
+        "mDef": 65.721690796149,
+        "pAtk": 60.19687,
+        "pAtkRnd": 50,
+        "pDef": 98.70919
+      },
+      "template": {
+        "ai": "BALANCED",
+        "hostile": false,
+        "kind": "Monster",
+        "level": 24,
+        "name": "Langk Lizardman Shaman",
+        "title": ""
+      },
+      "traits": {
+        "race": "humanoid",
+        "undead": false
+      },
+      "vitals": {
+        "corpseTime": 7000,
+        "maxHp": 435.34437,
+        "maxMp": 245.52,
+        "revHp": 3.5,
+        "revMp": 1.5
+      }
+    }
+  },
+  {
     "aiType": "balanced",
     "availability": {
       "directSpawn": true,

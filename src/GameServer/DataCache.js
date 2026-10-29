@@ -205,7 +205,8 @@ const DataCache = {
             ...validateModel(path + 'Npcs/Rewards/c4_low_level_raid_bosses'),
             ...validateModel(path + 'Npcs/Rewards/c4_raid_bosses'),
             ...validateModel(path + 'Npcs/Rewards/c4_raid_boss_minions'),
-            ...validateModel(path + 'Npcs/Rewards/c4_group_leader_minions')
+            ...validateModel(path + 'Npcs/Rewards/c4_group_leader_minions'),
+            ...validateModel(path + 'Npcs/Rewards/c4_quest_content')
         ];
         DataCache.adminShop       = validateModel(path + 'Admin/Shop/shop');
 
