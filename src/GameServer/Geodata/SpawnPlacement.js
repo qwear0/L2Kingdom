@@ -45,7 +45,8 @@ class BudgetStop extends Error {
 
 // Work quotas bound renewable startup windows, not the number of territories
 // allowed to receive a first attempt. Renewal keeps every proof/cursor and
-// per-target counter; wall time, RSS and capacities remain hard global stops.
+// per-target counter; wall time, RSS and required capacities remain hard stops.
+// Optional fixed-pair history yields to random work before the shared pair cap.
 // Counts include failed work; native expansions are reserved allowances.
 class Budget {
     constructor() {
@@ -273,7 +274,11 @@ class Proofs {
         this.targets = new Map();
         this.memberships = 0;
         this.queue = [];
-        this.pairs = new Set();
+        this.pairs = { random: new Map(), fixed: new Map() };
+        this.pairCounts = { random: 0, fixed: 0 };
+        this.pairAdmissions = { random: 0, fixed: 0 };
+        this.peakPairs = 0;
+        this.fixedPairsLimited = false;
         this.roots = [];
     }
     buckets(d, radius, visit) {
@@ -296,11 +301,54 @@ class Proofs {
         const dy = Math.max(d.minY - point.locY, 0, point.locY - d.maxY);
         return dx * dx + dy * dy <= ANCHOR_RADIUS ** 2;
     }
+    settled(target) {
+        return target.stopped || (target.kind === 'fixed' ? target.proven
+            : adequate(target).accepted || (target.complete && !target.eligible));
+    }
     enqueue(target) {
-        if (target.pending || target.stopped || (target.kind === 'fixed' && target.proven)) return;
-        if (target.kind === 'random' && (adequate(target).accepted || (target.complete && !target.eligible))) return;
+        if (target.pending || this.settled(target)) return;
         target.pending = true;
         this.queue.push(target);
+    }
+    release(target) {
+        // Only terminal targets can forget failures: an unresolved target may
+        // wake on a new witness and must not retry unchanged source/point pairs.
+        if (!this.settled(target)) return;
+        const pairs = this.pairs[target.kind].get(target);
+        if (!pairs) return;
+        this.pairCounts[target.kind] -= pairs.size;
+        this.pairs[target.kind].delete(target);
+    }
+    limitFixedPairs() {
+        // Fixed global proofs are diagnostic. Once their memo budget is spent
+        // or random work needs the space, stop that work before dropping history.
+        // Clearing an active retry history without this fence would repeat failures.
+        this.fixedPairsLimited = true;
+        this.pairs.fixed.clear();
+        this.pairCounts.fixed = 0;
+    }
+    rememberPair(target, key) {
+        const kind = target.kind;
+        let pairs = this.pairs[kind].get(target);
+        if (pairs?.has(key)) return false;
+        if (kind === 'fixed' && (this.fixedPairsLimited || this.pairAdmissions.fixed >= CAPACITY.pairs)) {
+            this.limitFixedPairs();
+            this.budget.stop('fixed:capacity:pairs');
+        }
+        if (this.pairCounts.random + this.pairCounts.fixed >= CAPACITY.pairs) {
+            if (kind === 'fixed') {
+                this.limitFixedPairs();
+                this.budget.stop('fixed:capacity:pairs');
+            }
+            if (this.pairCounts.fixed) this.limitFixedPairs();
+        }
+        this.budget.capacity('pairs', this.pairCounts.random + this.pairCounts.fixed + 1);
+        if (!pairs) this.pairs[kind].set(target, pairs = new Set());
+        pairs.add(key);
+        this.pairCounts[kind]++;
+        this.pairAdmissions[kind]++;
+        this.peakPairs = Math.max(this.peakPairs, this.pairCounts.random + this.pairCounts.fixed);
+        return true;
     }
     add(point) {
         const key = cellKey(point);
@@ -315,8 +363,7 @@ class Proofs {
             for (const target of this.targets.get(bucketKey) || []) {
                 if (seen.has(target.id) || !this.relevant(point, target.domain)) continue;
                 seen.add(target.id);
-                // New connectivity witnesses cannot change exhausted layer discovery.
-                if (target.kind === 'random' && target.complete && !target.eligible) continue;
+                if (this.settled(target)) continue;
                 target.proofVersion++;
                 if (target.complete) target.retryScan = true;
                 this.enqueue(target);
@@ -333,32 +380,25 @@ class Proofs {
         this.shared.add(key);
     }
     nearby(target, point, limit = 8, candidates) {
-        const found = [];
+        const found = [], pairs = this.pairs[target.kind].get(target);
         this.buckets(target.domain, ANCHOR_RADIUS, key => {
             for (const index of this.sources.get(key) || []) {
                 const source = this.trusted[index];
                 if (!this.relevant(source, target.domain)) continue;
                 const choices = candidates ? nearest(candidates, source, 2) : [target.point];
-                if (!choices.some(p => !this.pairs.has(`${target.id}/${index}/${cellKey(p)}`))) continue;
+                if (!choices.some(p => !pairs?.has(`${index}/${cellKey(p)}`))) continue;
                 found.push({ index, point: source });
             }
         });
         return nearest(found, point, limit);
     }
     pair(target, source, point) {
-        const key = `${target.id}/${source}/${cellKey(point)}`;
-        if (this.pairs.has(key)) return false;
-        this.budget.capacity('pairs', this.pairs.size + 1);
-        this.pairs.add(key);
-        return true;
+        return this.rememberPair(target, `${source}/${cellKey(point)}`);
     }
     failed(target, source, point, kind, remember = false) {
-        const key = `${kind}/${target.id}/${cellKey(source)}/${cellKey(point)}`;
-        if (this.pairs.has(key)) return true;
-        if (remember) {
-            this.budget.capacity('pairs', this.pairs.size + 1);
-            this.pairs.add(key);
-        }
+        const key = `${kind}/${cellKey(source)}/${cellKey(point)}`;
+        if (this.pairs[target.kind].get(target)?.has(key)) return true;
+        if (remember) this.rememberPair(target, key);
         return false;
     }
     root(point, source) {
@@ -665,6 +705,7 @@ function auditFixed(inv, budget) {
 function proveFixed(target, budget, proofs) {
     try {
         budget.enter(target, () => {
+            if (proofs.fixedPairsLimited) budget.stop('fixed:capacity:pairs');
             const sources = proofs.nearby(target, target.point);
             target.nearbyRoots = Math.max(target.nearbyRoots || 0, sources.length);
             const pending = [];
@@ -732,11 +773,15 @@ function describe(inv, proofs, budget, fixed, cacheHit) {
         work: { ...budget.work, scope: 'random_and_fixed_preparation', fixedConnectivitySearches: budget.fixedSearches || 0,
             directWalkScope: 'strictWalkCalls_includes_local_audits_and_reachable_internal_walks',
             pathNodeAllowanceKind: 'upper_bound_not_measured_expansions', fixedGlobalStatus: fixed.global,
-            maxRssBytes: budget.maxRssBytes, memberships: proofs.memberships, rememberedPairs: proofs.pairs.size,
+            maxRssBytes: budget.maxRssBytes, memberships: proofs.memberships,
+            rememberedPairs: proofs.pairCounts.random + proofs.pairCounts.fixed,
+            rememberedPairsByKind: { ...proofs.pairCounts }, peakRememberedPairs: proofs.peakPairs,
+            pairAdmissions: { ...proofs.pairAdmissions }, fixedPairLimitReached: proofs.fixedPairsLimited,
             windows: budget.windows, batches: budget.batches + 1, maxBatchCells: Math.max(budget.maxBatchCells, budget.batchCells),
             maxBatchLayers: Math.max(budget.maxBatchLayers, budget.batchLayers) },
         blocker: budget.stopped,
-        enforcedLimits: { ...LIMITS, capacities: CAPACITY, globalWorkBudget: false, renewableWorkWindows: true,
+        enforcedLimits: { ...LIMITS, capacities: CAPACITY, fixedPairAllowance: CAPACITY.pairs,
+            globalWorkBudget: false, renewableWorkWindows: true,
             deterministicFallback: true, fixedProofCache: true } };
 }
 
@@ -782,6 +827,7 @@ function init(definitions, cacheOptions = {}) {
             for (const target of inv.targets) {
                 if (budget.stopped) break;
                 poolAttempt(target, true, budget, proofs);
+                proofs.release(target);
                 proofs.enqueue(target);
             }
             // Register fixed targets only after random entry attempts, so their
@@ -795,13 +841,14 @@ function init(definitions, cacheOptions = {}) {
             let head = 0;
             while (head < proofs.queue.length && !budget.stopped) {
                 const target = proofs.queue[head++]; target.pending = false;
-                if (!target.stopped && !(target.kind === 'fixed' ? target.proven : adequate(target).accepted)) {
+                if (!proofs.settled(target)) {
                     if (target.kind === 'fixed') {
                         const before = budget.work.pathSearchRequests;
                         proveFixed(target, budget, proofs);
                         budget.fixedSearches = (budget.fixedSearches || 0) + budget.work.pathSearchRequests - before;
                     } else poolAttempt(target, false, budget, proofs);
                 }
+                proofs.release(target);
                 if (head >= 1024) { proofs.queue.splice(0, head); head = 0; }
                 if (!budget.stopped) budget.poll(true);
             }
@@ -856,11 +903,14 @@ function init(definitions, cacheOptions = {}) {
         blocker: budget.stopped, workWindows: budget.windows, elapsedMs: Math.round(performance.now() - budget.started) };
     utils.infoSuccess('SpawnPlacement', 'preparation: %d unavailable definitions, %d fixed proofs; %d ms; cache hit=%s; blocker=%s',
         unavailable, fixed?.proven || 0, result.elapsedMs, result.cacheHit, result.blocker || 'none');
+    utils.infoSuccess('SpawnPlacement', 'pair history: %d peak; %d random / %d fixed admissions; fixed limit=%s',
+        proofs?.peakPairs || 0, proofs?.pairAdmissions.random || 0, proofs?.pairAdmissions.fixed || 0, proofs?.fixedPairsLimited || false);
     if (cacheOptions.diagnostics) result.diagnostics = inv && proofs ? describe(inv, proofs, budget, fixed, result.cacheHit) : {
         version: 2, inventoryComplete: false, definitions: [], pools: [], roots: proofs?.roots || [],
         fixed: { global: 'incomplete', unique: null, invalid: null, proven: null, unknown: null, records: [] },
         work: { ...budget.work, windows: budget.windows }, blocker: budget.stopped, fixedOnlyAnchorsExcluded: 0,
-        enforcedLimits: { ...LIMITS, capacities: CAPACITY, globalWorkBudget: false, renewableWorkWindows: true,
+        enforcedLimits: { ...LIMITS, capacities: CAPACITY, fixedPairAllowance: CAPACITY.pairs,
+            globalWorkBudget: false, renewableWorkWindows: true,
             deterministicFallback: true, fixedProofCache: true }
     };
     return result;
