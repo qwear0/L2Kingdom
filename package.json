@@ -14,6 +14,7 @@
         "observer:key": "node scripts/generate-observer-key.js",
         "geodata": "node scripts/ensure-geodata.js",
         "generate:knowledge-base": "node scripts/generate-knowledge-base.js",
+        "generate:journey-routes": "node scripts/generate-journey-routes.js",
         "check:knowledge-base": "node scripts/generate-knowledge-base.js --check",
         "check": "node scripts/check-syntax.js",
         "test": "node scripts/run-tests.js",

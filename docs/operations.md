@@ -22,6 +22,7 @@ These are existing commands, not checks executed by creating this document.
 | `node scripts/run-simulations.js` | Creates isolated per-instance files as needed and starts management parents on 8181..8183, one origin per instance. Does not start games unless `--start-servers` (or `--restart-servers`) is explicitly selected. `--stop-servers` operates through management; `--count=1..3` and `--no-browser` remain supported. Lifecycle flags require `L2NODE_OBSERVER_KEY_<managementPort>` (for example `L2NODE_OBSERVER_KEY_8181`), or the fallback `L2NODE_OBSERVER_KEY`; the script logs in and reuses a session cookie. These are runtime operations, not checks. |
 | `npm run geodata` | Prepares/checks geodata; may download/install a large archive. Does not start gameplay. |
 | `node scripts/prepare-oren-geodata.js --base <file> --candidate <file> --output <new-file>` | Reproduces the pinned Oren block correction into scratch only. Requires exact input hashes; does not generate from the client, download, install, publish a cache or start gameplay. See [Oren preparation](#preparing-the-bounded-oren-geodata-correction). |
+| `npm run generate:journey-routes -- --scope slice ... --artifact-root <new-run>` | Explicit offline native route generation; reads registered resources/geodata and atomically writes the selected derived output plus diagnostics. Requires scope/artifact arguments; never starts gameplay or downloads/corrects geodata. Choose an explicit non-active output; see [P2 generation](#offline-journey-route-generation-p2). |
 | `npm run generate:knowledge-base` | Regenerates the five committed `data/KnowledgeBase/` outputs. |
 | `npm run check:knowledge-base` | Rebuilds catalogue content in memory and compares outputs; not gameplay verification. |
 | `npm run check` | Existing Node `--check` traversal of JavaScript under `src/`, `scripts/`, `tests/`; syntax only, no application startup. |
@@ -63,6 +64,29 @@ node scripts/prepare-oren-geodata.js \
 The output parent must already exist under repository `tmp/` or `/tmp/L2Kingdom/`; its resolved location is checked, and existing outputs are never overwritten. The command reads configuration through `Global` and reuses the native block indexer without initializing data, geodata regions, the database or world. Input size/hash, sorted block ranges and the complete output size/hash are checked before writing. A mismatch requires inspecting the changed input/recipe, not disabling validation. No new per-bot work or spawn/path budget is introduced.
 
 Preparation is **not installation or full-world acceptance**. The bounded Oren result does not resolve other spawn failures or certify native-client collision. Any later installation requires explicit authorization, recovery of the actual installed bytes, the appropriate stopped-game lifecycle boundary, and preparation of the complete native cache against final inputs. Never publish a region-only cache as the world's cache. The ordinary geodata bootstrap does not automatically apply this correction.
+
+## Offline journey-route generation (P2)
+
+This production generator is an explicit CPU/memory-intensive offline operation, not a routine syntax check or a server/environment build. It reads the authored candidates, actual DataCache-registered NPC/spawn resources, native service/teleport/placement/movement sources, virtual obstacles and selected installed region files. Its restricted native adapter does not initialize `Global`, SQLite, `SpawnPlacement.init`, the world, listeners, bots or workers. It does not download geodata, run the separately owned Oren correction or install a cache.
+
+For the current Gludin/Gludio gate-approach–Wasteland slice, select a fresh evidence directory and an explicit **non-active** output:
+
+```sh
+node scripts/generate-journey-routes.js \
+  --source data/Bots/travel-waypoints.json --geodata data/Geodata \
+  --scope slice --requirement-id w19_23_001 \
+  --requirement-id gludin_village --requirement-id gludio_town \
+  --output tmp/journey-routes/<new-run>/journey-routes.json \
+  --artifact-root tmp/journey-routes/<new-run>/build-evidence
+```
+
+`--scope slice|full` and `--artifact-root` are mandatory; repeatable `--waypoint-id` / `--connection-id` narrow explicit work. The default geodata directory respects `L2NODE_GEODATA_DIR`; without `--output`, output defaults to `${L2NODE_RUNTIME_DIR || 'tmp'}/cache/journey-routes.json`, so never omit it during isolated evaluation. The CLI creates output directories, validates the completed record and writes through a same-directory temporary file, fsync and atomic rename. Failed required proofs exit nonzero, preserve the last normal output and retain separately named incomplete/failure evidence. A prior output is not evidence for changed inputs.
+
+P2 enforces the [catalogue ceilings](../data/Bots/TRAVEL_CATALOG.md#concrete-work-and-size-ceilings): one builder, 900-second wall / 1,536-MiB absolute RSS / 512-MiB geodata / 64-region limits; finite total layer/transition/search work, 120,000 nodes and 2 seconds per pair, 60 seconds per polygon; 1-MiB authored and 10-MiB generated file caps. A limit stays unresolved, never no-path. The generated manifest/checksum, build/proof summaries and unresolved inventory accompany measurements of counts, output bytes, duration and observed peak RSS. The current slice proves 172 independent directed trunks and two admitted SCCs while retaining all 631 raw SCCs / 14,657 cells and 629 finite native-exclusion certificates. It retains 188 outside polygons plus town/service residuals; CLI readiness gates selected polygon admission and selected connections, **not** every town origin/service row or full-world completion.
+
+On a separately authorized startup, `NodeL2` awaits optional `inputIdentity({catalogueFile:file})` and `JourneyRouteCatalog.load` after geodata initialization and before `World.init`. Missing/stale/corrupt/over-limit input disables the catalogue with a precise log; startup never auto-builds or repairs it. One pre-identity wall/RSS baseline covers identity, fresh file reading, all validation/checksum work, shared indexes and deep freeze: at most 10 seconds, +128 MiB observed peak and +32 MiB immediate publication RSS, per catalogue-owning process. Validation/hash/index work yields in batches of at most 4,096 records. The private single-use parsed-tree handoff requires exact resolved path and fresh byte SHA and cannot bypass validation or guards. No forced GC or baseline reset is part of admission. The loader is shared once, with no per-bot or pathfinding-worker catalogue copies.
+
+Generating or loading a slice does not publish it to a running game or enable the future P3 executor. Existing journeys remain unchanged. Any later active-cache replacement, lifecycle operation, full generation or gameplay/client acceptance requires its own authorization and exact final input identity.
 
 ## Offline territory profiling
 

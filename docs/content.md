@@ -15,7 +15,7 @@ Read this before adding game data, regenerating exports or changing NPC/quest/pr
 | Generated knowledge exports | `scripts/generate-knowledge-base.js` → `data/KnowledgeBase/` | Native knowledge UI and WorldObserver |
 | Downloaded geodata | Bootstrap → ignored local region files | `Geodata/GeodataEngine.js` |
 | Bounded Oren geodata correction | `data/GeodataCorrections/22_18-oren.json` + exact local inputs → `scripts/prepare-oren-geodata.js` | Offline scratch output only; no automatic runtime consumer/installation |
-| Cached vassal-travel requirements (P1 only) | `data/Bots/travel-waypoints.json`; [frozen contract](../data/Bots/TRAVEL_CATALOG.md) | None yet; candidate seeds and unresolved coverage, not runnable road data |
+| Cached vassal-travel catalogue (P2 slice) | Authored `data/Bots/travel-waypoints.json` → `scripts/generate-journey-routes.js` → ignored derived catalogue; [contract](../data/Bots/TRAVEL_CATALOG.md) | Optional startup `JourneyRouteInputs` / `JourneyRouteCatalog` identity/load; planner/executor consumption remains P3 |
 | Basic manual fishing | `data/Fishing/{basic,zones}.json`; item/skill `c4_fishing.json` resources | `Fishing/{FishingData,FishingZones,FishingTraining,FishingService}.js`; explicit DataCache loaders |
 | Durable world/history | SQLite owners, not authored resources | [Persistence flow](persistence.md) |
 
@@ -52,6 +52,10 @@ Paths without a full prefix in the consumer column are under `src/GameServer/`.
 The separately prepared [bounded Oren geodata correction](operations.md#preparing-the-bounded-oren-geodata-correction) changes geometry inputs, not placement rules. Existing shared native proofs can admit the repaired target when neighboring domains are prepared together; an isolated-domain budget failure does not justify new unconditional roots or inflated limits. Applying the recipe does not install geodata, change authored spawn counts/XYZ or publish a runtime cache.
 
 ## Generated content versus hand-authored policy
+
+Cached travel separates authored transit permission/candidates from generated proof. `JourneyRouteComponents` enumerates exact cell/layer SCCs and bounded patches; `JourneyRouteBuilder` proves each directed trunk and admission/access certificate. The slice keeps all 189 polygon / 16 town / 23 gate requirements, including 188 outside-slice polygons and town/service residuals. Its 631 raw SCCs / 14,657 cells are retained: two supported SCCs, 629 explicit native exclusions, not deleted floors or globally unreachable terrain. Exclusions combine complete finite actor/native cuts, the actual complete seed/fixed-coordinate census and cold-producer/genuine same-input local warm-cache ancestry; a failed search or sampled spawn pool is insufficient. Membership checks component status independently of supported polygon coverage. The authored tiny corner is transit only, never additional farming territory.
+
+Derived `journey-routes.json` binds exact registered resources, loaded native factories/exports/JSON, authored permissions, virtual obstacles and relevant installed geodata bytes, plus its own canonical checksum. It is not hand-edited source, live persistence or permission to publish an active cache. Startup validates and optionally loads once; it does not regenerate. The [offline operation](operations.md#offline-journey-route-generation-p2) does not modify geodata, run the Oren correction tooling, populate the world or establish P3 execution/full coverage/gameplay readiness.
 
 - `scripts/lib/generate-c4-monster-location.js` consumes revision-pinned upstream SQL/XML under `tmp/vendor/l2j-lisvus` and emits related NPC/spawn/reward/skill/item resources.
 - Individual generators also encode local emulator choices; importing upstream data is not proof of unchanged retail behavior.

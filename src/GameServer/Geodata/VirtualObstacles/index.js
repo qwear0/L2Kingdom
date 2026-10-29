@@ -1,3 +1,4 @@
+require('../JourneyGeometryIdentity.js').define(module, require, function (module, exports, require, __filename, __dirname) {
 const fs = require('fs');
 const path = require('path');
 const { createHash } = require('crypto');
@@ -117,3 +118,4 @@ const VirtualObstacles = {
 };
 
 module.exports = VirtualObstacles;
+});

@@ -1,3 +1,4 @@
+require('../Geodata/JourneyGeometryIdentity.js').define(module, require, function (module, exports, require, __filename, __dirname) {
 'use strict';
 
 // Chronicle 4 Cruma Tower routes from the original gatekeeper and teleport
@@ -55,3 +56,4 @@ function html(npcId) {
 }
 
 module.exports = { DESTINATIONS, NPC_NAMES, ROUTES, destination, html };
+});

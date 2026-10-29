@@ -145,6 +145,22 @@ Database.init(() => {
     }).then(() => shuttingDown ? undefined : ClanService.init()).then(async () => {
         if (shuttingDown) return;
         GeodataEngine.init();
+        try {
+            const JourneyRouteCatalog = invoke('GameServer/Bot/Travel/JourneyRouteCatalog');
+            const file = JourneyRouteCatalog.defaultFile();
+            const identity = require('node:fs').existsSync(file)
+                ? await invoke('GameServer/Bot/Travel/JourneyRouteInputs').inputIdentity({ catalogueFile: file })
+                : null;
+            const result = await JourneyRouteCatalog.load(file, identity);
+            if (result.status === 'ready') {
+                utils.infoSuccess('JourneyRouteCatalog', 'loaded revision %s', result.revision);
+            } else {
+                utils.infoWarn('JourneyRouteCatalog', 'disabled: %s', result.reason);
+            }
+        } catch (error) {
+            utils.infoWarn('JourneyRouteCatalog', 'disabled: initialization failed: %s', error.message);
+        }
+        if (shuttingDown) return;
         await World.init();
         if (shuttingDown) return;
         await invoke('GameServer/ClanHall/Runtime').start();

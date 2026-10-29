@@ -1,3 +1,4 @@
+require('../Geodata/JourneyGeometryIdentity.js').define(module, require, function (module, exports, require, __filename, __dirname) {
 'use strict';
 
 // Native catalogues expose mutable arrays/objects without a revision. Keep a
@@ -39,3 +40,4 @@ function currentIndex(fields, build) {
 }
 
 module.exports = { currentIndex };
+});

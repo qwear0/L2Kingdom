@@ -1,3 +1,4 @@
+require('./JourneyGeometryIdentity.js').define(module, require, function (module, exports, require, __filename, __dirname) {
 const fs = require('fs');
 const path = require('path');
 const { createHash, randomUUID } = require('crypto');
@@ -487,8 +488,12 @@ const GeodataEngine = {
     // both sides of a corner must be walkable to avoid isolated roof cells.
     // Requested/interpolated Z is only a fallback where cell layers are absent.
     // matchHeight=false skips endpoint admission, not terrain/NSWE validation.
-    walkSegment(from, to, matchHeight = true) {
+    walkSegment(from, to, matchHeight = true, options = null) {
         if (![from.locX, from.locY, from.locZ, to.locX, to.locY].every(Number.isFinite)) return null;
+        const admitPoint = typeof options?.admitPoint === 'function' ? options.admitPoint : null;
+        const checkBudget = typeof options?.checkBudget === 'function' ? options.checkBudget : null;
+        if (admitPoint && admitPoint(from) !== true) return null;
+        let transitions = 0;
         let cx = from.locX >> 4, cy = from.locY >> 4;
         const endX = to.locX >> 4, endY = to.locY >> 4;
         let cell = this.getCellData(from.locX, from.locY, from.locZ);
@@ -501,6 +506,7 @@ const GeodataEngine = {
         let nextX = dx ? (((cx + (sx > 0 ? 1 : 0)) << 4) - from.locX) / dx : Infinity;
         let nextY = dy ? (((cy + (sy > 0 ? 1 : 0)) << 4) - from.locY) / dy : Infinity;
         const cross = (source, x, y, stepX, stepY, progress) => {
+            if (checkBudget && (++transitions & 127) === 0) checkBudget();
             const bit = stepX ? (stepX > 0 ? 1 : 2) : (stepY > 0 ? 4 : 8);
             const opposite = stepX ? (stepX > 0 ? 2 : 1) : (stepY > 0 ? 8 : 4);
             if (!(source.nswe & bit)) return null;
@@ -510,8 +516,9 @@ const GeodataEngine = {
             if (!target.hasLayerData && hasTargetZ) {
                 target.z = Math.round(from.locZ + (to.locZ - from.locZ) * progress);
             }
-            return (target.nswe & opposite) && (!target.hasLayerData
-                || Math.abs(target.z - sourceZ) <= MAX_LAYER_STEP) ? target : null;
+            if (!(target.nswe & opposite) || target.hasLayerData && Math.abs(target.z - sourceZ) > MAX_LAYER_STEP) return null;
+            if (admitPoint && !admitPoint({ locX: (x << 4) + 8, locY: (y << 4) + 8, locZ: target.z })) return null;
+            return target;
         };
         while (cx !== endX || cy !== endY) {
             if (cy === endY || cx !== endX && nextX < nextY - 1e-10) {
@@ -536,7 +543,8 @@ const GeodataEngine = {
             if (!cell) return null;
         }
         if (cell.hasLayerData && matchHeight && hasTargetZ && Math.abs(cell.z - to.locZ) > MAX_LAYER_STEP) return null;
-        return { locX: to.locX, locY: to.locY, locZ: !cell.hasLayerData && hasTargetZ ? to.locZ : cell.z };
+        const result = { locX: to.locX, locY: to.locY, locZ: !cell.hasLayerData && hasTargetZ ? to.locZ : cell.z };
+        return admitPoint && admitPoint(result) !== true ? null : result;
     },
 
     findPath(startX, startY, startZ, endX, endY, endZ, maxNodes = 2000, options = {}) {
@@ -544,6 +552,12 @@ const GeodataEngine = {
         if (evidence) Object.assign(evidence, { stopReason: 'SEARCHING', searchComplete: false,
             nodesExpanded: 0, maxNodes, goalReached: false, missingGeodata: false });
         const checkBudget = typeof options.checkBudget === 'function' ? options.checkBudget : null;
+        const checkTransitionBudget = typeof options.checkTransitionBudget === 'function'
+            ? options.checkTransitionBudget : checkBudget;
+        const checkSegmentBudget = typeof options.checkSegmentBudget === 'function'
+            ? options.checkSegmentBudget : checkBudget;
+        const admitNode = typeof options.admitNode === 'function' ? options.admitNode : null;
+        const admitSegment = typeof options.admitSegment === 'function' ? options.admitSegment : null;
         checkBudget?.();
         const startCx = startX >> 4;
         const startCy = startY >> 4;
@@ -567,6 +581,13 @@ const GeodataEngine = {
         const endCell = cellAt(endCx, endCy, endZ);
         const hasLayerData = this.hasGeo(startX, startY) && this.hasGeo(endX, endY);
         const goalRadius = Math.max(0, Number(options.goalRadius || 0));
+        if (admitNode) {
+            const startPoint = { locX: (startCx << 4) + 8, locY: (startCy << 4) + 8, locZ: startCell.z };
+            const endPoint = { locX: (endCx << 4) + 8, locY: (endCy << 4) + 8, locZ: endCell.z };
+            if (!admitNode(startPoint) || !admitNode(endPoint)
+                || !admitNode({ locX: startX, locY: startY, locZ: startZ })
+                || !admitNode({ locX: endX, locY: endY, locZ: endZ })) return null;
+        }
         const goalZTolerance = goalRadius > 0
             ? Math.max(MAX_LAYER_STEP, Number(options.goalZTolerance || MAX_LAYER_STEP))
             : 0;
@@ -596,9 +617,10 @@ const GeodataEngine = {
         const immediate = { cx: startCx, cy: startCy, cz: startCell.z };
         if (reachedGoal(immediate)) {
             if (evidence) Object.assign(evidence, { stopReason: 'GOAL_REACHED', searchComplete: true, goalReached: true });
-            if (goalRadius > 0) {
-                return [{ locX: startX, locY: startY, locZ: startZ }];
-            }
+            if (goalRadius > 0) return [{ locX: startX, locY: startY, locZ: startZ }];
+            if (admitSegment && !this.walkSegment({ locX: startX, locY: startY, locZ: startZ },
+                { locX: endX, locY: endY, locZ: endZ }, true,
+                { admitPoint: admitSegment, checkBudget: checkSegmentBudget })) return null;
             return [{ locX: endX, locY: endY, locZ: endZ }];
         }
 
@@ -625,6 +647,7 @@ const GeodataEngine = {
 
         let targetNode = null;
         let nodesExpanded = 0;
+        let transitions = 0;
 
         while (openList.length > 0) {
             const current = openList.shift();
@@ -651,6 +674,7 @@ const GeodataEngine = {
 
             const currentCell = cellAt(current.cx, current.cy, current.cz);
             for (const dir of PATH_DIRECTIONS) {
+                if (checkTransitionBudget && (++transitions & 127) === 0) checkTransitionBudget();
                 const nCx = current.cx + dir.dx;
                 const nCy = current.cy + dir.dy;
                 if ((currentCell.nswe & dir.bit) === 0) {
@@ -659,6 +683,7 @@ const GeodataEngine = {
 
                 const nCell = cellAt(nCx, nCy, currentCell.z);
                 const key = pathNodeKey(nCx, nCy, nCell.z);
+                if (admitNode && !admitNode({ locX: (nCx << 4) + 8, locY: (nCy << 4) + 8, locZ: nCell.z })) continue;
 
                 if ((nCell.nswe & dir.oppBit) === 0) {
                     continue;
@@ -667,6 +692,10 @@ const GeodataEngine = {
                 if (Math.abs(nCell.z - currentCell.z) > MAX_LAYER_STEP) {
                     continue;
                 }
+                if (admitSegment && !this.walkSegment({ locX: (current.cx << 4) + 8,
+                    locY: (current.cy << 4) + 8, locZ: current.cz },
+                { locX: (nCx << 4) + 8, locY: (nCy << 4) + 8, locZ: nCell.z }, true,
+                { admitPoint: admitSegment, checkBudget: checkSegmentBudget })) continue;
 
                 const g = current.g + 16;
                 const previousCost = bestCosts.get(key);
@@ -732,7 +761,8 @@ const GeodataEngine = {
                     for (let stride = 2; checkIdx < pathPoints.length - 1; stride *= 2) {
                         checkBudget?.();
                         const next = Math.min(currentIdx + stride, pathPoints.length - 1);
-                        if (!this.walkSegment(pathPoints[currentIdx], pathPoints[next])) break;
+                        if (!this.walkSegment(pathPoints[currentIdx], pathPoints[next], true,
+                            admitSegment ? { admitPoint: admitSegment, checkBudget: checkSegmentBudget } : undefined)) break;
                         checkIdx = next;
                     }
                 } else {
@@ -741,7 +771,8 @@ const GeodataEngine = {
                         if ((checkIdx & 31) === 0) checkBudget?.();
                         const startPt = pathPoints[currentIdx];
                         const endPt = pathPoints[checkIdx];
-                        if (this.walkSegment(startPt, endPt)) {
+                        if (this.walkSegment(startPt, endPt, true,
+                            admitSegment ? { admitPoint: admitSegment, checkBudget: checkSegmentBudget } : undefined)) {
                             break;
                         }
                         checkIdx--;
@@ -753,11 +784,10 @@ const GeodataEngine = {
         }
 
         if (smoothedPath.length > 0 && goalRadius <= 0) {
-            smoothedPath[smoothedPath.length - 1] = {
-                locX: endX,
-                locY: endY,
-                locZ: endZ
-            };
+            const finalPoint = { locX: endX, locY: endY, locZ: endZ };
+            if (admitSegment && !this.walkSegment(smoothedPath[smoothedPath.length - 1], finalPoint, true,
+                { admitPoint: admitSegment, checkBudget: checkSegmentBudget })) return null;
+            smoothedPath[smoothedPath.length - 1] = finalPoint;
         }
 
         return smoothedPath;
@@ -791,3 +821,5 @@ const GeodataEngine = {
 };
 
 module.exports = GeodataEngine;
+return [[require.resolve('./VirtualObstacles'), VirtualObstacles]];
+});

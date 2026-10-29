@@ -1,3 +1,4 @@
+require('./JourneyGeometryIdentity.js').define(module, require, function (module, exports, require, __filename, __dirname) {
 const Geo = invoke('GameServer/Geodata/GeodataEngine');
 
 const MAX_STEP = 64;
@@ -123,3 +124,5 @@ function reachable(from, to, maxNodes, budget, skipDirect = false) {
 }
 
 module.exports = { layers, supported, walk, reachable };
+return [[require.resolve('./GeodataEngine'), Geo]];
+});
