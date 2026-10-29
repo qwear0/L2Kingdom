@@ -12,7 +12,7 @@ function fail(code) { return Object.assign(new Error(code), { code }); }
 const credentials = z.strictObject({
     login: z.string().regex(/^[!-~]{1,14}$/),
     password: z.string().regex(/^[!-~]{1,16}$/),
-    character: z.string().min(1).max(64)
+    character: z.string().min(1).max(64).refine(value => !value.includes('\0'))
 });
 
 async function privateJson(filename, maximum) {
@@ -75,7 +75,7 @@ class ClientBridge {
             let used = 0;
             let sent = false;
             let settled = false;
-            const buffer = Buffer.alloc(8192);
+            const buffer = Buffer.alloc(16384);
             const done = (error, result) => {
                 if (settled) return;
                 settled = true;
@@ -112,7 +112,16 @@ class ClientBridge {
         const target = await this.connection();
         if (result.protocol !== protocol || result.profile !== profile || result.pid !== target.pid
             || !Number.isInteger(result.epoch) || !Number.isInteger(result.sequence) || !result.session) throw fail('session_identity_mismatch');
-        return { ...result, captureStage: 'post_native_tick', receivedAt: new Date().toISOString(),
+        const names = result.session.characterNamesUtf16le;
+        const selected = result.session.selectedCharacterUtf16le;
+        const validName = value => typeof value === 'string' && value.length <= 256 && /^(?:[a-f0-9]{4})*$/.test(value);
+        if (!Array.isArray(names) || names.length > 7 || !names.every(validName) || !validName(selected)
+            || !Array.isArray(result.session.serverIds) || result.session.serverIds.length > 32
+            || !result.session.serverIds.every(id => Number.isInteger(id) && id > 0 && id <= 255)) throw fail('invalid_session_lists');
+        return { ...result, session: { ...result.session,
+            characters: names.map((name, index) => ({ index, name: Buffer.from(name, 'hex').toString('utf16le') })),
+            selectedCharacter: selected ? Buffer.from(selected, 'hex').toString('utf16le') : null },
+            captureStage: 'post_native_tick', receivedAt: new Date().toISOString(),
             evidence: { pawn: 'client_native', session: 'client_network', mapCompleteness: 'unknown', feetCalibration: 'unavailable' } };
     }
 
@@ -120,9 +129,9 @@ class ClientBridge {
         const sample = await this.observe();
         return { protocol, profile, pid: sample.pid, sequence: sample.sequence, epoch: sample.epoch, ageMs: sample.ageMs,
             tickThread: sample.tickThread, session: sample.session, pawnAvailable: !!sample.pawn,
-            capabilities: ['client_status', 'client_observe', 'login', 'client_action_status'],
-            unavailable: ['server_selection', 'character_selection', 'consent_automation', 'movement', 'stop', 'events', 'wait', 'capture', 'calibrated_geometry'],
-            control: { owned: this.owned, lost: this.lost, disconnect: 'Queued login is revoked on release/lease expiry; dispatched auth is not undone. No movement capability.' } };
+            capabilities: ['client_status', 'client_observe', 'login', 'select_server', 'select_character', 'client_action_status'],
+            unavailable: ['consent_automation', 'security_pad_answers', 'movement', 'stop', 'events', 'wait', 'capture', 'calibrated_geometry'],
+            control: { owned: this.owned, lost: this.lost, disconnect: 'Queued actions are revoked on release/lease expiry; dispatched session actions are not undone. No movement capability.' } };
     }
 
     async claim() {
@@ -147,33 +156,47 @@ class ClientBridge {
         this.pending = true;
         let accountBytes;
         let passwordBytes;
+        let characterBytes;
         try {
             const id = input.requestId.replaceAll('-', '').toLowerCase();
             const replay = this.payloads.has(id);
             if (!replay) {
                 const sample = await this.observe();
                 if (sample.epoch !== input.expectedEpoch) throw fail('stale_epoch');
+                if (input.action !== 'login' && sample.session.revision !== input.expectedRevision) throw fail('stale_revision');
             }
-            const parsed = credentials.safeParse(await privateJson(input.credentialFile, 4096));
-            if (!parsed.success) throw fail('credentials_shape_unsupported');
-            accountBytes = Buffer.from(parsed.data.login, 'utf16le');
-            passwordBytes = Buffer.from(parsed.data.password, 'utf16le');
+            let payload;
+            if (input.action === 'select_server') {
+                payload = `server ${id} ${input.expectedEpoch} ${input.expectedRevision} ${input.serverId}`;
+            } else {
+                const parsed = credentials.safeParse(await privateJson(input.credentialFile, 4096));
+                if (!parsed.success) throw fail('credentials_shape_unsupported');
+                if (input.action === 'login') {
+                    accountBytes = Buffer.from(parsed.data.login, 'utf16le');
+                    passwordBytes = Buffer.from(parsed.data.password, 'utf16le');
+                    payload = `login ${id} ${input.expectedEpoch} ${accountBytes.toString('hex')} ${passwordBytes.toString('hex')}`;
+                } else if (input.action === 'select_character') {
+                    characterBytes = Buffer.from(parsed.data.character, 'utf16le');
+                    payload = `char ${id} ${input.expectedEpoch} ${input.expectedRevision} ${characterBytes.toString('hex')}`;
+                } else throw fail('unsupported_action');
+            }
             // JS strings cannot be reliably zeroed. Do not retain parsed data,
             // wire payloads, secrets, or secret-derived hashes in tool results.
-            const payload = `${id} ${input.expectedEpoch} ${accountBytes.toString('hex')} ${passwordBytes.toString('hex')}`;
             const digest = createHash('sha256').update(payload).digest('hex');
             if (this.payloads.has(id) && this.payloads.get(id) !== digest) throw fail('request_conflict');
             if (!this.payloads.has(id) && this.payloads.size >= 32) throw fail('receipt_capacity');
             if (this.rejections.has(id)) return this.rejections.get(id);
             if (!replay) await this.claim();
             this.payloads.set(id, digest);
-            const result = { ...this.normalizeReceipt(await this.rpc(`login ${this.owner} ${payload}`, true), input.requestId),
-                guidance: 'Queued/dispatched is not login/world completion. Inspect client_status and the same client_action_status; never retry an uncertain login with a new requestId.' };
+            const split = payload.indexOf(' ');
+            const result = { ...this.normalizeReceipt(await this.rpc(`${payload.slice(0, split)} ${this.owner} ${payload.slice(split + 1)}`, true), input.requestId),
+                guidance: 'Queued/dispatched is not session/world completion. Inspect client_status and the same client_action_status; worldEntered requires native acceptance, matching self identity and a checked pawn. Never retry an uncertain action with a new requestId.' };
             if (result.error) this.rejections.set(id, result);
             return result;
         } finally {
             accountBytes?.fill(0);
             passwordBytes?.fill(0);
+            characterBytes?.fill(0);
             this.pending = false;
         }
     }
@@ -181,7 +204,8 @@ class ClientBridge {
     normalizeReceipt(result, requestId) {
         if (result.error) return result;
         if (result.requestId !== requestId.replaceAll('-', '').toLowerCase() || !Number.isInteger(result.epoch)
-            || !['queued', 'dispatched', 'stale_epoch', 'owner_lost', 'native_unavailable', 'native_rejected', 'queue_expired'].includes(result.status)
+            || !['login', 'select_server', 'select_character'].includes(result.action)
+            || !['queued', 'dispatched', 'stale_epoch', 'owner_lost', 'native_unavailable', 'native_rejected', 'queue_expired', 'stale_revision'].includes(result.status)
             || !Number.isInteger(result.nativeReturn)) throw fail('invalid_receipt');
         return { ...result, requestId: requestId.toLowerCase() };
     }

@@ -198,10 +198,11 @@ void Serve(SOCKET socket, const char* token) {
     }
     if (!used || request[used - 1] != '\n') return;
     request[used - 1] = 0;
-    // The worker parses/copies fixed requests only. Native login and geometry
+    // The worker parses/copies fixed requests only. Native session actions and geometry
     // execute on the checked game tick, never on this socket thread.
     if (strlen(request) < 65 || memcmp(request, token, 64) || request[64] != ' ') return;
     const char* command = request + 65;
+    session::ResolveWindow();
     if (!strcmp(command, "surface")) {
         EnterCriticalSection(&sampleLock);
         const char* error = surface.status == 1 ? "surface_busy" : (!sample.pawn ? "pawn_unavailable" : nullptr);
@@ -220,7 +221,7 @@ void Serve(SOCKET socket, const char* token) {
         return;
     }
     if (strcmp(command, "health") && strcmp(command, "sample")) {
-        char reply[1024];
+        static char reply[4096];
         EnterCriticalSection(&sampleLock);
         session::Rpc(command, sample.epoch, sample.sequence && GetTickCount() - sample.time < 5000, reply, sizeof(reply));
         LeaveCriticalSection(&sampleLock);
@@ -231,13 +232,13 @@ void Serve(SOCKET socket, const char* token) {
     EnterCriticalSection(&sampleLock);
     Sample copy = sample;
     Surface ray = surface;
-    char sessionJson[768];
+    static char sessionJson[4096];
     session::ExpireOwner();
     session::Render(sessionJson, sizeof(sessionJson));
     LeaveCriticalSection(&sampleLock);
     // Serve runs serially on the sole RPC worker; keep the large public JSON
     // buffer off its stack without introducing a CRT stack-probe dependency.
-    static char response[4096];
+    static char response[8192];
     char age[16], pawn[256], result[512];
     if (copy.sequence) _snprintf(age, sizeof(age), "%lu", GetTickCount() - copy.time);
     else strcpy(age, "null");
@@ -252,7 +253,7 @@ void Serve(SOCKET socket, const char* token) {
         ray.hit.normal.x, ray.hit.normal.y, ray.hit.normal.z, ray.hit.time, ray.hit.item, ray.hit.primitive, ray.hit.material);
     else strcpy(result, "null");
     _snprintf(response, sizeof(response),
-        "{\"protocol\":\"c4-agent/1\",\"profile\":\"%s\",\"pid\":%lu,\"sequence\":%lu,\"ageMs\":%s,\"tickThread\":%lu,\"epoch\":%lu,\"engine\":\"%p\",\"viewportActor\":\"%p\",\"level\":\"%p\",\"pawn\":%s,\"session\":%s,\"capabilities\":[\"health\",\"native_tick_sample\",\"surface\",\"session_observe\",\"native_login\"],\"surface\":{\"requestId\":%lu,\"epoch\":%lu,\"status\":\"%s\",\"nativeReturn\":%d,\"mask\":%lu,\"extent\":[0,0,0],\"start\":[%.6f,%.6f,%.6f],\"end\":[%.6f,%.6f,%.6f],\"hit\":%s}}\n",
+        "{\"protocol\":\"c4-agent/2\",\"profile\":\"%s\",\"pid\":%lu,\"sequence\":%lu,\"ageMs\":%s,\"tickThread\":%lu,\"epoch\":%lu,\"engine\":\"%p\",\"viewportActor\":\"%p\",\"level\":\"%p\",\"pawn\":%s,\"session\":%s,\"capabilities\":[\"health\",\"native_tick_sample\",\"surface\",\"session_observe\",\"native_login\",\"native_selection\"],\"surface\":{\"requestId\":%lu,\"epoch\":%lu,\"status\":\"%s\",\"nativeReturn\":%d,\"mask\":%lu,\"extent\":[0,0,0],\"start\":[%.6f,%.6f,%.6f],\"end\":[%.6f,%.6f,%.6f],\"hit\":%s}}\n",
         c4::Profile, GetCurrentProcessId(), copy.sequence, age, copy.thread, copy.epoch, copy.engine, copy.viewportActor, copy.level, pawn, sessionJson,
         ray.id, ray.epoch, statuses[ray.status], ray.nativeReturn, WorldTraceMask,
         ray.start.x, ray.start.y, ray.start.z, ray.end.x, ray.end.y, ray.end.z, result);

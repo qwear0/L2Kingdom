@@ -8,7 +8,7 @@ static_assert(sizeof(void*) == 4, "The C4 profile requires an x86 build");
 
 namespace c4 {
 constexpr const char* Profile = "l2solo-c4-656-0293b3ed-p1";
-constexpr const char* Protocol = "c4-agent/1";
+constexpr const char* Protocol = "c4-agent/2";
 // UNetworkHandler::Init writes this module-relative singleton. Its notify
 // subobject must match UGameEngine +0x38 (verified in this build's constructor).
 constexpr SIZE_T NetworkSingleton = 0x6d5e68;
@@ -19,6 +19,10 @@ constexpr SIZE_T NetworkGameDriver = 0x48;
 constexpr SIZE_T NetworkAuthPending = 0x50;
 constexpr SIZE_T DriverTransport = 0x38;
 constexpr SIZE_T EngineConsole = 0x6c;
+// SHA-pinned NWindow console class and its native Start(index) wrapper. The
+// wrapper calls RequestGameStart, then performs the matching UI transition.
+constexpr SIZE_T WindowConsoleTable = 0x1b2428;
+constexpr SIZE_T WindowGameStart = 0x65120;
 // RequestAuthLogin accesses auth-driver fields through +0x4f68. Merely
 // finding the network singleton does not prove driver initialization finished.
 constexpr SIZE_T AuthDriverFields = 0x4f6c;
@@ -64,8 +68,9 @@ inline bool VerifyBuild(bool loaded) {
         char path[MAX_PATH];
         if (loaded) {
             HMODULE module = GetModuleHandleA(identity.name);
-            // NWindow is loaded by the game later, not a static L2 import. Its
-            // on-disk identity is pinned; the bridge never calls its unmapped ABI.
+            // NWindow is loaded later, not a static L2 import. Pin its disk
+            // identity now; session::ResolveWindow checks its loaded path again
+            // before the game thread may use the exact console wrapper.
             if (!module && strcmp(identity.name, "NWindow.dll")) return false;
             DWORD n = module ? GetModuleFileNameA(module, path, sizeof(path))
                 : GetFullPathNameA(identity.name, sizeof(path), path, nullptr);
