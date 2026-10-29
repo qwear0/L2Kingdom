@@ -2,9 +2,10 @@
 map $uri $l2kingdom_file {
     default "";
     ~^/observer/login/?$ /observer/login.html;
-    ~^/observer/settings(?:/(?:world|bots|server))?/?$ /observer/settings.html;
+    ~^/observer/settings(?:/(?:world|bots|server|game-account))?/?$ /observer/settings.html;
     ~^/observer/database(?:/(?:items|npcs)(?:/\d+)?)?/?$ /observer/knowledge-base.html;
     ~^/observer/market/?$ /observer/market.html;
+    ~^/observer/game-dashboard/?$ /observer/game-dashboard.html;
     ~^/observer/(?:world|overview|characters|parties|dungeons/[a-z0-9_-]+|rankings|raid-bosses(?:/\d+)?|clans(?:/\d+)?(?:/map)?|actors/(?:bot|player)/\d+)?/?$ /observer/index.html;
     ~^/observer/[^/]+\.(?:html|js|css|json|svg|png|webp|jpg|jpeg)$ $uri;
     ~^/observer/map-tiles/[^/]+\.(?:webp|png|jpg|jpeg|json)$ $uri;

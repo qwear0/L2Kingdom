@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Game Dashboard · L2Kingdom</title>
+    <script src="/observer/appearance.js"></script>
+    <script src="/observer/auth.js"></script>
+    <link rel="icon" type="image/png" href="/observer/l2kingdom-logo.png">
+    <link rel="stylesheet" href="/observer/styles.css">
+    <link rel="stylesheet" href="/observer/application.css">
+    <link rel="stylesheet" href="/observer/game-dashboard.css">
+</head>
+<body class="game-dashboard-body">
+    <main class="game-dashboard">
+        <header class="dashboard-heading"><div><span class="section-kicker">Your connected character</span><h1>Game Dashboard</h1><p>Shared in-game controls. Closing this page does not stop gameplay.</p></div><div class="dashboard-actions"><a href="/observer/settings/game-account">Game account settings</a><button id="refreshDashboard" type="button">Refresh</button></div></header>
+        <section class="dashboard-availability" aria-label="Character availability"><strong id="dashboardCharacter">Loading character…</strong><p id="dashboardAvailability" role="status" aria-live="polite">Reading bounded game state…</p><a id="dashboardLink" href="/observer/settings/game-account" hidden>Link an existing game account →</a></section>
+        <p id="dashboardDraftNotice" role="status" hidden></p>
+        <div class="dashboard-cards">
+            <section class="dashboard-card" id="autoFightCard" aria-labelledby="autoFightTitle">
+                <header><div><span class="section-kicker">Connected-player hunt</span><h2 id="autoFightTitle">Auto-fight</h2></div><span id="autoFightRun" class="dashboard-badge">Unavailable</span></header>
+                <p id="autoFightPersistence">Preferences unavailable.</p>
+                <p id="autoFightFeedback" class="dashboard-feedback" role="status" aria-live="polite"></p>
+                <p id="autoFightDisabled" class="dashboard-help">Controls require one online linked character.</p>
+                <div class="dashboard-actions dashboard-primary"><button type="button" data-action="autoFight.start" disabled>Start</button><button type="button" data-action="autoFight.stop" disabled>Stop hunt</button><button type="button" data-action="autoFight.newSession" disabled>New session</button></div>
+                <nav class="dashboard-tabs" aria-label="Auto-fight sections"><button type="button" data-view="hunt" aria-pressed="true">Hunt</button><button type="button" data-view="skills" aria-pressed="false">Skills</button><button type="button" data-view="settings" aria-pressed="false">Settings</button></nav>
+                <div id="huntView">
+                    <dl class="dashboard-facts"><div><dt>Status</dt><dd id="huntReason">Unavailable</dd></div><div><dt>State / recovery</dt><dd id="huntState">Unavailable</dd></div><div><dt>Combat target</dt><dd id="huntTarget">Unavailable</dd></div><div><dt>Zone center</dt><dd id="huntCenter">Unavailable</dd></div><div><dt>Rest point</dt><dd id="huntPoint">Unavailable</dd></div></dl>
+                    <div class="dashboard-actions"><button type="button" data-action="autoFight.setCenter" disabled>Set center here</button><button type="button" data-action="autoFight.setRestPoint" disabled>Set rest point here</button></div>
+                    <form id="radiusForm" class="dashboard-edit"><label for="huntRadius">Hunt radius (1–6000)</label><input id="huntRadius" type="number" min="1" max="6000" step="1" required disabled><small id="radiusAccepted">Accepted: unavailable</small><div class="dashboard-actions"><button type="submit" data-action="autoFight.setRadius" disabled>Apply radius</button><button type="button" data-discard="radius">Use accepted value</button><button type="button" data-rebase="radius" hidden>Keep draft on current version</button></div></form>
+                    <p class="dashboard-help">Start needs both points. Stop preserves them; New session clears them. Points and runs are not saved. Stop before structural edits; manual movement or combat takes over.</p>
+                </div>
+                <div id="skillsView" hidden>
+                    <p class="dashboard-help">Learned eligible skills load only when this view opens. While running, allowed skills can only be removed. Basic-only mode suppresses all skill casts.</p>
+                    <p id="skillsStatus" role="status">Not loaded.</p><div id="skillList"></div>
+                    <div class="dashboard-actions"><button id="skillsPrevious" type="button">Previous</button><span id="skillsPage">Page 1 / 1</span><button id="skillsNext" type="button">Next</button></div>
+                </div>
+                <div id="fightSettingsView" hidden>
+                    <div class="dashboard-switch"><span>Basic attacks only <strong id="basicAccepted">Unavailable</strong></span><button type="button" data-action="autoFight.setBasicAttackOnly" disabled>Change</button></div>
+                    <div class="dashboard-switch"><span>Physical pickup <strong id="pickupAccepted">Unavailable</strong></span><button type="button" data-action="autoFight.setPickup" disabled>Change</button></div>
+                    <form id="thresholdForm" class="dashboard-edit"><fieldset><legend>Recovery percentages (enter &lt; resume)</legend><div class="dashboard-thresholds"><label>HP enter<input id="hpEnter" type="number" min="1" max="100" step="1" required disabled></label><label>HP resume<input id="hpResume" type="number" min="1" max="100" step="1" required disabled></label><label>MP enter<input id="mpEnter" type="number" min="1" max="100" step="1" required disabled></label><label>MP resume<input id="mpResume" type="number" min="1" max="100" step="1" required disabled></label></div></fieldset><small id="thresholdAccepted">Accepted: unavailable</small><div class="dashboard-actions"><button type="submit" data-action="autoFight.setThresholds" disabled>Apply thresholds</button><button type="button" data-discard="thresholds">Use accepted values</button><button type="button" data-rebase="thresholds" hidden>Keep draft on current version</button></div></form>
+                    <p class="dashboard-help">MP recovery applies to allowed MP-cost actions or bow attacks. Edits save per character, separately from transient session state.</p>
+                    <div class="dashboard-actions"><button type="button" data-action="autoFight.retryLoad" disabled>Retry loading preferences</button><button type="button" data-action="autoFight.retrySave" disabled>Retry saving preferences</button><button type="button" data-action="autoFight.resetDefaults" disabled>Replace preferences with defaults</button></div>
+                </div>
+            </section>
+            <section class="dashboard-card" id="partyCard" aria-labelledby="partyTitle">
+                <header><div><span class="section-kicker">Your active companions</span><h2 id="partyTitle">Party control</h2></div><span id="partyCount" class="dashboard-badge">Unavailable</span></header>
+                <p id="partyFeedback" class="dashboard-feedback" role="status" aria-live="polite"></p><p id="partyDisabled" class="dashboard-help">Controls require one online linked character.</p>
+                <div class="dashboard-party-modes">
+                    <div><h3>Movement <small id="movementAccepted">Unavailable</small></h3><div class="dashboard-actions"><button type="button" data-action="party.setMovement" data-value="follow" disabled>Follow</button><button type="button" data-action="party.setMovement" data-value="hold" disabled>Hold</button></div></div>
+                    <div><h3>Combat <small id="combatAccepted">Unavailable</small></h3><div class="dashboard-actions"><button type="button" data-action="party.setCombat" data-value="assist" disabled>Assist</button><button type="button" data-action="party.setCombat" data-value="protect" disabled>Protect</button><button type="button" data-action="party.setCombat" data-value="passive" disabled>Passive</button></div></div>
+                    <div><h3>Pull <small id="pullAccepted">Unavailable</small></h3><div class="dashboard-actions"><button type="button" data-action="party.setPull" data-value="auto" disabled>Auto</button><button type="button" data-action="party.setPull" data-value="leader" disabled>Leader</button><button type="button" data-action="party.setPull" data-value="off" disabled>Off</button></div></div>
+                    <div class="dashboard-switch"><span>Loot <strong id="lootAccepted">Unavailable</strong></span><button type="button" data-action="party.setLoot" disabled>Change</button></div>
+                </div>
+                <button type="button" data-action="party.regroup" disabled>Regroup party</button><p class="dashboard-help">Session modes are not saved. Hidden supply errands may skip actions; commands can preempt MCP activity. Partial results list affected, skipped and preempted members, without claiming rollback.</p>
+                <div id="partyMembers"><p>No roster available.</p></div>
+            </section>
+        </div>
+    </main>
+    <script src="/observer/spaRouter.js"></script>
+    <script src="/observer/worldState.js"></script>
+    <script src="/observer/appShell.js"></script>
+    <script src="/observer/game-dashboard.js"></script>
+</body>
+</html>

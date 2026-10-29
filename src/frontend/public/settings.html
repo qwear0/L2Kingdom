@@ -18,11 +18,25 @@
             <a href="/observer/settings/world" data-tab="world">World settings</a>
             <a href="/observer/settings/bots" data-tab="bots">Bot settings</a>
             <a href="/observer/settings/server" data-tab="server">Server management</a>
+            <a href="/observer/settings/game-account" data-tab="game-account">Game account</a>
         </nav>
         <p id="settingsMessage" role="status" aria-live="polite">Loading saved settings…</p>
         <section id="progressionSummary" class="settings-card" hidden aria-label="Progression summary"></section>
         <p id="tabDescription"></p>
         <form id="settingsForm" novalidate><div id="settingsFields"></div><div class="settings-save-bar"><span id="dirtyCount">No unsaved changes</span><button type="submit" id="saveSettings" disabled>Save changes</button><button type="button" id="discardSettings" disabled>Discard draft</button></div></form>
+        <section id="gameAccount" class="settings-card" hidden aria-label="Linked game account">
+            <h2>Game account</h2>
+            <p id="gameAccountState" role="status">Loading association…</p>
+            <p>This association belongs to your frontend identity and survives sign out. It does not log a character in, create an account, or grant control over another account. Unlinking does not stop an admitted action or active hunt.</p>
+            <p>Verification requires the running game. Trusted-LAN HTTP does not encrypt the submitted password. Credentials are cleared after submission and never saved in browser storage.</p>
+            <form id="gameAccountForm" class="settings-actions" autocomplete="off">
+                <label>Game login <input id="gameAccountLogin" name="login" required pattern="[A-Za-z0-9_]{1,14}" maxlength="14" autocomplete="off" autocapitalize="none" spellcheck="false"></label>
+                <label>Game password <input id="gameAccountPassword" name="password" type="password" required maxlength="16" autocomplete="off"></label>
+                <button id="linkGameAccount" type="submit" disabled>Link / replace account</button>
+            </form>
+            <div class="settings-actions"><button id="unlinkGameAccount" type="button" disabled>Unlink account</button><button id="refreshGameAccount" type="button">Refresh association</button><a class="app-button" href="/observer/game-dashboard">Open Game Dashboard</a></div>
+            <p id="gameAccountMessage" role="status" aria-live="polite">Independent of Settings Save; failed verification preserves the previous link.</p>
+        </section>
         <section id="serverManagement" hidden aria-label="Server management actions">
             <section class="settings-card"><h2>Game server</h2><p id="serverStatus" role="status">Loading management status…</p><div class="settings-actions"><button type="button" id="startServer">Start</button><button type="button" id="stopServer">Stop</button><a id="openMap" class="app-button" href="/observer/">Open world map</a><a class="app-button" href="/observer/api/server/logs" target="_blank" rel="noopener">Open full log</a></div><p id="serverMeta"></p><p id="serverOperation" role="status"></p></section>
             <section class="settings-card"><h2>Next-start progression preset</h2><p>Separate from tab Save. Changes never alter a running child's environment.</p><p id="presetState"></p><form id="presetForm" class="settings-actions"><label for="preset">Preset</label><select id="preset"><option>x1</option><option>x10</option><option>x50</option></select><button type="submit" id="savePreset">Save next-start preset</button></form></section>
@@ -37,6 +51,7 @@
     <script src="/observer/spaRouter.js"></script>
     <script src="/observer/worldState.js"></script>
     <script src="/observer/appShell.js"></script>
+    <script src="/observer/game-account.js"></script>
     <script src="/observer/settings.js"></script>
 </body>
 </html>

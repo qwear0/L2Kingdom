@@ -4,7 +4,7 @@
     const $ = id => document.getElementById(id);
     const escape = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
     const format = value => value === null || value === undefined ? 'unavailable' : typeof value === 'boolean' ? value ? 'on' : 'off' : String(value);
-    const drafts = { world: {}, bots: {}, server: {} };
+    const drafts = { world: {}, bots: {}, server: {}, 'game-account': {} };
     let state = null, server = null, saving = false, acting = false, uncertain = false, allowLeave = false, presetDirty = false;
     let presetRevision = null, statusSequence = 0, managementUncertain = false;
     let tab = Router.parse(location.pathname).tab || 'world';
@@ -33,7 +33,7 @@
         try {
             const response = await fetch(url, { cache: 'no-store', ...options, signal: controller.signal });
             const data = await response.json();
-            if (!response.ok) throw Object.assign(new Error(data.error || `HTTP ${response.status}`), { status: response.status });
+            if (!response.ok) throw Object.assign(new Error(data.error || data.code || `HTTP ${response.status}`), { status: response.status });
             return data;
         } finally { clearTimeout(timer); }
     }
@@ -101,7 +101,14 @@
         document.querySelectorAll('.settings-tabs [data-tab]').forEach(link => {
             if (link.dataset.tab === tab) link.setAttribute('aria-current', 'page'); else link.removeAttribute('aria-current');
         });
+        const accountTab = tab === 'game-account';
+        $('gameAccount').hidden = !accountTab;
+        $('settingsForm').hidden = accountTab;
+        $('settingsMessage').hidden = accountTab;
+        $('refreshSettings').textContent = accountTab ? 'Refresh association' : 'Refresh authoritative values';
+        window.WorldObserverGameAccount.activate(accountTab);
         $('serverManagement').hidden = tab !== 'server';
+        $('tabDescription').hidden = accountTab;
         $('tabDescription').textContent = tab === 'bots' ? 'Player-owned vassal behavior and optional AI dialogue.' : tab === 'world' ? 'Future operations use saved live values after confirmation; restart settings are never retroactive.' : 'The parent management service remains available when the game stops. Actions and the preset form never save unrelated drafts.';
         const groups = new Map();
         for (const field of fields()) { if (!groups.has(field.group)) groups.set(field.group, []); groups.get(field.group).push(field); }
@@ -115,12 +122,13 @@
         if (tab === 'server') refreshServer();
     }
     function navigate(next, push = true) {
-        if (!['world', 'bots', 'server'].includes(next)) return;
+        if (!['world', 'bots', 'server', 'game-account'].includes(next)) return;
         const enteringServer = tab !== 'server' && next === 'server';
         tab = next;
         if (push && location.pathname !== Router.href({ name: 'settings', tab })) history.pushState({}, '', Router.href({ name: 'settings', tab }));
         render();
         if (enteringServer) refreshSaves();
+        if (!state && tab !== 'game-account') refreshSettings();
     }
     async function refreshSettings({ quiet = false } = {}) {
         try {
@@ -167,7 +175,7 @@
         } finally { saving = false; render(); }
     });
     $('discardSettings').addEventListener('click', () => { drafts[tab] = {}; message('Only the unsaved draft was discarded. Persisted pending values were not reverted.'); render(); });
-    $('refreshSettings').addEventListener('click', () => refreshSettings());
+    $('refreshSettings').addEventListener('click', () => tab === 'game-account' ? window.WorldObserverGameAccount.refresh() : refreshSettings());
     document.addEventListener('click', event => {
         const link = event.target.closest('a'); if (event.defaultPrevented || !link?.hasAttribute('href') || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey || link.target === '_blank') return;
         const route = Router.parse(new URL(link.href).pathname);
@@ -292,5 +300,6 @@
         if (window.confirm('Permanently delete the selected accounts, characters and related state? Includes owned vassals in bot scope.')) action('wipe', { scope: $('wipeScope').value, confirmation: $('wipeConfirmation').value });
     });
     window.WorldObserverShell?.connection(false, 'Management settings');
-    refreshSettings().then(() => { if (tab === 'server') refreshSaves(); });
+    render();
+    if (tab !== 'game-account') refreshSettings().then(() => { if (tab === 'server') refreshSaves(); });
 }());

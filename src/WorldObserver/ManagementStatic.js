@@ -23,10 +23,11 @@ function serveStatic(request, response, url) {
     if (url.pathname === '/' || url.pathname === '/observer') { response.writeHead(302, { Location: '/observer/' }); response.end(); return true; }
     if (!url.pathname.startsWith('/observer/') || url.pathname.startsWith('/observer/api/')) return false;
     let relative;
-    if (/^\/observer\/settings(?:\/(?:world|bots|server))?\/?$/.test(url.pathname)) relative = 'settings.html';
+    if (/^\/observer\/settings(?:\/(?:world|bots|server|game-account))?\/?$/.test(url.pathname)) relative = 'settings.html';
     else if (url.pathname.startsWith('/observer/settings/')) return false;
     else if (/^\/observer\/database(?:\/(?:items|npcs)(?:\/\d+)?)?\/?$/.test(url.pathname)) relative = 'knowledge-base.html';
     else if (/^\/observer\/market\/?$/.test(url.pathname)) relative = 'market.html';
+    else if (/^\/observer\/game-dashboard\/?$/.test(url.pathname)) relative = 'game-dashboard.html';
     else if (/^\/observer\/(?:world|overview|characters|parties|dungeons\/[a-z0-9_-]+|rankings|raid-bosses(?:\/\d+)?|clans(?:\/\d+)?(?:\/map)?|actors\/(?:bot|player)\/\d+)?\/?$/.test(url.pathname)) relative = 'index.html';
     else {
         try { relative = decodeURIComponent(url.pathname.slice('/observer/'.length)); }

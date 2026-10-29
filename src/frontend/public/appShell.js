@@ -4,6 +4,7 @@
     const icon = (name) => `<svg aria-hidden="true"><use href="/observer/ui-icons.svg#${name}"></use></svg>`;
     const sections = [
         ['overview', 'Overview', 'history', '/observer/overview'],
+        ['game-dashboard', 'Game Dashboard', 'shield', '/observer/game-dashboard'],
         ['world', 'World map', 'map', '/observer/'],
         ['characters', 'Characters', 'users', '/observer/characters'],
         ['parties', 'Parties', 'users', '/observer/parties'],
@@ -127,6 +128,8 @@
     let searchActors = null, actorPromise = null, controller = null, timer = null, revision = 0;
     function localActors() { return root.WorldObserverShell.getActors?.() || searchActors || []; }
     async function loadSearchActors() {
+        // The personal control page must not bootstrap the world for shell search.
+        if (Router.parse(location.pathname).name === 'game-dashboard') return;
         if (root.WorldObserverShell.getActors || searchActors) return;
         actorPromise ||= fetch('/observer/api/world/bootstrap').then((response) => {
             if (!response.ok) throw new Error('Characters could not load.');

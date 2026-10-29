@@ -24,6 +24,8 @@
 .settings-save-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; position: sticky; bottom: 0; padding: 16px; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; z-index: 2; }
 .settings-save-bar span { margin-right: auto; }
 .settings-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+#gameAccountForm { margin: 18px 0; align-items: end; }
+#gameAccountForm label { display: grid; gap: 6px; }
 .settings-danger { border-color: #b65a51; }
 .settings-danger button[type="submit"] { border-color: #b65a51; }
 #serverLog { white-space: pre-wrap; overflow-wrap: anywhere; overflow: auto; max-height: 320px; min-height: 100px; background: var(--bg); padding: 12px; font: 12px/1.5 monospace; }

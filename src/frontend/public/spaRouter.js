@@ -25,8 +25,9 @@
         const params = new URLSearchParams(search);
         if (pathname === `${BASE}/overview`) return { name: 'overview' };
         if (pathname === `${BASE}/market`) return { name: 'market' };
+        if (pathname === `${BASE}/game-dashboard`) return { name: 'game-dashboard' };
         if (pathname === `${BASE}/settings`) return { name: 'settings', tab: 'world' };
-        const settings = pathname.match(/^\/observer\/settings\/(world|bots|server)$/);
+        const settings = pathname.match(/^\/observer\/settings\/(world|bots|server|game-account)$/);
         if (settings) return { name: 'settings', tab: settings[1] };
         if (pathname === `${BASE}/characters` || pathname === `${BASE}/parties`) {
             const route = { name: pathname.endsWith('/parties') ? 'parties' : 'characters' };
@@ -64,7 +65,8 @@
     function href(route = {}) {
         if (route.name === 'overview') return `${BASE}/overview`;
         if (route.name === 'market') return `${BASE}/market`;
-        if (route.name === 'settings' && ['world', 'bots', 'server'].includes(route.tab || 'world')) return `${BASE}/settings/${route.tab || 'world'}`;
+        if (route.name === 'game-dashboard') return `${BASE}/game-dashboard`;
+        if (route.name === 'settings' && ['world', 'bots', 'server', 'game-account'].includes(route.tab || 'world')) return `${BASE}/settings/${route.tab || 'world'}`;
         if (route.name === 'dungeon' && /^[a-z0-9_-]+$/.test(route.id)) return `${BASE}/dungeons/${route.id}`;
         if (route.name === 'characters' || route.name === 'parties') {
             const params = new URLSearchParams();

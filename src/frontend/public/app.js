@@ -4164,7 +4164,7 @@ mapControls = window.WorldObserverMapControls.create({ state, getMeta: mapMeta, 
     applyViewport, renderViewport: scheduleMapViewportRender, renderLabels, renderRaids: renderRaidBossPoints,
     getActors: actors, getSelected: selectedActor, navigate: (route) => { commitRoute(route); if (route.name !== 'world') applyRoute(route); } });
 window.addEventListener('observer:navigate', (event) => {
-    if (event.detail.name === 'not-found' || event.detail.name === 'settings' || event.detail.name === 'market' || event.detail.name.startsWith('knowledge-')) return;
+    if (event.detail.name === 'not-found' || event.detail.name === 'settings' || event.detail.name === 'game-dashboard' || event.detail.name === 'market' || event.detail.name.startsWith('knowledge-')) return;
     event.preventDefault(); commitRoute(event.detail); applyRoute(event.detail);
 });
 window.addEventListener('popstate', () => applyRoute());
