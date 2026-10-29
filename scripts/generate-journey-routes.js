@@ -1,3 +1,4 @@
+require('../src/GameServer/Geodata/JourneyGeometryIdentity.js').define(module, require, function (module, exports, require, __filename, __dirname) {
 'use strict';
 
 const fs = require('node:fs/promises');
@@ -16,7 +17,7 @@ function parseArgs(argv) {
     for (let index = 0; index < argv.length; index++) {
         const flag = argv[index];
         if (flag === '--help') return { help: true };
-        const key = repeated.get(flag) || flag;
+        const key = repeated.get(flag) || flag.slice(2);
         if (!singleton.has(flag) && !repeated.has(flag)) throw new Error(`unknown_option:${flag}`);
         const value = argv[++index];
         if (!value || value.startsWith('--')) throw new Error(`missing_value:${flag}`);
@@ -51,8 +52,10 @@ function installOfflineInvoke(root, dataCache, gatekeepers) {
         switch (name) {
         case 'GameServer/DataCache': return dataCache;
         case 'GameServer/World/C4GatekeeperTeleports': return gatekeepers;
+        case 'GameServer/Geodata/GeodataEngine':
+        case 'GameServer/World/TownRespawn':
         case 'GameServer/World/C4SevenSignsDungeonTeleports':
-            return require(resolveGameModule('GameServer/World/C4SevenSignsDungeonTeleports'));
+            return require(resolveGameModule(name));
         case 'GameServer/World/Generics/NpcShopBuyLists':
             return require(resolveGameModule('GameServer/World/Generics/NpcShopBuyLists'));
         case 'GameServer/Geodata/VirtualObstacles/index':
@@ -62,7 +65,7 @@ function installOfflineInvoke(root, dataCache, gatekeepers) {
         }
     };
 }
-async function loadNative(root, geodataDir, regionKeys, registered) {
+async function loadNative(root, geodataDir, regionKeys, registered, budget) {
     const gatekeepers = teleporterAdapter(root);
     const dataCache = { npcs: registered.templates, npcSpawns: registered.spawnDefinitions, items: [] };
     installOfflineInvoke(root, dataCache, gatekeepers);
@@ -71,6 +74,7 @@ async function loadNative(root, geodataDir, regionKeys, registered) {
     VirtualObstacles.init();
     let totalBytes = 0;
     for (const region of regionKeys) {
+        budget.poll();
         const file = path.join(geodataDir, `${region}.l2j`);
         const key = region;
         Geo.missing[key] = true;
@@ -96,7 +100,7 @@ async function loadNative(root, geodataDir, regionKeys, registered) {
     const TownServices = require(path.join(root, 'src/GameServer/Bot/Economy/TownServiceCatalog'));
     const serviceRows = TownServices.rows();
     return { Geo, Surface, GatherAreas, TownGateCatalog, TownRespawn, WorldAreaCatalog,
-        RaidBossBalance, serviceRows, totalGeoBytes };
+        RaidBossBalance, serviceRows, totalGeoBytes: totalBytes };
 }
 async function writeJsonAtomic(file, value) {
     const directory = path.dirname(file);
@@ -118,6 +122,7 @@ async function writeJsonAtomic(file, value) {
     }
 }
 async function main(argv) {
+    const startedAt = performance.now(), budget = new Builder.BuildBudget();
     const args = parseArgs(argv);
     if (args.help) { process.stdout.write(`${usage()}\n`); return; }
     const sourceFile = path.resolve(ROOT, args.source || Inputs.DEFAULT_SOURCE);
@@ -129,16 +134,20 @@ async function main(argv) {
     const scope = Inputs.selectScope(selected.input, { kind: args.scope,
         requirementIds: args.requirementIds, waypointIds: args.waypointIds, connectionIds: args.connectionIds });
     const geometry = Inputs.selectedGeometry(selected.input, scope, registered);
-    const world = await loadNative(ROOT, geodataDir, geometry.regions, registered);
-    const startedAt = performance.now();
+    budget.poll();
+    const world = await loadNative(ROOT, geodataDir, geometry.regions, registered, budget);
     const result = await Builder.build({ sourceFile, geodataDir, outputFile, scope: args.scope,
         requirementIds: args.requirementIds, waypointIds: args.waypointIds, connectionIds: args.connectionIds,
-        input: selected.input, registered, world, artifactRoot });
+        input: selected.input, registered, world, artifactRoot, budget });
     const summary = { ...result.summary, elapsedMs: Math.round(performance.now() - startedAt),
+        entireProcessPeakRssBytes: process.resourceUsage().maxRSS * 1024,
+        outputBytes: result.summary.outputFile ? (await fs.stat(result.summary.outputFile)).size : null,
+        diagnosticBytes: result.summary.diagnosticFile ? (await fs.stat(result.summary.diagnosticFile)).size : null,
         selectedRequirements: scope.requirementIds, selectedWaypoints: scope.waypointIds,
         selectedConnections: scope.connectionIds, geodataDir };
     await writeJsonAtomic(path.join(artifactRoot, 'journey-routes-build-summary.json'), summary);
     process.stdout.write(`${JSON.stringify(summary)}\n`);
+    if (summary.status !== 'ready') process.exitCode = 1;
 }
 
 if (require.main === module) {
@@ -157,4 +166,5 @@ if (require.main === module) {
     });
 }
 
-module.exports = { main, parseArgs, usage };
+module.exports = { main, parseArgs, usage, loadNative };
+});

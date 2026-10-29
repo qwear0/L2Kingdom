@@ -1,3 +1,4 @@
+require('../Geodata/JourneyGeometryIdentity.js').define(module, require, function (module, exports, require, __filename, __dirname) {
 const raidBossMinionDefinitions = require('../../../data/Npcs/Minions/c4_raid_bosses.json');
 
 const RAID_ENTITY_SCALE = 0.75;
@@ -58,3 +59,4 @@ module.exports = {
     weakenTemplate,
     weakenTemplates
 };
+});

@@ -1,3 +1,4 @@
+require('../Geodata/JourneyGeometryIdentity.js').define(module, require, function (module, exports, require, __filename, __dirname) {
 // Explicit mainland destinations, using authored spawn polygons rather than
 // town-distance/name matching. Both travel destinations and offensive targets
 // stay in these zones; menu eligibility alone is not a combat-safety decision.
@@ -128,3 +129,4 @@ function suitable(area, level) {
     return !!area && Number.isFinite(Number(level)) && area.minLevel <= Number(level) + 3 && area.maxLevel >= Number(level) - 7;
 }
 module.exports = { list, find, suitable, contains, containsZone, pointOf };
+});

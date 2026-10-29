@@ -1,3 +1,4 @@
+require('../Geodata/JourneyGeometryIdentity.js').define(module, require, function (module, exports, require, __filename, __dirname) {
 const C4SevenSignsDungeonTeleports = invoke('GameServer/World/C4SevenSignsDungeonTeleports');
 
 const SEVEN_SIGNS_SPAWNS = Object.freeze({
@@ -253,3 +254,5 @@ module.exports = {
     decorateSpot,
     isLocalForState
 };
+return [[require.resolve('./C4SevenSignsDungeonTeleports'), C4SevenSignsDungeonTeleports]];
+});

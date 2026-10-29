@@ -149,7 +149,7 @@ Database.init(() => {
             const JourneyRouteCatalog = invoke('GameServer/Bot/Travel/JourneyRouteCatalog');
             const file = JourneyRouteCatalog.defaultFile();
             const identity = require('node:fs').existsSync(file)
-                ? await invoke('GameServer/Bot/Travel/JourneyRouteInputs').inputIdentity()
+                ? await invoke('GameServer/Bot/Travel/JourneyRouteInputs').inputIdentity({ catalogueFile: file })
                 : null;
             const result = await JourneyRouteCatalog.load(file, identity);
             if (result.status === 'ready') {

@@ -1,3 +1,4 @@
+require('../../Geodata/JourneyGeometryIdentity.js').define(module, require, function (module, exports, require, __filename, __dirname) {
 'use strict';
 
 const { createHash } = require('node:crypto');
@@ -389,14 +390,52 @@ function encodeSpans(areaId, spawnId, nodes, patches, componentId) {
     return spans;
 }
 
-function decomposePolygon({ areaId, spawnId, bounds, spawnAnchors = [], fixedPoints = [], fingerprint,
-    Geo, Surface, budget, areaContains, excludePoint = null }) {
+// A closed boundary is a native transition fact, not spawn-root admission.
+// Retain these components: an authored/native root could already be inside.
+function nativeBoundary(component, nodes, Geo, Surface, budget) {
+    const members = new Set(component.map(index => `${nodes[index].cx}:${nodes[index].cy}:${nodes[index].z}`));
+    const evidence = { status: 'closed', checkedPairs: 0, includesDiagonals: true, includesSameCellLayers: true,
+        rootAdmission: 'not_proven' };
+    const surfaceBudget = { beforeLayers: () => budget.beforeLayers(), decoded: count => budget.decoded(count),
+        walk: () => budget.transition(), transition: () => budget.transition(), poll: () => budget.poll() };
+    for (const index of component) {
+        const node = nodes[index], from = { locX: node.x, locY: node.y, locZ: node.z };
+        for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+            const x = ((node.cx + dx) << 4) + 8, y = ((node.cy + dy) << 4) + 8;
+            if (!Geo.hasGeo(x, y)) return { ...evidence, status: 'unknown', reason: 'missing_geodata' };
+            const layers = Surface.layers(x, y, surfaceBudget);
+            if (!layers.length && Geo.getCellData(x, y, from.locZ).nswe !== 0) {
+                return { ...evidence, status: 'unknown', reason: 'no_admitted_surface' };
+            }
+            for (const layer of layers) {
+                if (!layer.nswe || members.has(`${node.cx + dx}:${node.cy + dy}:${layer.z}`)) continue;
+                const to = { locX: x, locY: y, locZ: layer.z };
+                budget.transition(4);
+                if ((++evidence.checkedPairs & 127) === 0) budget.poll();
+                const outgoing = Geo.walkSegment(from, to, true);
+                const incoming = Geo.walkSegment(to, from, true);
+                const spawnOut = Surface.walk(from, to, surfaceBudget);
+                const spawnIn = Surface.walk(to, from, surfaceBudget);
+                if (outgoing?.locZ === to.locZ || incoming?.locZ === from.locZ || spawnOut || spawnIn) {
+                    return { ...evidence, status: 'open', witness: { from, to,
+                        movementOut: outgoing?.locZ === to.locZ, movementIn: incoming?.locZ === from.locZ,
+                        spawnOut: !!spawnOut, spawnIn: !!spawnIn } };
+                }
+            }
+        }
+    }
+    return evidence;
+}
+
+function decomposePolygon({ areaId, spawnId, bounds, fingerprint,
+    Geo, Surface, budget, admission, areaContains, excludePoint = null }) {
     const startedAt = performance.now();
     const scan = createBudget({ budget });
     const excluded = { dungeonCells: 0, raidCells: 0, waterOrUnavailable: 0 };
     const stats = { bboxCells: 0, examinedCells: 0, decodedLayers: 0, admittedLayers: 0,
         blockedLayers: 0, outOfZLayers: 0, noSurfaceCells: 0, boundaryFragments: 0,
-        unresolvedBoundaryFragments: 0, ambiguousLayerCells: 0, transitions: 0, components: 0, localPatches: 0,
+        unresolvedBoundaryFragments: 0, nonSpawnBoundaryFragments: 0, unresolvedAuthoredPoints: 0,
+        ambiguousLayerCells: 0, transitions: 0, components: 0, localPatches: 0,
         localRefinementVisits: 0, maxPatchNodes: 0, durationMs: 0 };
     if (!Array.isArray(bounds) || bounds.length < 3 || bounds.some(point =>
         !point || !['locX', 'locY', 'minZ', 'maxZ'].every(key => Number.isFinite(point[key])) || point.minZ > point.maxZ)) {
@@ -418,9 +457,9 @@ function decomposePolygon({ areaId, spawnId, bounds, spawnAnchors = [], fixedPoi
     const byCell = new Map();
     const ambiguousCells = new Set();
     const pointInside = areaContains || ((point) => pointInPolygon(point.locX, point.locY, bounds));
+    if (!admission) throw new Error('native_spawn_admission_required');
     const boundaryPointCandidates = new Map();
-    for (const point of [...spawnAnchors, ...fixedPoints].filter(point => pointInside(point)
-        && point.locZ >= z.minZ && point.locZ <= z.maxZ)) {
+    for (const point of admission.authoredPoints.filter(point => admission.containsXY(point.locX, point.locY))) {
         const key = `${point.locX >> 4}:${point.locY >> 4}`;
         if (!boundaryPointCandidates.has(key)) boundaryPointCandidates.set(key, []);
         boundaryPointCandidates.get(key).push(point);
@@ -435,33 +474,29 @@ function decomposePolygon({ areaId, spawnId, bounds, spawnAnchors = [], fixedPoi
                 budget.scan(1);
                 stats.examinedCells++;
                 const center = { locX: (cx << 4) + 8, locY: (cy << 4) + 8, locZ: z.minZ };
-                const admittedXY = pointInside(center);
+                const admittedXY = admission.randomCentre(center.locX, center.locY) && pointInside(center);
                 if (!admittedXY) {
                     const fragment = clipPolygonToCell(bounds, cx, cy);
                     if (fragment) {
-                        stats.boundaryFragments++;
-                        if (!fragment.sample) {
-                            stats.unresolvedBoundaryFragments++;
+                        const boundary = !pointInside(center);
+                        if (boundary) stats.boundaryFragments++;
+                        const cellKey = `${cx}:${cy}`;
+                        const candidates = (boundaryPointCandidates.get(cellKey) || [])
+                            .map(point => ({ ...point, expectedZ: point.locZ }));
+                        if (!candidates.length) {
+                            // Neither centre-only random discovery nor an
+                            // authored native point admits this cell fragment.
+                            if (boundary) stats.nonSpawnBoundaryFragments++;
                             continue;
                         }
-                        const cellKey = `${cx}:${cy}`;
-                        const candidates = [
-                            { ...fragment.sample, locZ: z.minZ },
-                            ...(boundaryPointCandidates.get(cellKey) || []).map(point => ({ ...point, expectedZ: point.locZ }))
-                        ];
                         const boundaryNodesByZ = new Map();
                         let admitted = 0, boundaryFailure = !convex;
                         const markAmbiguous = () => {
                             if (!ambiguousCells.has(cellKey)) { ambiguousCells.add(cellKey); stats.ambiguousLayerCells++; }
                         };
                         for (const point of candidates) {
-                            if (!pointInside(point)) continue;
-                            const exclusion = excludePoint?.(point) || null;
-                            if (exclusion) {
-                                if (exclusion === 'dungeon') excluded.dungeonCells++;
-                                else if (exclusion === 'raid') excluded.raidCells++;
-                                continue;
-                            }
+                            const normalized = Surface.supported(point, budget);
+                            if (!normalized || !pointInside(normalized)) { boundaryFailure = true; continue; }
                             const layers = Surface.layers(point.locX, point.locY, budget);
                             stats.decodedLayers += layers.length;
                             if (!layers.length && !hasLayerData(point)) {
@@ -472,8 +507,13 @@ function decomposePolygon({ areaId, spawnId, bounds, spawnAnchors = [], fixedPoi
                             let matchedExpected = false;
                             for (const layer of layers) {
                                 if (!layer.nswe) { stats.blockedLayers++; continue; }
-                                if (layer.z < z.minZ || layer.z > z.maxZ) continue;
-                                if (Number.isFinite(point.expectedZ) && Math.abs(layer.z - point.expectedZ) > 64) continue;
+                                if (!admission.layer(layer.z, layer.nswe) || layer.z !== normalized.locZ) continue;
+                                const exclusion = excludePoint?.({ locX: point.locX, locY: point.locY, locZ: layer.z });
+                                if (exclusion) {
+                                    if (exclusion === 'dungeon') excluded.dungeonCells++;
+                                    else if (exclusion === 'raid') excluded.raidCells++;
+                                    continue;
+                                }
                                 matchedExpected = true;
                                 if (seenAtPoint.has(layer.z)) { markAmbiguous(); continue; }
                                 seenAtPoint.add(layer.z);
@@ -506,12 +546,6 @@ function decomposePolygon({ areaId, spawnId, bounds, spawnAnchors = [], fixedPoi
                     }
                     continue;
                 }
-                const exclusion = excludePoint?.(center) || null;
-                if (exclusion) {
-                    if (exclusion === 'dungeon') excluded.dungeonCells++;
-                    else if (exclusion === 'raid') excluded.raidCells++;
-                    continue;
-                }
                 const values = Surface.layers(center.locX, center.locY, budget);
                 stats.decodedLayers += values.length;
                 if (!values.length) {
@@ -523,7 +557,13 @@ function decomposePolygon({ areaId, spawnId, bounds, spawnAnchors = [], fixedPoi
                 const seenZ = new Set();
                 for (const layer of values) {
                     if (!layer.nswe) { stats.blockedLayers++; continue; }
-                    if (layer.z < z.minZ || layer.z > z.maxZ) { stats.outOfZLayers++; continue; }
+                    if (!admission.layer(layer.z, layer.nswe)) { stats.outOfZLayers++; continue; }
+                    const exclusion = excludePoint?.({ locX: center.locX, locY: center.locY, locZ: layer.z });
+                    if (exclusion) {
+                        if (exclusion === 'dungeon') excluded.dungeonCells++;
+                        else if (exclusion === 'raid') excluded.raidCells++;
+                        continue;
+                    }
                     const cellKey = `${cx}:${cy}`;
                     if (seenZ.has(layer.z)) {
                         if (!ambiguousCells.has(cellKey)) { ambiguousCells.add(cellKey); stats.ambiguousLayerCells++; }
@@ -540,6 +580,20 @@ function decomposePolygon({ areaId, spawnId, bounds, spawnAnchors = [], fixedPoi
                 }
                 if (!admitted) stats.noSurfaceCells++;
             }
+        }
+        for (const points of boundaryPointCandidates.values()) for (const point of points) {
+            const normalized = Surface.supported(point, budget);
+            if (!normalized || !pointInside(normalized)) { stats.unresolvedAuthoredPoints++; continue; }
+            if (excludePoint?.(normalized)) continue;
+            const cellNodes = byCell.get(`${normalized.locX >> 4}:${normalized.locY >> 4}`) || [];
+            const representative = cellNodes.map(index => nodes[index]).find(node => node.z === normalized.locZ);
+            if (!representative) { stats.unresolvedAuthoredPoints++; continue; }
+            const centre = { locX: representative.x, locY: representative.y, locZ: representative.z };
+            budget.transition(2);
+            const forward = Geo.walkSegment(centre, normalized, true, nativeBudget);
+            const reverse = Geo.walkSegment(normalized, centre, true, nativeBudget);
+            if (!segmentInsidePolygon(centre, normalized, bounds) || !forward || !reverse
+                || forward.locZ !== normalized.locZ || reverse.locZ !== centre.locZ) stats.unresolvedAuthoredPoints++;
         }
         if (nodes.length > 16000000) throw Object.assign(Error('polygon_layer_state_limit'), { reason: 'limit_reached' });
         for (let from = 0; from < nodes.length; from++) {
@@ -579,6 +633,7 @@ function decomposePolygon({ areaId, spawnId, bounds, spawnAnchors = [], fixedPoi
                 expand: () => budget.localExpand(), refine: () => budget.refine() });
             const entryAnchorIds = [];
             const componentRecord = { id: componentId, areaId, spawnId, nodeCount: component.length,
+                nativeBoundary: nativeBoundary(component, nodes, Geo, Surface, budget),
                 entryAnchorIds, patchIds: local.patches.map(patch => patch.id), status: local.supported ? 'supported' : 'unresolved',
                 reason: local.reason };
             components.push(componentRecord);
@@ -613,10 +668,12 @@ function decomposePolygon({ areaId, spawnId, bounds, spawnAnchors = [], fixedPoi
         for (const component of components) component.outgoingComponentIds?.sort();
         stats.components = components.length;
         stats.durationMs = Math.round(performance.now() - startedAt);
-        const incomplete = nodes.length === 0 || stats.unresolvedBoundaryFragments > 0 || stats.ambiguousLayerCells > 0
+        const incomplete = nodes.length === 0 || stats.unresolvedBoundaryFragments > 0 || stats.unresolvedAuthoredPoints > 0
+            || stats.ambiguousLayerCells > 0
             || components.some(component => component.status !== 'supported');
         return { status: incomplete ? 'unresolved' : 'supported', reason: incomplete
-            ? (stats.unresolvedBoundaryFragments ? 'boundary_fragment_unresolved' : stats.ambiguousLayerCells ? 'ambiguous_layer'
+            ? (stats.unresolvedBoundaryFragments || stats.unresolvedAuthoredPoints ? 'boundary_fragment_unresolved'
+                : stats.ambiguousLayerCells ? 'ambiguous_layer'
                 : components.find(component => component.status !== 'supported')?.reason || 'no_admitted_surface') : null,
             nodes, components, patches, spans, stats, excluded, condensation: [...condensation].map(value => value.split(':').map(Number)) };
     } catch (error) {
@@ -630,3 +687,4 @@ function decomposePolygon({ areaId, spawnId, bounds, spawnAnchors = [], fixedPoi
 }
 
 module.exports = { decomposePolygon, pointInPolygon, stronglyConnected };
+});

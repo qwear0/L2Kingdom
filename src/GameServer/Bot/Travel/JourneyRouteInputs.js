@@ -1,3 +1,4 @@
+require('../../Geodata/JourneyGeometryIdentity.js').define(module, require, function (module, exports, require, __filename, __dirname) {
 'use strict';
 
 const fs = require('node:fs');
@@ -5,11 +6,23 @@ const fsp = require('node:fs/promises');
 const path = require('node:path');
 const { createHash } = require('node:crypto');
 const Format = require('./JourneyRouteFormat');
+const GeometryIdentity = require('../../Geodata/JourneyGeometryIdentity');
 
 const ROOT = path.resolve(__dirname, '../../../..');
 const DEFAULT_SOURCE = path.join(ROOT, 'data/Bots/travel-waypoints.json');
 const DEFAULT_FILE = path.resolve(ROOT, process.env.L2NODE_RUNTIME_DIR || 'tmp', 'cache/journey-routes.json');
-const IDENTITY_SOURCE_VERSION = 'journey-route-input-identity-v1';
+const IDENTITY_SOURCE_VERSION = 'journey-route-input-identity-v2';
+const ALGORITHM_INPUTS = Object.freeze([
+    'src/GameServer/Geodata/JourneyGeometryIdentity.js',
+    'src/GameServer/Geodata/GeodataEngine.js', 'src/GameServer/Geodata/SpawnSurface.js',
+    'src/GameServer/Geodata/SpawnPlacement.js', 'src/GameServer/Geodata/SpawnPlacementCache.js',
+    'src/GameServer/Geodata/VirtualObstacles/index.js', 'src/GameServer/Lord/GatherAreas.js',
+    'src/GameServer/World/WorldAreaCatalog.js', 'src/GameServer/RaidBoss/RaidBossBalance.js',
+    'src/GameServer/World/C4SevenSignsDungeonTeleports.js',
+    'src/GameServer/Bot/Travel/JourneyRouteInputs.js', 'src/GameServer/Bot/Travel/JourneyRouteFormat.js',
+    'src/GameServer/Bot/Travel/JourneyRouteBuilder.js', 'src/GameServer/Bot/Travel/JourneyRouteComponents.js',
+    'src/GameServer/Bot/Travel/JourneyRouteCatalog.js', 'scripts/generate-journey-routes.js'
+]);
 const EXPECTED_SOURCES = Object.freeze({
     gatherAreas: 'src/GameServer/Lord/GatherAreas.js',
     polygonSpawns: 'data/Npcs/Spawns/spawns.json',
@@ -348,7 +361,8 @@ function cachedModule(file) {
         throw new Error(`journey_registered_module_load_failed:${path.basename(file)}:${error.message}`);
     }
 }
-async function inputIdentity({ sourceFile = DEFAULT_SOURCE, geodataDir = process.env.L2NODE_GEODATA_DIR
+async function inputIdentity({ sourceFile = DEFAULT_SOURCE, catalogueFile = DEFAULT_FILE,
+    geodataDir = process.env.L2NODE_GEODATA_DIR
     || path.join(ROOT, 'data/Geodata'), scope = null, relevantRegions = null, loadedGeo = null,
     throwOnError = false } = {}) {
     const startedAt = performance.now(), startedAtWallMs = Date.now(), baselineRss = process.memoryUsage.rss();
@@ -357,7 +371,7 @@ async function inputIdentity({ sourceFile = DEFAULT_SOURCE, geodataDir = process
         let expectedRecord = null, selectedScope = scope;
         if (!selectedScope) {
             try {
-                const { bytes } = await readRegular(DEFAULT_FILE, Format.LIMITS.generatedBytes, 'journey_catalogue');
+                const { bytes } = await readRegular(catalogueFile, Format.LIMITS.generatedBytes, 'journey_catalogue');
                 expectedRecord = Format.parseStrictJson(bytes.toString('utf8'), 'journey_catalogue');
                 await Format.validateRecord(expectedRecord);
                 const { serviceInventory: ignoredServiceInventory, ...recordedRequirements } = expectedRecord.requirements;
@@ -381,7 +395,13 @@ async function inputIdentity({ sourceFile = DEFAULT_SOURCE, geodataDir = process
         const fileMap = new Map();
         const addFile = (id, file, displayPath = null) => fileMap.set(id, { file, displayPath });
         addFile('authored-waypoints', authored.file, relative(authored.file));
-        for (const source of CORE_INPUTS) addFile(`source:${source}`, path.join(ROOT, source), source);
+        // Loading definitions has no preparation/cache-write side effects. An
+        // older cached native module without provenance must fail, not borrow
+        // the current disk hash of its private constants or decoder.
+        for (const source of ALGORITHM_INPUTS) cachedModule(path.join(ROOT, source));
+        for (const source of new Set([...CORE_INPUTS, ...ALGORITHM_INPUTS])) {
+            addFile(`source:${source}`, path.join(ROOT, source), source);
+        }
         const registeredFileNames = [...new Set([...registeredPaths.npcFiles, ...registeredPaths.spawnFiles])].sort();
         for (const source of registeredFileNames) addFile(`registered:${source}`, path.join(ROOT, source), source);
         const obstacleDirectory = path.join(ROOT, 'src/GameServer/Geodata/VirtualObstacles');
@@ -405,6 +425,11 @@ async function inputIdentity({ sourceFile = DEFAULT_SOURCE, geodataDir = process
         const geoRoot = path.resolve(geodataDir);
         let totalGeoBytes = 0;
         for (const key of regions) addFile(`geodata:${key}`, path.join(geoRoot, `${key}.l2j`), `geodata/${key}.l2j`);
+        const admissionJsonFiles = new Set(GeometryIdentity.jsonFiles());
+        for (const file of admissionJsonFiles) if (![...fileMap.values()].some(row => row.file === file)) {
+            const source = relative(file);
+            addFile(`algorithm-json:${source}`, file, source);
+        }
         const actualIds = new Set(fileMap.keys());
         if (expectedRecord) {
             const expectedIds = new Set(expectedRecord.inputs.map(row => row.id));
@@ -415,12 +440,19 @@ async function inputIdentity({ sourceFile = DEFAULT_SOURCE, geodataDir = process
                 throw new Error('journey_registered_input_manifest_mismatch');
             }
         }
+        const admissionJsonDigests = new Map(), diskDigests = new Map();
         const inputs = [];
         let index = 0;
         for (const [id, { file, displayPath }] of [...fileMap.entries()].sort(([a], [b]) => a.localeCompare(b))) {
             checkDeadline(startedAt, index, baselineRss);
             const result = await hashFile(file, startedAt, index++, baselineRss);
             if (result.missing && !id.startsWith('geodata:')) throw new Error(`journey_required_input_missing:${id}`);
+            diskDigests.set(file, result.sha256);
+            if (admissionJsonFiles.has(file)) {
+                const { bytes } = await readRegular(file, 64 * 1024 * 1024, 'journey_admission_json');
+                if (Format.sha256(bytes) !== result.sha256) throw new Error(`journey_admission_json_changed:${file}`);
+                admissionJsonDigests.set(file, Format.sha256(JSON.stringify(JSON.parse(bytes.toString('utf8')))));
+            }
             const entry = { id, path: displayPath, size: result.size, missing: result.missing };
             if (!result.missing) entry.sha256 = result.sha256;
             if (id.startsWith('registered:src/')) {
@@ -438,10 +470,13 @@ async function inputIdentity({ sourceFile = DEFAULT_SOURCE, geodataDir = process
             }
             inputs.push(entry);
         }
-        const geo = loadedGeo || (() => {
-            const key = path.resolve(__dirname, '../../Geodata/GeodataEngine.js');
-            return require.cache[key]?.exports || null;
-        })();
+        for (const source of ALGORITHM_INPUTS) {
+            const file = path.join(ROOT, source);
+            GeometryIdentity.verify(file, diskDigests.get(file), admissionJsonDigests);
+        }
+        const nativeGeo = require('../../Geodata/GeodataEngine');
+        if (loadedGeo && loadedGeo !== nativeGeo) throw new Error('journey_loaded_geodata_engine_identity_mismatch');
+        const geo = nativeGeo;
         if (geo) for (const region of regions) {
             const loaded = geo.regions?.[region];
             const current = inputs.find(entry => entry.id === `geodata:${region}`);
@@ -485,3 +520,4 @@ module.exports = {
     selectScope,
     selectedGeometry
 };
+});

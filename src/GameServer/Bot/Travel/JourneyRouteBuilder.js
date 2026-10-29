@@ -1,3 +1,4 @@
+require('../../Geodata/JourneyGeometryIdentity.js').define(module, require, function (module, exports, require, __filename, __dirname) {
 'use strict';
 
 const fs = require('node:fs/promises');
@@ -125,8 +126,7 @@ class BuildBudget {
     assertHealthy() { this.poll(); }
     summary() {
         return { ...this.work, maxRssBytes: this.absoluteRssBytes,
-            elapsedMs: Math.round(performance.now() - this.startedAt), workerProcesses: 1,
-            totalRetainedMemoryBytes: 0 };
+            elapsedMs: Math.round(performance.now() - this.startedAt), workerProcesses: 1 };
     }
 }
 
@@ -258,7 +258,9 @@ function densifyPath(points, Geo, Surface, budget, admit) {
     const dense = [];
     const push = point => {
         const previous = dense[dense.length - 1];
-        if (!previous || pointKey(previous) !== pointKey(point)) dense.push([point.locX, point.locY, point.locZ]);
+        if (!previous || previous[0] !== point.locX || previous[1] !== point.locY || previous[2] !== point.locZ) {
+            dense.push([point.locX, point.locY, point.locZ]);
+        }
     };
     if (points.length < 2) return { points: [], length: 0, length2d: 0 };
     push(points[0]);
@@ -267,15 +269,20 @@ function densifyPath(points, Geo, Surface, budget, admit) {
     for (let index = 1; index < points.length; index++) {
         const from = { locX: dense[dense.length - 1][0], locY: dense[dense.length - 1][1], locZ: dense[dense.length - 1][2] };
         const to = points[index];
-        const xy = distance2d(from, to), steps = Math.max(1, Math.ceil(xy / MAX_NATIVE_STEP));
+        // Rounding both endpoints can add at most sqrt(2) XY units. Reserve
+        // two units before rounding; the issued native segment must stay <=128.
+        const xy = distance2d(from, to), steps = Math.max(1, Math.ceil(xy / (MAX_NATIVE_STEP - 2)));
         for (let step = 1; step <= steps; step++) {
             const ratio = step / steps;
             const candidate = { locX: Math.round(from.locX + (to.locX - from.locX) * ratio),
                 locY: Math.round(from.locY + (to.locY - from.locY) * ratio),
                 locZ: Math.round(from.locZ + (to.locZ - from.locZ) * ratio) };
-            const resolved = Geo.walkSegment(from, candidate, true, nativeOptions);
-            if (!resolved) return null;
             const previous = dense[dense.length - 1];
+            // Intermediate Z follows the native source floor, not linear height
+            // interpolation across a hill. Recheck the exact authored endpoint.
+            const resolved = Geo.walkSegment({ locX: previous[0], locY: previous[1], locZ: previous[2] },
+                candidate, false, nativeOptions);
+            if (!resolved || step === steps && resolved.locZ !== to.locZ) return null;
             length += Math.hypot(resolved.locX - previous[0], resolved.locY - previous[1], resolved.locZ - previous[2]);
             length2d += Math.hypot(resolved.locX - previous[0], resolved.locY - previous[1]);
             push(resolved);
@@ -285,7 +292,7 @@ function densifyPath(points, Geo, Surface, budget, admit) {
     if (dense.length > 1) {
         for (let index = 1; index < dense.length; index++) {
             const delta = Math.hypot(dense[index][0] - dense[index - 1][0], dense[index][1] - dense[index - 1][1]);
-            if (delta > MAX_NATIVE_STEP + 1) return null;
+            if (delta > MAX_NATIVE_STEP) return null;
         }
     }
     return { points: dense, length, length2d };
@@ -313,10 +320,10 @@ function provePath({ from, to, regionIds, context = {}, world, budget, safety, c
                 checkSegmentBudget: domain.checkSegmentBudget });
     } catch (error) {
         budget.endSearch(evidence);
-        if (error.code === 'PATH_NODE_LIMIT') return { status: 'unresolved', reason: 'limit_reached', evidence };
-        if (error instanceof BuildStop) throw error;
-        return { status: 'unresolved', reason: 'limit_reached', evidence,
-            diagnostic: String(error.message || error).slice(0, 200) };
+        if (error.code === 'PATH_NODE_LIMIT' || error instanceof BuildStop && !error.global) {
+            return { status: 'unresolved', reason: 'limit_reached', evidence, diagnostic: error.reason || error.code };
+        }
+        throw error;
     }
     budget.endSearch(evidence);
     if (!route?.length) {
@@ -432,7 +439,7 @@ function buildTownProofs({ input, scope, world, budget, safety, waypointMap, acc
             [a, b, 'forward'], [b, a, 'reverse']]) {
             const from = sides[fromIndex], to = sides[toIndex];
             if (!from || !to) { failed = true; failureReason ||= 'source_missing'; continue; }
-            const result = provePath({ from: from.point, to: to.point, regionIds, context: { townKey: seed.townKey },
+            const result = provePath({ from: from.point, to: to.point, regionIds: regions, context: { townKey: seed.townKey },
                 world, budget, safety });
             const id = `gate:${seed.id}:${direction}:${fromIndex}-${toIndex}`;
             if (result.status === 'supported') {
@@ -538,7 +545,14 @@ function certifyTrunk({ connection, waypoints, input, world, budget, safety, cer
         regionIds, certificateId: certId, componentIds: [] };
 }
 function attachComponentEntries(polygon, areaResult, entryWaypoints, input, world, budget, safety, certificates, attachments) {
-    const nodeByGlobalId = areaResult.nodes;
+    const entryComponents = new Map();
+    for (const waypoint of entryWaypoints) {
+        const point = world.Surface.supported(waypoint.point, budget);
+        if (!point) continue;
+        const span = areaResult.spans.find(row => row.layerZ === point.locZ && row.rowY === (point.locY >> 4)
+            && row.xStart <= (point.locX >> 4) && row.xEnd >= (point.locX >> 4));
+        if (span) entryComponents.set(waypoint.id, span.componentId);
+    }
     for (const component of areaResult.components) {
         const patches = areaResult.patches.filter(patch => patch.componentId === component.id);
         if (!patches.length || component.status !== 'supported') {
@@ -549,6 +563,14 @@ function attachComponentEntries(polygon, areaResult, entryWaypoints, input, worl
         const localAnchor = patches[0].anchor;
         const candidates = entryWaypoints.filter(row => row.areaId === polygon.areaId && row.spawnId === polygon.spawnId)
             .sort((a, b) => distance2d(a.point, localAnchor) - distance2d(b.point, localAnchor) || a.id.localeCompare(b.id));
+        if (component.nativeBoundary?.status === 'closed'
+            && !candidates.some(row => entryComponents.get(row.id) === component.id)) {
+            // A closed transition boundary does not settle native root/fixed
+            // admission inside it. Retain the layer and unresolved coverage.
+            component.status = 'unresolved'; component.reason = 'trunk_unproved';
+            component.diagnostic = 'closed_boundary_root_admission_not_proven';
+            continue;
+        }
         const boundedCandidates = candidates.slice(0, Format.LIMITS.maxEntryAnchors);
         if (!candidates.length) {
             component.status = 'unresolved'; component.reason = 'entry_anchor_missing'; continue;
@@ -563,17 +585,28 @@ function attachComponentEntries(polygon, areaResult, entryWaypoints, input, worl
             const outward = provePath({ from: waypoint.point, to: localAnchor, regionIds,
                 context: { areaId: polygon.areaId, spawnId: polygon.spawnId }, world, budget, safety,
                 constraints: { maxDistance: Format.LIMITS.localDistance, maxRadius: Format.LIMITS.localRadius } });
-            if (outward.status !== 'supported') continue;
+            if (outward.status !== 'supported') {
+                (component.entryFailures ||= []).push({ anchorId: waypoint.id, direction: 'to_component',
+                    reason: outward.reason, diagnostic: outward.diagnostic || null,
+                    length: outward.length ?? null, maxXY: outward.maxXY ?? null, evidence: outward.evidence || null });
+                continue;
+            }
             const returning = provePath({ from: localAnchor, to: waypoint.point, regionIds,
                 context: { areaId: polygon.areaId, spawnId: polygon.spawnId }, world, budget, safety,
                 constraints: { maxDistance: Format.LIMITS.localDistance, maxRadius: Format.LIMITS.localRadius } });
-            if (returning.status !== 'supported') continue;
+            if (returning.status !== 'supported') {
+                (component.entryFailures ||= []).push({ anchorId: waypoint.id, direction: 'from_component',
+                    reason: returning.reason, diagnostic: returning.diagnostic || null,
+                    length: returning.length ?? null, maxXY: returning.maxXY ?? null, evidence: returning.evidence || null });
+                continue;
+            }
             const certIds = [];
             for (const [direction, proof, fromId, toId] of [
                 ['to_component', outward, waypoint.id, patches[0].id],
                 ['from_component', returning, patches[0].id, waypoint.id]]) {
                 const id = `entry:${component.id}:${waypoint.id}:${direction}`;
-                certificates.push({ id, kind: 'entry_access', areaId: polygon.areaId, spawnId: polygon.spawnId,
+                certificates.push({ id, kind: 'entry_access', requirementId: polygon.spawnId,
+                    areaId: polygon.areaId, spawnId: polygon.spawnId,
                     componentId: component.id, direction, anchorId: waypoint.id, patchId: patches[0].id,
                     fromAnchorId: fromId, toAnchorId: toId, provedNodeCount: proof.nodeCount,
                     pathDistance: proof.length, maxPathDistance: proof.length, coveredLayerCellCount: component.nodeCount,
@@ -592,8 +625,8 @@ function attachComponentEntries(polygon, areaResult, entryWaypoints, input, worl
             component.reason = candidates.length > Format.LIMITS.maxEntryAnchors ? 'anchor_limit'
                 : regionIds.length ? 'trunk_unproved' : 'unsafe_transit';
         }
-        for (const patch of patches) attachments.push({ anchorId: patch.id, componentId: component.id,
-            patchId: patch.id, direction: 'both', point: patch.anchor });
+        if (component.status === 'supported') for (const patch of patches) attachments.push({
+            anchorId: patch.id, componentId: component.id, patchId: patch.id, direction: 'both', point: patch.anchor });
     }
 }
 function makeTownGateWaypoints(input, selectedTownKeys, TownGateCatalog, initialMap) {
@@ -659,12 +692,17 @@ function makeServiceCoverage({ input, scope, world, waypoints, budget, safety, c
 
 async function build({ sourceFile = Inputs.DEFAULT_SOURCE, geodataDir, outputFile = Inputs.DEFAULT_FILE,
     scope: requestedScope, requirementIds = [], waypointIds = [], connectionIds = [],
-    input = null, registered = null, world, artifactRoot = null }) {
+    input = null, registered = null, world, artifactRoot = null, budget = new BuildBudget() }) {
     if (!world?.Geo || !world?.Surface || !world?.GatherAreas || !world?.WorldAreaCatalog
         || !world?.RaidBossBalance || !world?.TownRespawn || !world?.TownGateCatalog || !Array.isArray(world.serviceRows)) {
         throw new Error('journey_offline_native_inputs_required');
     }
-    const budget = new BuildBudget();
+    for (const [name, file] of Object.entries({ Geo: '../../Geodata/GeodataEngine',
+        Surface: '../../Geodata/SpawnSurface', GatherAreas: '../../Lord/GatherAreas',
+        WorldAreaCatalog: '../../World/WorldAreaCatalog', RaidBossBalance: '../../RaidBoss/RaidBossBalance' })) {
+        if (world[name] !== require(file)) throw new Error(`journey_native_module_identity_mismatch:${name}`);
+    }
+    budget.poll();
     const authored = input ? { file: path.resolve(sourceFile), input } : await Inputs.readAuthored(sourceFile);
     input = authored.input;
     const scope = Inputs.selectScope(input, { kind: requestedScope,
@@ -719,20 +757,18 @@ async function build({ sourceFile = Inputs.DEFAULT_SOURCE, geodataDir, outputFil
                 stats: { bboxCells: 0, examinedCells: 0, admittedLayers: 0 } });
             continue;
         }
-        const spawnAnchors = Array.isArray(definition.spawnAnchors) ? definition.spawnAnchors : [];
-        const fixedPoints = (definition.spawns || []).filter(spawn => Number(spawn.total) > 0)
-            .flatMap(spawn => spawn.coords || []);
+        const admission = require('../../Geodata/SpawnPlacement').journeyAdmission(definition);
         budget.beginPolygon(spawnId);
         let decomposed;
         try {
             decomposed = Components.decomposePolygon({ areaId: area.id, spawnId, bounds: zone.bounds,
-                spawnAnchors, fixedPoints, fingerprint: initialIdentity.fingerprint,
+                admission, fingerprint: initialIdentity.fingerprint,
                 Geo: world.Geo, Surface: world.Surface, budget,
                 areaContains: point => world.GatherAreas.containsZone(zone, point),
                 excludePoint: safety.point });
         } catch (error) {
-            if (error instanceof BuildStop && error.global) throw error;
-            decomposed = { status: 'unresolved', reason: error.reason || 'limit_reached', nodes: [], components: [], patches: [], spans: [],
+            if (!(error instanceof BuildStop) || error.global) throw error;
+            decomposed = { status: 'unresolved', reason: 'limit_reached', nodes: [], components: [], patches: [], spans: [],
                 stats: { components: 0, localPatches: 0 }, excluded: {}, diagnostic: String(error.message || error).slice(0, 200) };
         } finally { budget.endPolygon(); }
         const spanOffset = membershipSpans.length;
@@ -743,8 +779,11 @@ async function build({ sourceFile = Inputs.DEFAULT_SOURCE, geodataDir, outputFil
             attachComponentEntries({ areaId: area.id, spawnId }, decomposed, polygonEntryCandidates,
                 input, world, budget, safety, accessCertificates, attachments);
         } catch (error) {
-            if (error instanceof BuildStop && error.global) throw error;
-            for (const component of componentRows) { component.status = 'unresolved'; component.reason = error.reason || 'limit_reached'; }
+            if (!(error instanceof BuildStop) || error.global) throw error;
+            for (const component of componentRows) {
+                component.status = 'unresolved'; component.reason = 'limit_reached';
+                component.diagnostic = error.reason;
+            }
         }
         const spansForPolygon = decomposed.spans || [];
         const spanIndex = new Map();
@@ -758,7 +797,8 @@ async function build({ sourceFile = Inputs.DEFAULT_SOURCE, geodataDir, outputFil
             delete outputPatch.anchorNode;
             patches.push(outputPatch);
             const id = `local:${patch.id}`;
-            const localCert = { id, kind: 'local_patch', areaId: area.id, spawnId, componentId: patch.componentId,
+            const localCert = { id, kind: 'local_patch', requirementId: spawnId,
+                areaId: area.id, spawnId, componentId: patch.componentId,
                 direction: 'both', anchorId: patch.id, patchId: patch.id,
                 provedNodeCount: patch.nodeCount, pathDistance: patch.maxPathDistance,
                 maxPathDistance: patch.maxPathDistance, coveredLayerCellCount: patch.nodeCount,
@@ -827,7 +867,8 @@ async function build({ sourceFile = Inputs.DEFAULT_SOURCE, geodataDir, outputFil
             trunk.coverageStatus = 'supported';
             coverage.connections.push(makeCoverageEntry('connection', connection.id, 'supported', null, [certificateId]));
             generatedTrunks.push(trunk);
-        } else coverage.connections.push(makeCoverageEntry('connection', connection.id, result.status, result.reason));
+        } else coverage.connections.push({ ...makeCoverageEntry('connection', connection.id, result.status, result.reason),
+            diagnostic: result.diagnostic || null, evidence: result.evidence || null });
     }
     const services = makeServiceCoverage({ input, scope, world, waypoints: [...waypointMap.values()], budget, safety,
         certificates: accessCertificates, coverage });
@@ -890,10 +931,28 @@ async function build({ sourceFile = Inputs.DEFAULT_SOURCE, geodataDir, outputFil
     record.buildStats.elapsedMs = Math.round(performance.now() - budget.startedAt);
     record.buildStats.maxRssBytes = Math.max(record.buildStats.maxRssBytes, process.memoryUsage.rss());
     record.checksum = Format.checksumOf(record);
+    if (artifactRoot) {
+        await fs.mkdir(artifactRoot, { recursive: true });
+        await fs.writeFile(path.join(artifactRoot, 'journey-routes-proof-summary.json'), JSON.stringify({
+            inputFingerprint: record.inputFingerprint, polygonResults, components, patches,
+            coverage, safetyUnknown: safety.unknown, buildStats: record.buildStats
+        }, null, 2));
+    }
     await Format.validateRecord(record, initialIdentity);
     budget.assertHealthy();
-    await publishAtomically(outputFile, record);
-    return { record, summary: { status: 'ready', outputFile: path.resolve(outputFile), checksum: record.checksum,
+    const requiredFailures = [
+        ...coverage.polygons.filter(row => scope.requirementIds.includes(row.requirementId) && row.status !== 'supported'),
+        ...coverage.connections.filter(row => scope.connectionIds.includes(row.requirementId) && row.status !== 'supported')
+    ];
+    const complete = requiredFailures.length === 0;
+    let emittedFile = null;
+    if (complete) emittedFile = path.resolve(outputFile);
+    else if (artifactRoot) emittedFile = path.resolve(artifactRoot, 'journey-routes-incomplete.json');
+    if (emittedFile) await publishAtomically(emittedFile, record);
+    return { record, summary: { status: complete ? 'ready' : 'incomplete',
+        reason: complete ? null : 'required_slice_proofs_incomplete',
+        outputFile: complete ? emittedFile : null, diagnosticFile: complete ? null : emittedFile,
+        requiredFailures, checksum: record.checksum,
         inputFingerprint: record.inputFingerprint, scope, coverage: {
             supported: unresolved.length === 0,
             supportedPolygons: coverage.polygons.filter(row => row.status === 'supported').length,
@@ -928,3 +987,4 @@ async function publishAtomically(outputFile, record) {
 }
 
 module.exports = { BuildBudget, build, publishAtomically, provePath, raidExclusions };
+});

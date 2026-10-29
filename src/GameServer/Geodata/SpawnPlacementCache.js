@@ -1,3 +1,4 @@
+require('./JourneyGeometryIdentity.js').define(module, require, function (module, exports, require, __filename, __dirname) {
 const fs = require('node:fs');
 const path = require('node:path');
 const { createHash, randomUUID } = require('node:crypto');
@@ -190,3 +191,5 @@ function open(expected, anchors, poolSize, { cachePath = defaultPath(), rebuild 
 }
 
 module.exports = { open, CAPACITY };
+return [[require.resolve('./GeodataEngine'), Geo]];
+});

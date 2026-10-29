@@ -1,3 +1,4 @@
+require('../Geodata/JourneyGeometryIdentity.js').define(module, require, function (module, exports, require, __filename, __dirname) {
 // Chronicle 4 Gatekeeper Ziggurat pairs from L2J Lisvus spawnlist.sql and
 // teleport.sql. Seven Signs is not implemented yet, so the source server's
 // SevenSignsDungeonNPCAccess override is represented by always exposing these
@@ -136,3 +137,4 @@ function html(npcId) {
 }
 
 module.exports = { DUNGEONS, destination, html, npcs, spawns };
+});

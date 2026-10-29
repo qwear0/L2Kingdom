@@ -1,3 +1,4 @@
+require('../../Geodata/JourneyGeometryIdentity.js').define(module, require, function (module, exports, require, __filename, __dirname) {
 'use strict';
 
 const fs = require('node:fs/promises');
@@ -363,3 +364,4 @@ module.exports = {
             : Object.freeze({ status: 'missing', reason: 'catalogue_disabled' });
     }
 };
+});

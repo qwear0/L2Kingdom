@@ -1,3 +1,4 @@
+require('./JourneyGeometryIdentity.js').define(module, require, function (module, exports, require, __filename, __dirname) {
 const { performance } = require('node:perf_hooks');
 const Geo = invoke('GameServer/Geodata/GeodataEngine');
 const Surface = require('./SpawnSurface');
@@ -976,4 +977,27 @@ function nearLeader(leader) {
     return origin;
 }
 
-module.exports = { init, randomCoords, nearLeader, identity };
+// Offline travel enumerates the native candidate domain, not a retained pool.
+// Random discovery only emits cell centres; authored fixed/root coordinates may
+// be non-centred and still need their own nearest-floor connector certificate.
+function journeyAdmission(definition) {
+    const bounds = domain(definition.bounds);
+    if (!bounds) throw new Error('journey_spawn_domain_invalid');
+    const random = definition.spawns.some(spawn => Number(spawn.total) > 0 && !spawn.coords?.length);
+    const points = [...(definition.spawnAnchors || []), ...definition.spawns
+        .filter(spawn => Number(spawn.total) > 0).flatMap(spawn => spawn.coords || [])];
+    return {
+        rule: 'native_random_cell_centres_and_authored_points',
+        randomCentre(x, y) {
+            return random && (x - 8) % 16 === 0 && (y - 8) % 16 === 0 && inside(x, y, definition.bounds);
+        },
+        containsXY: (x, y) => inside(x, y, definition.bounds),
+        layer: (z, nswe) => !!nswe && z >= bounds.minZ && z <= bounds.maxZ,
+        authoredPoints: points
+    };
+}
+
+module.exports = { init, randomCoords, nearLeader, identity, journeyAdmission };
+return [[require.resolve('./GeodataEngine'), Geo], [require.resolve('./SpawnSurface'), Surface],
+    [require.resolve('./SpawnPlacementCache'), DiskCache]];
+});

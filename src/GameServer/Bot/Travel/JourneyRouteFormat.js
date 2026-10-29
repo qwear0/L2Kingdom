@@ -1,3 +1,4 @@
+require('../../Geodata/JourneyGeometryIdentity.js').define(module, require, function (module, exports, require, __filename, __dirname) {
 'use strict';
 
 const { createHash } = require('node:crypto');
@@ -226,7 +227,7 @@ function validateTransitRegion(region, label) {
     }
 }
 function validateAuthored(input) {
-    if (!isRecord(input) || input.schemaVersion !== SCHEMA_VERSION || input.state !== 'requirements_only') {
+    if (!isRecord(input) || input.schemaVersion !== SCHEMA_VERSION || !['requirements_only', 'slice_candidates'].includes(input.state)) {
         throw new Error('authored_schema_or_state_invalid');
     }
     if (!Array.isArray(input.requiredAreas) || input.requiredAreas.length !== 5
@@ -312,7 +313,7 @@ function validateAuthored(input) {
 }
 
 async function validateAuthoredBatched(input, checkpoint) {
-    if (!isRecord(input) || input.schemaVersion !== SCHEMA_VERSION || input.state !== 'requirements_only'
+    if (!isRecord(input) || input.schemaVersion !== SCHEMA_VERSION || !['requirements_only', 'slice_candidates'].includes(input.state)
         || !Array.isArray(input.requiredAreas) || input.requiredAreas.length !== 5
         || !Array.isArray(input.requiredPolygons) || input.requiredPolygons.length !== 189
         || !Array.isArray(input.requiredTowns) || input.requiredTowns.length !== 16
@@ -507,7 +508,7 @@ async function validateRecord(record, expectedIdentity = null, loadContext = {})
             || !STATUSES.has(entry.status) || !REASONS.has(entry.reason) && entry.reason !== null
             || typeof entry.requirementId !== 'string' || !entry.requirementId || !Array.isArray(entry.certificateIds)
             || (entry.status === 'supported' ? entry.reason !== null : entry.reason === null)) {
-            throw new Error('generated_coverage_entry_invalid');
+            throw new Error(`generated_coverage_entry_invalid:${entry.kind}:${entry.requirementId}:${entry.status}:${entry.reason}`);
         }
         const key = `${entry.kind}:${entry.requirementId}`;
         if (coverageKeys.has(key)) throw new Error(`generated_coverage_duplicate:${key}`);
@@ -577,9 +578,10 @@ async function validateRecord(record, expectedIdentity = null, loadContext = {})
     for (let i = 1; i < record.membershipSpans.length; i++) {
         await checkpoint();
         const a = record.membershipSpans[i - 1], b = record.membershipSpans[i];
-        const orderA = [a.areaId, a.spawnId, a.layerZ, a.rowY, a.xStart, a.xEnd, a.componentId].join('\0');
-        const orderB = [b.areaId, b.spawnId, b.layerZ, b.rowY, b.xStart, b.xEnd, b.componentId].join('\0');
-        if (orderA > orderB) throw new Error('generated_membership_spans_not_sorted');
+        const order = a.areaId.localeCompare(b.areaId) || a.spawnId.localeCompare(b.spawnId)
+            || a.layerZ - b.layerZ || a.rowY - b.rowY || a.xStart - b.xStart || a.xEnd - b.xEnd
+            || a.componentId.localeCompare(b.componentId);
+        if (order > 0) throw new Error('generated_membership_spans_not_sorted');
     }
     const spans = record.membershipSpans;
     for (const patch of record.patches) for (const index of patch.membershipSpanIndices) {
@@ -647,7 +649,7 @@ async function validateRecord(record, expectedIdentity = null, loadContext = {})
         && (!Number.isFinite(value) || value < 0))) throw new Error('generated_build_stats_invalid');
     const checksum = await canonicalDigest(record, false, checkpoint);
     if (checksum.bytes > LIMITS.generatedBytes) throw new Error('generated_size_limit_exceeded');
-    if (Date.now() - startedAt > LIMITS.maxLoaderMs) throw new Error('loader_wall_limit');
+    if (Date.now() - startedAtWallMs > LIMITS.maxLoaderMs) throw new Error('loader_wall_limit');
     if (process.memoryUsage.rss() - baselineRss > LIMITS.maxLoaderRss) throw new Error('loader_additional_rss_limit');
     return { bytes: checksum.bytes, checksum: record.checksum, inputFingerprint: record.inputFingerprint };
 }
@@ -670,3 +672,4 @@ module.exports = {
     validateAuthored,
     validateRecord
 };
+});
