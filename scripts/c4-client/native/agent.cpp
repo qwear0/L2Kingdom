@@ -73,6 +73,7 @@ void* PointerAt(void* object, SIZE_T offset) {
 }
 
 #include "session.h"
+#include "telemetry.h"
 
 // The exported UObject-side vtable owns a thiscall Tick(float) slot at +0x64
 // in the SHA-pinned build. A fastcall shim consumes its ECX and stack argument
@@ -82,8 +83,8 @@ void __fastcall OnTick(void* engine, void*, float delta) {
     originalTick(engine, delta);
     if (!correctThread) return;
     DWORD now = GetTickCount();
-    if (now - lastSampleTime < 200) return;
-    lastSampleTime = now;
+    bool publish = now - lastSampleTime >= 200;
+    if (!publish && !telemetry::Active()) return;
     Sample next = {};
     next.time = now;
     next.thread = GetCurrentThreadId();
@@ -120,12 +121,17 @@ void __fastcall OnTick(void* engine, void*, float delta) {
     }
     // RPC serialization must never stall the game thread. A contended sample
     // is skipped, not waited for; world pointers are opaque diagnostic IDs.
-    if (!TryEnterCriticalSection(&sampleLock)) return;
+    if (!TryEnterCriticalSection(&sampleLock)) { telemetry::Skipped(); return; }
     next.sequence = sample.sequence + 1;
     next.epoch = sample.epoch + (next.engine != sample.engine || next.level != sample.level || next.viewportActor != sample.viewportActor || next.pawn != sample.pawn);
-    sample = next;
-    session::Tick(engine, next);
-    if (surface.status == 1) {
+    if (publish) {
+        lastSampleTime = now;
+        sample = next;
+        session::Tick(engine, next);
+        telemetry::Publish(next);
+    }
+    telemetry::Record(next);
+    if (publish && surface.status == 1) {
         if (!next.pawn || surface.epoch != next.epoch || requestedPawn != next.pawn) surface.status = 4;
         else {
             surface.start = next.origin;
@@ -226,9 +232,10 @@ void Serve(SOCKET socket, const char* token) {
         return;
     }
     if (strcmp(command, "health") && strcmp(command, "sample")) {
-        static char reply[4096];
+        static char reply[16384];
         EnterCriticalSection(&sampleLock);
-        session::Rpc(command, sample.epoch, sample.sequence && GetTickCount() - sample.time < 5000, reply, sizeof(reply));
+        if (!telemetry::Rpc(command, reply, sizeof(reply)))
+            session::Rpc(command, sample.epoch, sample.sequence && GetTickCount() - sample.time < 5000, reply, sizeof(reply));
         LeaveCriticalSection(&sampleLock);
         SendAll(socket, reply);
         SendAll(socket, "\n");
@@ -237,6 +244,7 @@ void Serve(SOCKET socket, const char* token) {
     EnterCriticalSection(&sampleLock);
     Sample copy = sample;
     Surface ray = surface;
+    DWORD eventHead = telemetry::head;
     static char sessionJson[4096], movementJson[1024];
     session::ExpireOwner();
     session::Render(sessionJson, sizeof(sessionJson));
@@ -260,9 +268,9 @@ void Serve(SOCKET socket, const char* token) {
         ray.hit.normal.x, ray.hit.normal.y, ray.hit.normal.z, ray.hit.time, ray.hit.item, ray.hit.primitive, ray.hit.material);
     else strcpy(result, "null");
     _snprintf(response, sizeof(response),
-        "{\"protocol\":\"c4-agent/3\",\"profile\":\"%s\",\"pid\":%lu,\"sequence\":%lu,\"ageMs\":%s,\"tickThread\":%lu,\"epoch\":%lu,\"engine\":\"%p\",\"viewportActor\":\"%p\",\"level\":\"%p\",\"pawn\":%s,\"session\":%s,\"movement\":%s,\"capabilities\":[\"health\",\"native_tick_sample\",\"surface\",\"session_observe\",\"native_login\",\"native_selection\",\"native_movement\"],\"surface\":{\"requestId\":%lu,\"epoch\":%lu,\"status\":\"%s\",\"nativeReturn\":%d,\"mask\":%lu,\"extent\":[0,0,0],\"start\":[%.6f,%.6f,%.6f],\"end\":[%.6f,%.6f,%.6f],\"hit\":%s}}\n",
-        c4::Profile, GetCurrentProcessId(), copy.sequence, age, copy.thread, copy.epoch, copy.engine, copy.viewportActor, copy.level, pawn, sessionJson, movementJson,
-        ray.id, ray.epoch, statuses[ray.status], ray.nativeReturn, WorldTraceMask,
+        "{\"protocol\":\"%s\",\"profile\":\"%s\",\"instance\":\"%s\",\"pid\":%lu,\"sequence\":%lu,\"ageMs\":%s,\"tickThread\":%lu,\"epoch\":%lu,\"engine\":\"%p\",\"viewportActor\":\"%p\",\"level\":\"%p\",\"pawn\":%s,\"session\":%s,\"movement\":%s,\"capabilities\":[\"health\",\"native_tick_sample\",\"surface\",\"session_observe\",\"native_login\",\"native_selection\",\"native_movement\",\"bounded_events\",\"native_tick_capture\"],\"events\":{\"head\":%lu,\"capacity\":64},\"surface\":{\"requestId\":%lu,\"epoch\":%lu,\"status\":\"%s\",\"nativeReturn\":%d,\"mask\":%lu,\"extent\":[0,0,0],\"start\":[%.6f,%.6f,%.6f],\"end\":[%.6f,%.6f,%.6f],\"hit\":%s}}\n",
+        c4::Protocol, c4::Profile, telemetry::instance, GetCurrentProcessId(), copy.sequence, age, copy.thread, copy.epoch, copy.engine, copy.viewportActor, copy.level, pawn, sessionJson, movementJson,
+        eventHead, ray.id, ray.epoch, statuses[ray.status], ray.nativeReturn, WorldTraceMask,
         ray.start.x, ray.start.y, ray.start.z, ray.end.x, ray.end.y, ray.end.z, result);
     SendAll(socket, response);
 }
@@ -292,11 +300,12 @@ DWORD WINAPI Worker(void*) {
     int addressSize = sizeof(address);
     if (getsockname(listener, reinterpret_cast<sockaddr*>(&address), &addressSize)) { closesocket(listener); return Fail(5); }
     InitializeCriticalSection(&sampleLock);
+    if (!telemetry::Initialize()) { closesocket(listener); return Fail(6); }
     if (!InstallTick()) { closesocket(listener); return Fail(6); }
     char descriptor[512];
     int length = _snprintf(descriptor, sizeof(descriptor),
-        "{\"protocol\":\"%s\",\"profile\":\"%s\",\"pid\":%lu,\"host\":\"127.0.0.1\",\"port\":%u,\"token\":\"%s\"}\n",
-        c4::Protocol, c4::Profile, GetCurrentProcessId(), ntohs(address.sin_port), token);
+        "{\"protocol\":\"%s\",\"profile\":\"%s\",\"instance\":\"%s\",\"pid\":%lu,\"host\":\"127.0.0.1\",\"port\":%u,\"token\":\"%s\"}\n",
+        c4::Protocol, c4::Profile, telemetry::instance, GetCurrentProcessId(), ntohs(address.sin_port), token);
     // The host creates this file with mode 0600 before launch. Do not create a
     // token-bearing file with Wine's inherited/default Unix permissions.
     HANDLE file = CreateFileA(session, GENERIC_WRITE, 0, nullptr, TRUNCATE_EXISTING, 0, nullptr);

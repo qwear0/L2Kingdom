@@ -4,6 +4,7 @@ const fs = require('node:fs/promises');
 const { constants } = require('node:fs');
 const path = require('node:path');
 const net = require('node:net');
+const { setTimeout: delay } = require('node:timers/promises');
 const { randomBytes, createHash } = require('node:crypto');
 const { z } = require('zod');
 const { protocol, profile, descriptor } = require('./Contracts');
@@ -79,12 +80,13 @@ class ClientBridge {
             const done = (error, result) => {
                 if (settled) return;
                 settled = true;
+                clearTimeout(deadline);
                 socket.destroy();
                 buffer.fill(0);
                 if (error) reject(error); else resolve(result);
             };
             const unavailable = () => done(fail(mutation && sent ? 'rpc_outcome_unknown' : 'rpc_unavailable'));
-            socket.setTimeout(3000, unavailable);
+            const deadline = setTimeout(unavailable, 3000);
             socket.on('error', unavailable);
             socket.on('end', unavailable);
             socket.on('data', chunk => {
@@ -110,8 +112,9 @@ class ClientBridge {
     async observe() {
         const result = await this.rpc('sample');
         const target = await this.connection();
-        if (result.protocol !== protocol || result.profile !== profile || result.pid !== target.pid
-            || !Number.isInteger(result.epoch) || !Number.isInteger(result.sequence) || !result.session) throw fail('session_identity_mismatch');
+        this.identity(result, target);
+        if (!Number.isInteger(result.epoch) || !Number.isInteger(result.sequence) || !result.session
+            || !Number.isInteger(result.events?.head)) throw fail('invalid_observation');
         const names = result.session.characterNamesUtf16le;
         const selected = result.session.selectedCharacterUtf16le;
         const validName = value => typeof value === 'string' && value.length <= 256 && /^(?:[a-f0-9]{4})*$/.test(value);
@@ -127,11 +130,13 @@ class ClientBridge {
 
     async status() {
         const sample = await this.observe();
-        return { protocol, profile, pid: sample.pid, sequence: sample.sequence, epoch: sample.epoch, ageMs: sample.ageMs,
+        return { protocol, profile, instance: sample.instance, pid: sample.pid, sequence: sample.sequence, epoch: sample.epoch, ageMs: sample.ageMs,
+            eventCursor: { instance: sample.instance, after: sample.events.head },
+            telemetryLimits: { eventRetention: 64, eventPage: 16, capturesPerClient: 8, framesPerCapture: 256, captureDurationMs: 10000, waitTimeoutMs: 30000 },
             tickThread: sample.tickThread, session: sample.session, pawnAvailable: !!sample.pawn,
             movement: sample.movement,
-            capabilities: ['client_status', 'client_observe', 'login', 'select_server', 'select_character', 'move', 'stop', 'client_action_status'],
-            unavailable: ['consent_automation', 'security_pad_answers', 'events', 'wait', 'capture', 'correction_classification', 'calibrated_geometry'],
+            capabilities: ['client_status', 'client_observe', 'login', 'select_server', 'select_character', 'move', 'stop', 'client_action_status', 'client_events', 'client_wait', 'client_capture'],
+            unavailable: ['consent_automation', 'security_pad_answers', 'decoded_movement_packets', 'correction_classification', 'actor_lifecycle', 'calibrated_geometry'],
             control: { owned: this.owned, lost: this.lost, disconnect: 'Release/15s lease expiry revokes queued commands and requests native stop for foreground movement. Inspect movement.stop: dispatch is not stationary confirmation. Dispatched session actions are not undone.' } };
     }
 
@@ -221,7 +226,149 @@ class ClientBridge {
         return this.normalizeReceipt(await this.rpc(`receipt ${requestId.replaceAll('-', '').toLowerCase()}`), requestId);
     }
 
+    identity(result, target) {
+        if (result.error) throw fail(result.error);
+        if (result.protocol !== protocol || result.profile !== profile || result.pid !== target.pid
+            || result.instance !== target.instance) throw fail('session_identity_mismatch');
+    }
+
+    async events({ cursor, limit = 16 }) {
+        const target = await this.connection();
+        if (cursor.instance !== target.instance) throw fail('event_instance_mismatch');
+        const result = await this.rpc(`events ${cursor.instance} ${cursor.after} ${limit}`);
+        this.identity(result, target);
+        if (!Number.isInteger(result.head) || !Number.isInteger(result.oldest) || !Number.isInteger(result.gap)
+            || result.gap < 0 || result.head < cursor.after || result.oldest < 1
+            || !Array.isArray(result.events) || result.events.length > limit
+            || result.nextCursor?.instance !== target.instance
+            || result.nextCursor.after !== (result.events.at(-1)?.sequence ?? cursor.after)
+            || result.hasMore !== (result.nextCursor.after < result.head)
+            || result.gap !== Math.max(0, result.oldest - cursor.after - 1)
+            || !result.events.every((event, index) => event.sequence === Math.max(cursor.after + 1, result.oldest) + index
+                && event.sequence <= result.head && Number.isInteger(event.epoch))) throw fail('invalid_event_page');
+        return result;
+    }
+
+    async wait(input, signal) {
+        if (this.waiting) throw fail('wait_busy');
+        this.waiting = true;
+        const began = performance.now();
+        let cursor = input.cursor;
+        let observation;
+        let receipt;
+        let journal;
+        const finish = (reason, satisfied = false, event) => {
+            const elapsed = performance.now() - began;
+            if (signal?.aborted || this.closed || this.closing) { reason = 'cancelled'; satisfied = false; }
+            else if (satisfied && elapsed > input.timeoutMs) { reason = 'timeout'; satisfied = false; }
+            return { predicate: input.predicate, satisfied, reason,
+                elapsedMs: Math.round(elapsed), observation, ...(receipt && { receipt }),
+                ...(cursor && { cursor }), ...(journal && { journal }), ...(event && { event }),
+                evidenceScope: 'Observed predicate only; terminal, timeout and lack of progress are not collision/correction or gameplay success.' };
+        };
+        try {
+            while (true) {
+                if (signal?.aborted || this.closed || this.closing) return finish('cancelled');
+                if (observation && performance.now() - began >= input.timeoutMs) return finish('timeout');
+                observation = await this.observe();
+                if (observation.epoch !== input.expectedEpoch) return finish('epoch_changed');
+                if (!Number.isInteger(observation.ageMs) || observation.ageMs >= 5000) return finish('sample_stale');
+                if (input.predicate === 'world_entered' && observation.session.worldEntered) return finish('matched', true);
+                if (input.predicate === 'action_terminal' || input.predicate === 'stopped') {
+                    receipt = await this.receipt(input);
+                    if (receipt.error) throw fail(receipt.error);
+                    if (receipt.epoch !== input.expectedEpoch) return finish('receipt_epoch_mismatch');
+                    if (input.predicate === 'action_terminal') {
+                        const movement = ['move', 'stop'].includes(receipt.action);
+                        if ((receipt.status !== 'queued' && receipt.status !== 'dispatched')
+                            || receipt.status === 'dispatched' && (!movement || !['not_observed', 'pending', 'moving'].includes(receipt.outcome))) {
+                            return finish('matched', true);
+                        }
+                    } else {
+                        if (!['move', 'stop'].includes(receipt.action)) throw fail('movement_receipt_required');
+                        const movement = observation.movement;
+                        if (movement && movement.requestId === input.requestId.replaceAll('-', '').toLowerCase()
+                            && movement.epoch === input.expectedEpoch && !movement.active && observation.pawn
+                            && observation.pawn.velocity.every(value => Number.isFinite(value) && Math.abs(value) <= 1)
+                            && (movement.stop === 'observed_stopped' || movement.outcome === 'reached_xy_stopped')) return finish('matched', true);
+                        if (movement && movement.requestId !== input.requestId.replaceAll('-', '').toLowerCase()) return finish('movement_superseded');
+                    }
+                }
+                if (input.predicate === 'event') {
+                    // Drain at most the fixed native ring per polling cycle.
+                    for (let page = 0; page < 4; page++) {
+                        const result = await this.events({ cursor });
+                        journal = { head: result.head, oldest: result.oldest, gap: result.gap, exhausted: result.exhausted };
+                        if (result.gap || result.exhausted) return finish('event_gap');
+                        const event = result.events.find(value => value.epoch === input.expectedEpoch && value.kind === input.kind);
+                        if (event) { cursor = { instance: result.instance, after: event.sequence }; return finish('matched', true, event); }
+                        cursor = result.nextCursor;
+                        if (!result.hasMore) break;
+                    }
+                }
+                const remaining = input.timeoutMs - (performance.now() - began);
+                if (remaining <= 0) return finish('timeout');
+                try { await delay(Math.min(250, remaining), undefined, { signal }); }
+                catch (error) { if (error.name === 'AbortError') return finish('cancelled'); throw error; }
+            }
+        } finally { this.waiting = false; }
+    }
+
+    async captureRpc(command, captureId) {
+        const result = await this.rpc(command, !command.startsWith('capture_read '));
+        this.identity(result, await this.connection());
+        if (result.captureId !== captureId || !['recording', 'deadline', 'stopped', 'epoch_changed'].includes(result.state)
+            || !Number.isInteger(result.count) || result.count < 0 || result.count > 256
+            || !Number.isInteger(result.nextOffset) || result.nextOffset < 0 || result.nextOffset > result.count
+            || !Array.isArray(result.frames) || result.frames.length > 16) throw fail('invalid_capture_page');
+        return result;
+    }
+
+    async capture(input, signal) {
+        const id = input.captureId.replaceAll('-', '').toLowerCase();
+        if (input.operation === 'start') return this.captureRpc(`capture_start ${id} ${input.expectedEpoch} ${input.durationMs}`, id);
+        if (input.operation === 'stop') return this.captureRpc(`capture_stop ${id}`, id);
+        if (input.operation === 'read') return this.captureRpc(`capture_read ${id} ${input.offset} ${input.limit}`, id);
+        const initial = await this.captureRpc(`capture_read ${id} 0 16`, id);
+        if (initial.state === 'recording') throw fail('capture_still_recording');
+        const frames = [...initial.frames];
+        let offset = initial.nextOffset;
+        while (offset < initial.count) {
+            if (signal?.aborted || this.closed || this.closing) throw fail('capture_export_cancelled');
+            const page = await this.captureRpc(`capture_read ${id} ${offset} 16`, id);
+            if (page.state !== initial.state || page.count !== initial.count || page.epoch !== initial.epoch
+                || page.nextOffset <= offset || !page.frames.every((frame, index) => frame.index === offset + index)) throw fail('capture_changed');
+            frames.push(...page.frames); offset = page.nextOffset;
+        }
+        let cursor = { instance: initial.instance, after: initial.eventBegin };
+        const events = [];
+        let journalGap = 0;
+        for (let page = 0; page < 4 && cursor.after < initial.eventEnd; page++) {
+            const result = await this.events({ cursor });
+            journalGap += Math.min(result.gap, initial.eventEnd - cursor.after);
+            events.push(...result.events.filter(event => event.sequence <= initial.eventEnd));
+            cursor = result.nextCursor;
+            if (!result.hasMore) break;
+        }
+        if (frames.length !== initial.count || !frames.every((frame, index) => frame.index === index)) throw fail('invalid_capture_frames');
+        if (signal?.aborted || this.closed || this.closing) throw fail('capture_export_cancelled');
+        const root = path.resolve(__dirname, '../../../tmp/investigations/c4-client-agent/captures');
+        await fs.mkdir(root, { recursive: true, mode: 0o700 });
+        const directory = await fs.mkdtemp(path.join(root, `${id}-`));
+        const filename = path.join(directory, 'capture.json');
+        const { nextOffset, hasMore, frames: firstPage, ...metadata } = initial;
+        const output = { ...metadata, frames, events, journalGap,
+            evidence: { frames: 'client_native', events: 'sampled_client_observations',
+                timing: 'elapsedMs is client-local milliseconds modulo 2^32; publicationSequence is the last <=5Hz mailbox sample, not a frame ID.',
+                unavailable: ['decoded_movement_packets', 'correction_classification', 'actor_lifecycle', 'calibrated_geometry', 'screenshot'] } };
+        await fs.writeFile(filename, `${JSON.stringify(output, null, 2)}\n`, { mode: 0o600, flag: 'wx' });
+        return { captureId: input.captureId, state: initial.state, epoch: initial.epoch, frameCount: frames.length,
+            droppedFrames: initial.droppedFrames, lockSkippedFrames: initial.lockSkippedFrames, journalGap,
+            artifact: filename, bytes: (await fs.stat(filename)).size };
+    }
+
     async close() {
+        this.closing = true;
         clearInterval(this.heartbeat);
         if (this.owned) {
             const result = await this.rpc(`release ${this.owner}`, true);

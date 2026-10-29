@@ -8,7 +8,7 @@ static_assert(sizeof(void*) == 4, "The C4 profile requires an x86 build");
 
 namespace c4 {
 constexpr const char* Profile = "l2solo-c4-656-0293b3ed-p1";
-constexpr const char* Protocol = "c4-agent/3";
+constexpr const char* Protocol = "c4-agent/4";
 // UNetworkHandler::Init writes this module-relative singleton. Its notify
 // subobject must match UGameEngine +0x38 (verified in this build's constructor).
 constexpr SIZE_T NetworkSingleton = 0x6d5e68;
