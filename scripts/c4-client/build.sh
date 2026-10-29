@@ -2,7 +2,7 @@
 set -euo pipefail
 REPO="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)"
 SDK="${C4_MINGW_ROOT:-$REPO/C4Client/tools/mingw-p0/usr}"
-OUT="$REPO/C4Client/runtime/c4-agent-p0"
+OUT="$REPO/C4Client/runtime/c4-agent-p1"
 CC="${C4_CLANG:-clang++-21}"
 LD="${C4_LLD:-/usr/bin/ld.lld-21}"
 if [[ ! -d "$SDK/i686-w64-mingw32/include" || ! -f "$SDK/i686-w64-mingw32/lib/libkernel32.a" ]]; then
@@ -21,4 +21,4 @@ COMMON=(--target=i686-w64-windows-gnu -std=c++17 -O2 -Wall -Wextra -Werror
 "$CC" "${COMMON[@]}" "$REPO/scripts/c4-client/native/launcher.cpp" \
     -Wl,--entry,_mainCRTStartup -o "$OUT/C4AgentLauncher.exe" \
     -lkernel32 -ladvapi32 -lmsvcrt
-printf 'Built x86 P0 DLL and launcher in %s\n' "$OUT"
+printf 'Built x86 client DLL and launcher in %s\n' "$OUT"

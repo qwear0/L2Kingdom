@@ -4,10 +4,24 @@
 #include <stdio.h>
 #include <string.h>
 
-static_assert(sizeof(void*) == 4, "The C4 P0 profile requires an x86 build");
+static_assert(sizeof(void*) == 4, "The C4 profile requires an x86 build");
 
 namespace c4 {
-constexpr const char* Profile = "l2solo-c4-656-0293b3ed-p0";
+constexpr const char* Profile = "l2solo-c4-656-0293b3ed-p1";
+constexpr const char* Protocol = "c4-agent/1";
+// UNetworkHandler::Init writes this module-relative singleton. Its notify
+// subobject must match UGameEngine +0x38 (verified in this build's constructor).
+constexpr SIZE_T NetworkSingleton = 0x6d5e68;
+constexpr SIZE_T EngineNotify = 0x38;
+constexpr SIZE_T NetworkNotify = 0x54;
+constexpr SIZE_T NetworkAuthDriver = 0x4c;
+constexpr SIZE_T NetworkGameDriver = 0x48;
+constexpr SIZE_T NetworkAuthPending = 0x50;
+constexpr SIZE_T DriverTransport = 0x38;
+constexpr SIZE_T EngineConsole = 0x6c;
+// RequestAuthLogin accesses auth-driver fields through +0x4f68. Merely
+// finding the network singleton does not prove driver initialization finished.
+constexpr SIZE_T AuthDriverFields = 0x4f6c;
 struct Identity { const char* name; const char* sha256; };
 constexpr Identity Identities[] = {
     {"L2.exe", "11814d7246de9ce13e0a3ffd5a3679540a21386ca2d15e65234917f9bbef0710"},
@@ -51,7 +65,7 @@ inline bool VerifyBuild(bool loaded) {
         if (loaded) {
             HMODULE module = GetModuleHandleA(identity.name);
             // NWindow is loaded by the game later, not a static L2 import. Its
-            // on-disk identity is pinned, but P0 never calls its unmapped ABI.
+            // on-disk identity is pinned; the bridge never calls its unmapped ABI.
             if (!module && strcmp(identity.name, "NWindow.dll")) return false;
             DWORD n = module ? GetModuleFileNameA(module, path, sizeof(path))
                 : GetFullPathNameA(identity.name, sizeof(path), path, nullptr);
@@ -66,6 +80,6 @@ inline bool VerifyBuild(bool loaded) {
 }
 
 inline void ReadyEventName(char* name, unsigned size, DWORD pid) {
-    _snprintf(name, size, "Local\\C4Agent-P0-%lu", pid);
+    _snprintf(name, size, "Local\\C4Agent-P1-%lu", pid);
 }
 }

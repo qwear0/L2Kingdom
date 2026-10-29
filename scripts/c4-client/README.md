@@ -1,25 +1,20 @@
-# Native C4 client feasibility gate (P0)
+# Exact-build native C4 client bridge
 
-This is an exact-build P0 feasibility bridge, **not** the P1 client MCP server. It does not replace `scripts/bot-mcp.js`, emulate packets, automate login, move a character, or expose arbitrary memory/engine calls. See the [project map](../../docs/README.md).
+The P0 feasibility gate passed. The current **partial P1** adds session observations, native login and a separate MCP adapter. Server/character selection, consent automation, movement/stop and the remaining P1 telemetry are not implemented. This is not a packet bot and does not replace `scripts/bot-mcp.js`. See the [project map](../../docs/README.md).
 
-## Owners and limits
+## Owners and boundaries
 
-- `native/profile.h`: SHA-256 identities of the installed L2Solo C4 client, advertised as protocol 656. This is a single profile, not general support for other C4 releases.
-- `native/launcher.cpp`: validates client files, creates its own suspended `L2.exe -windowed`, loads `C4Agent.dll` into **only that child**, starts the agent explicitly outside `DllMain`, then resumes/waits for the child. Setup failure terminates only that child. There is no attach-by-PID, unloading, hot replacement, or restart of any server.
-- `native/agent.cpp`: validates the loaded L2/Engine/Core file identities and the on-disk NWindow identity (NWindow loads later); replaces the exact exported UObject-side `UGameEngine` vtable slot `+0x64` only if it still points to the expected exported tick. It calls the original `thiscall Tick(float)` first. No inline instruction patching is used.
-- The tick takes a bounded sample at most every 200 ms, with a non-waiting lock. Client viewport offsets `+0x58`, `+0x38`/`+0x3c`, `+0x3c` were inspected in this exact Engine's tick. `UObject::IsA` and `AActor::GetLevel` are called **on the game thread**, never by the RPC thread. A controller's pawn at `+0x3a8` is checked against APawn and the current level. Pawn origin `+0x1bc` and cylinder radius/height `+0x2f0/+0x2f4` come from this build's `execFastTrace` and `GetCylinderExtent`. Pointer strings are opaque diagnostic identities, not handles for later dereference.
-- RPC binds an ephemeral port on `127.0.0.1` inside the DLL. It accepts only `health`, `sample` and `surface`, behind a random per-launch token. One bounded request per connection; newline framing; request limit 127 bytes, receive/send timeouts. This temporary P0 wire contract is not a committed P1 action protocol.
-- `surface` queues one downward ray from the current pawn origin to origin Z minus native cylinder height minus 256, with zero extent and no caller-supplied coordinates. The game tick checks the queued pawn/epoch before executing `ULevel::SingleLineCheck`. The 48-byte FCheckResult layout, endpoint order, return convention (0 hit / 1 clear), and `0x86` mask were inspected in this exact build's `execTrace(false)` and `SingleLineCheck`. This is an experimental loaded-geometry ray, not a swept cylinder or proof of complete map loading. One stationary in-world native hit has been verified, including its return/time/normal and continued tick updates afterwards. Feet/contact conventions and movement/clearance remain uncalibrated.
-- Request submission is not a result: inspect `surface.requestId`, `epoch` and `status` in the subsequent sample. Status is `queued`, `hit`, `clear`, `stale_epoch` or `invalid_native_result`; `unavailable` means no request has run. Only `hit` exposes copied hit fields; object IDs are never dereferenced later. One queued request at a time; no automatic retry.
-- A login-scene viewport actor/level is **not** an authenticated player/pawn or proof of a standing surface. `pawn: null` means no checked pawn geometry is available. Zero sequence means no native tick has been observed; `ageMs: null` then avoids reporting a fresh sample. Otherwise use sequence, age, thread and epoch together; software rendering can make sampling slower than 5 Hz.
+- `native/profile.h`: SHA-256 identities of the installed L2Solo C4 client, advertised as protocol 656; module-relative singleton and notify-subobject offsets. One exact profile, not general C4 support.
+- `native/launcher.cpp`: validates client files, creates its own suspended `L2.exe -windowed`, loads `C4Agent.dll` into **only that child**, explicitly starts it outside `DllMain`, then resumes/waits. Setup failure terminates only that child. No attach-by-PID, unloading, hot replacement or server operations.
+- `native/agent.cpp`: validates identities, replaces the exact exported UObject-side `UGameEngine` tick slot `+0x64` only if it matches the exported tick, and calls the original `thiscall Tick(float)` first. Samples at most every 200 ms using a non-waiting lock. No inline instruction patches.
+- `native/session.h`: validates and hooks eight exported native auth/server-list callbacks through this exact Engine's notify vtable. Callbacks preserve their native arguments/return values and copy only observations on the game thread. A checked singleton must have the expected `UNetworkHandler` vtable and notify pointer to the current engine's `+0x38` subobject. No global object scans.
+- `src/Mcp/Client/`: independent stdio MCP → direct loopback RPC adapter, using the installed SDK. `scripts/c4-client-mcp.js` attaches to an explicitly provided private descriptor; it never launches a client/display/server, reads SQLite or calls WorldObserver. The existing bot MCP remains separate.
 
-The DLL and its hook remain resident until its child exits. An unexpected launcher kill can leave that child running: inspect the owned process before any cleanup/relaunch. A descriptor is not evidence that a session is still alive. The launcher removes its descriptor after observing child exit; never reuse the same descriptor path across concurrent launches.
+The DLL remains resident until its child exits. A killed launcher can leave that child running: inspect exact owned process identities before cleanup/relaunch. A descriptor is not proof that a client remains alive. Never reuse its path for concurrent launches. Ordinary Wine has the host user's normal filesystem/network access: **not a sandbox**.
 
-## Local toolchain and build
+## Build and explicit launch
 
-No system-wide installation is required. On this Debian host the selected toolchain is Clang/LLD 21.1.8 with MinGW-w64 12.0.0 x86 headers/import libraries. SDK files, compiled binaries and the client remain Git-ignored under `C4Client/`.
-
-To provision the SDK explicitly (does not start Wine or any server):
+No system-wide installation is required. The local toolchain is Clang/LLD 21.1.8 with MinGW-w64 12.0.0 x86 headers/import libraries. Client, SDK and generated binaries remain ignored under `C4Client/`. To provision the SDK explicitly, without starting Wine or a server:
 
 ```bash
 mkdir -p /tmp/L2Kingdom/c4-p0-toolchain C4Client/tools/mingw-p0
@@ -31,37 +26,72 @@ mkdir -p /tmp/L2Kingdom/c4-p0-toolchain C4Client/tools/mingw-p0
 bash scripts/c4-client/build.sh
 ```
 
-Build inputs can be overridden with `C4_MINGW_ROOT` (the extracted `usr` directory), `C4_CLANG` and `C4_LLD`. Output: `C4Client/runtime/c4-agent-p0/{C4Agent.dll,C4AgentLauncher.exe}`. No compiled artifact is installed into `game/system` and the original client binaries are not modified. There is no bundled automated test runner.
+Overrides: `C4_MINGW_ROOT` (the extracted `usr` directory), `C4_CLANG`, `C4_LLD`. Current output: `C4Client/runtime/c4-agent-p1/{C4Agent.dll,C4AgentLauncher.exe}`; old P0 binaries are not overwritten. No output is installed into `game/system`; original client binaries are not modified.
 
-## Explicit launch
+`wine.sh` uses direct host networking, the dedicated `C4Client/prefix`, software rendering and a caller-owned display. It creates no display/server. Defaults: `:101`, `C4Client/runtime/Xauthority`. Do not start over an occupied display. The ignored `C4Client/README.md` records local display setup and manual shutdown.
 
-`wine.sh` uses **ordinary Wine with direct host filesystem/network access**, the dedicated `C4Client/prefix`, software rendering and a caller-owned display. It is not a sandbox and creates neither a display nor a server. Defaults: display `:101` and `C4Client/runtime/Xauthority`. Do not start over an occupied display; the ignored `C4Client/README.md` records the local display setup and manual shutdown.
-
-On this host Wine 11's default EGL path failed to create a pixel format even without the DLL. GLX reached the login scene after explicitly setting the following in the dedicated prefix (see [Wine 11 release notes](https://github.com/wine-mirror/wine/blob/wine-11.0/ANNOUNCE.md)):
+On this host Wine 11's default EGL path failed to create a pixel format even without the DLL. GLX reached the login scene after this explicit dedicated-prefix setting ([Wine release notes](https://github.com/wine-mirror/wine/blob/wine-11.0/ANNOUNCE.md)):
 
 ```bash
 bash scripts/c4-client/wine.sh reg.exe add 'HKCU\Software\Wine\X11 Driver' \
   /v UseEGL /t REG_SZ /d N /f
 ```
 
-After explicitly starting your display, build first and launch from the repository root. The descriptor contains a bearer token: keep it private and never print, commit or copy it into evidence.
+After explicitly starting the owned display, build and launch from the repository root:
 
 ```bash
 umask 077
-SESSION_DIR="$(mktemp -d "$PWD/C4Client/runtime/p0-session-XXXXXX")"
+SESSION_DIR="$(mktemp -d "$PWD/C4Client/runtime/p1-session-XXXXXX")"
 touch "$SESSION_DIR/connection.json"
 export C4_AGENT_SESSION="Z:${SESSION_DIR//\//\\}\\connection.json"
-bash scripts/c4-client/wine.sh "$PWD/C4Client/runtime/c4-agent-p0/C4AgentLauncher.exe"
+bash scripts/c4-client/wine.sh "$PWD/C4Client/runtime/c4-agent-p1/C4AgentLauncher.exe"
 ```
 
-Keep the launcher alive until the client exits. The legacy AGP warning can appear behind the splash and require a manual OK; first map loading can take minutes. Use the client's Exit button when available. Inspect exact process identities before terminating a stuck owned client or its display; never use global `wineserver -k` or kill another display.
+Keep the launcher alive until the child exits. The AGP warning may require manual OK; first scene loading can take minutes. Use the client's Exit button when available. Stop only this owned client/display after verifying identities; never use global `wineserver -k`. Leave management/game/frontend unchanged.
 
-The descriptor holds protocol, profile, Windows PID (not the Linux PID), host, port and token. An RPC consumer reads it locally, connects directly to that loopback port, sends `<token> sample\n`, `<token> health\n` or `<token> surface\n`, reads one JSON line and closes. A surface request without a pawn is rejected; a queued request must be observed through a later sample. Do not include credentials in this RPC: no login method exists yet.
+## Partial P1 MCP and credential contract
+
+Start an adapter separately, with the **absolute Linux path** of the descriptor, not its contents:
+
+```bash
+C4_CLIENT_SESSION="$SESSION_DIR/connection.json" node scripts/c4-client-mcp.js
+```
+
+This process speaks MCP stdio, not an interactive shell. Only MCP messages go to stdout. Descriptor/credential files must be regular, single-link, current-user-owned, owner-private files in an owner-private immediate directory; final-component symlinks are rejected. The descriptor pins protocol `c4-agent/1`, profile `l2solo-c4-656-0293b3ed-p1`, Windows PID, `127.0.0.1`, ephemeral port and per-launch bearer token. Never print/copy its token into tool arguments, logs or evidence. A new client requires a new descriptor and adapter.
+
+Tools:
+
+| Tool | Current contract |
+| --- | --- |
+| `client_status` | Exact profile/PID, sequence/epoch/age/thread, native session observations, pawn availability, supported/unavailable capabilities and adapter ownership. No claim that auth acceptance means world entry. |
+| `client_observe` | One bounded post-native-tick sample, including raw pawn/ray data below, separately labelled network session observations and receipt time. Cross-process clocks are not presumed synchronized. |
+| `client_action` | Only `action: "login"`, a UUID `requestId`, observed `expectedEpoch`, and absolute local `credentialFile`. No password argument, account/character creation, server/character selection, agreement acceptance or movement. |
+| `client_action_status` | Original UUID → retained DLL receipt; `queued`/`dispatched` is not authenticated or entered-world completion. |
+
+The credential JSON has exactly `login`, `password`, `character` string fields. Login/password currently support printable non-space ASCII, at most 14/16 characters, matching inspected native copy bounds. The character reference is reserved for later verified selection and is **not** acted upon now. Supply credentials locally; never put their values in MCP arguments. Node reads at most 4096 bytes, sends credentials only over the authenticated loopback socket and does not log them. Mutable byte buffers and the DLL mailbox/request buffers are cleared; JavaScript strings cannot be reliably zeroed, and the real client's own credential storage remains outside this guarantee.
+
+Native `RequestAuthLogin(wchar_t*, wchar_t*)` executes only on the checked game tick after revalidating epoch, handler, no pawn, no observed transport and native login readiness. At most one native login dispatch is allowed per client lifetime in this slice. An auth callback is an independent decoded client observation, not a fabricated causal action result. `auth_accepted_consent_unverified` explicitly does **not** accept legal terms. New/changed terms need the user's decision; no accept-all or unverified repeated-prompt suppression exists.
+
+### Ownership, receipts and direct wire
+
+- One random adapter owner; a 15-second native lease, renewed every 3 seconds while attached. Another owner is rejected. Explicit close revokes queued work; connection loss/expiry revokes it when next observed by the worker/tick. Already-dispatched authentication is not undone. No movement is supported, so no stop is claimed.
+- One fixed credential mailbox; queued login expires after 10 seconds. Submission rejects a stale epoch or sample older than 5 seconds. The game tick checks epoch/readiness again before dispatch. Receipt status distinguishes dispatch, stale epoch, owner loss, expiry and native unavailability/rejection.
+- Up to 32 accepted request receipts per client lifetime; no eviction/replay ambiguity from silent rollover. Reusing a key requires the exact owner/payload SHA-256 match; mismatches are rejected. Digests are not exported. An unknown receipt or transport loss never permits automatic retry under a fresh key. A new adapter may read an old receipt without reclaiming/replaying its action.
+- One bounded line per connection, at most 511 request bytes, 1-second receive/send limits, loopback-only listener. The Node adapter bounds response bytes/time and verifies sample protocol/profile/PID. The new protocol deliberately does not attach to old P0 descriptors.
+- Direct diagnostic commands remain `<token> sample`, `health`, `surface`; `session`, `claim`, `keep`, `release`, `login`, `receipt` serve the new adapter. Do not construct credential-bearing wire commands in retained shell/tool arguments. No arbitrary memory, console, packet, function-pointer or process-control endpoint exists.
+
+## Native geometry inherited from P0
+
+Viewport offsets `+0x58`, `+0x38/+0x3c`, `+0x3c` were inspected in this Engine's tick. `UObject::IsA` and `AActor::GetLevel` execute on the game thread. Controller pawn `+0x3a8` is checked against APawn and the current level; origin `+0x1bc`, cylinder radius/height `+0x2f0/+0x2f4` came from this build's `execFastTrace`/`GetCylinderExtent`. Pointer strings are opaque diagnostic identities, not reusable handles. A login-scene level/actor is not an authenticated player; null pawn is unavailable geometry, not an empty world.
+
+The legacy direct `surface` command queues one downward ray from current origin to origin Z minus cylinder height minus 256, with zero extent/no caller coordinates. The game tick fences pawn/epoch and invokes `ULevel::SingleLineCheck`. The 48-byte FCheckResult, endpoint order, return convention (0 hit / 1 clear) and `0x86` mask came from this exact build's `execTrace(false)`/`SingleLineCheck`. It is not a swept cylinder, calibrated contact point, standing correction, walkability proof or complete map-loading claim.
+
+Observe `surface.requestId`, `epoch`, `status` in a later sample; submission is not a result. Status: `unavailable`, `queued`, `hit`, `clear`, `stale_epoch`, `invalid_native_result`. Only `hit` exposes copied fields; linked native results are not retained. One pending ray, no automatic retry. Zero sample sequence has null age; otherwise use sequence/age/thread/epoch together. Software rendering can be slower than 5 Hz.
 
 ## Verification boundary
 
-P0 feasibility passed for this exact profile: DLL handshake, direct loopback RPC, direct auth/game connections, selection/world entry of the designated existing character, checked native pawn geometry, and one bounded downward native surface hit. The returned fraction matched the hit distance along the ray, the normal was unit length, and subsequent samples advanced on the same native thread with stable pawn/epoch. The client stayed responsive and exited normally. No packet bot, observer projection or server geodata supplied the collision result.
+P0 passed for this exact client: handshake, direct auth/game/world entry with the designated existing character, checked native pawn geometry and one bounded downward native hit. Hit fraction/normal and continuing tick samples were cross-checked; the client exited normally. Wrong-token and missing/altered-identity checks were recorded earlier. Original client binaries/configuration and server admission were not patched. The user accepted the agreement manually; GM assignment had separate explicit approval.
 
-Earlier bounded checks rejected missing/altered client identity and an incorrect RPC token. Normal client exit removed the descriptor and closed the listener; only the owned display/window manager were stopped. Management/game were not restarted. The designated character's GM flag was assigned through a separately approved one-character offline SQLite update. Credentials were supplied locally without logging their values; the existing encrypted client configuration already specified loopback auth and was not patched. The user accepted the client agreement manually.
+The bounded partial-P1 check negotiated MCP, listed its four tools, rejected a stale epoch and queued one native login from the local credential file. Exact replay returned the same request; the later receipt was `dispatched` / native return 1. The client opened a direct auth connection and displayed its agreement without coordinate-based login input. A new adapter read the original receipt and advancing samples without replaying auth; ownership was released. Auth-success/server-list callbacks and world entry through these tools are not yet verified; the agreement was not accepted by the agent.
 
-This is one local feasibility result, not complete collision/mask coverage, a calibrated feet/contact offset, successful native walking/clearance, spawn-coverage acceptance, or P1 client MCP/login automation. No new automated tests or test infrastructure were added. Per-session evidence and resumable phase records belong under ignored `tmp/`, not in maintained docs. P1 must settle the typed action/session contract and native login/server/character selection before routine agent use.
+P1 remains partial; native/MCP build and live-check evidence belong under ignored `tmp/investigations/c4-client-agent/`. Syntax/build success is not full P1 acceptance. Explicit server/existing-character selection, confirmed world-entry outcomes through these tools, movement/stop, events/wait/capture, calibrated contact/clearance and spawn coverage remain outstanding. No automated tests/test infrastructure are added or run. No server build/restart is part of this bridge's checks.

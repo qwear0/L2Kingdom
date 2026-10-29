@@ -70,11 +70,15 @@ void* PointerAt(void* object, SIZE_T offset) {
     return Readable(address, sizeof(void*)) ? *reinterpret_cast<void**>(address) : nullptr;
 }
 
+#include "session.h"
+
 // The exported UObject-side vtable owns a thiscall Tick(float) slot at +0x64
 // in the SHA-pinned build. A fastcall shim consumes its ECX and stack argument
 // without copying instructions or changing the original tick's ordering.
 void __fastcall OnTick(void* engine, void*, float delta) {
+    bool correctThread = session::BeginTick(engine);
     originalTick(engine, delta);
+    if (!correctThread) return;
     DWORD now = GetTickCount();
     if (now - lastSampleTime < 200) return;
     lastSampleTime = now;
@@ -115,6 +119,7 @@ void __fastcall OnTick(void* engine, void*, float delta) {
     next.sequence = sample.sequence + 1;
     next.epoch = sample.epoch + (next.engine != sample.engine || next.level != sample.level || next.viewportActor != sample.viewportActor || next.pawn != sample.pawn);
     sample = next;
+    session::Tick(engine, next.epoch, next.pawn != nullptr);
     if (surface.status == 1) {
         if (!next.pawn || surface.epoch != next.epoch || requestedPawn != next.pawn) surface.status = 4;
         else {
@@ -153,6 +158,7 @@ bool InstallTick() {
     lineCheck = reinterpret_cast<LineCheck>(GetProcAddress(engine, "?SingleLineCheck@ULevel@@UAEHAAUFCheckResult@@PAVAActor@@ABVFVector@@2KV4@@Z"));
     if (!table || !tick || !getLevel || !isA || !actorStaticClass || !pawnStaticClass || !controllerStaticClass || !lineCheck
         || !Readable(table, 0x68) || table[0x64 / 4] != reinterpret_cast<void*>(tick)) return false;
+    if (!session::Install(engine)) return false;
     originalTick = reinterpret_cast<Tick>(tick);
     DWORD protection = 0;
     if (!VirtualProtect(table + 0x64 / 4, sizeof(void*), PAGE_READWRITE, &protection)) return false;
@@ -177,10 +183,14 @@ void Serve(SOCKET socket, const char* token) {
     DWORD timeout = 1000;
     setsockopt(socket, SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<char*>(&timeout), sizeof(timeout));
     setsockopt(socket, SOL_SOCKET, SO_SNDTIMEO, reinterpret_cast<char*>(&timeout), sizeof(timeout));
-    char request[128];
+    struct PrivateRequest {
+        char bytes[512] = {};
+        ~PrivateRequest() { SecureZeroMemory(bytes, sizeof(bytes)); }
+    } privateRequest;
+    char* request = privateRequest.bytes;
     unsigned used = 0;
     DWORD began = GetTickCount();
-    while (used < sizeof(request) - 1) {
+    while (used < sizeof(privateRequest.bytes) - 1) {
         if (GetTickCount() - began >= 1000) return;
         int n = recv(socket, request + used, 1, 0);
         if (n != 1) return;
@@ -188,9 +198,8 @@ void Serve(SOCKET socket, const char* token) {
     }
     if (!used || request[used - 1] != '\n') return;
     request[used - 1] = 0;
-    // RPC never dereferences engine objects. The sole native query is queued
-    // for one current-pawn ray on the game thread, with epoch/pawn fencing.
-    // There is no auth, movement, arbitrary call or process control method.
+    // The worker parses/copies fixed requests only. Native login and geometry
+    // execute on the checked game tick, never on this socket thread.
     if (strlen(request) < 65 || memcmp(request, token, 64) || request[64] != ' ') return;
     const char* command = request + 65;
     if (!strcmp(command, "surface")) {
@@ -211,14 +220,25 @@ void Serve(SOCKET socket, const char* token) {
         return;
     }
     if (strcmp(command, "health") && strcmp(command, "sample")) {
-        SendAll(socket, "{\"error\":\"unsupported_p0_command\"}\n");
+        char reply[1024];
+        EnterCriticalSection(&sampleLock);
+        session::Rpc(command, sample.epoch, sample.sequence && GetTickCount() - sample.time < 5000, reply, sizeof(reply));
+        LeaveCriticalSection(&sampleLock);
+        SendAll(socket, reply);
+        SendAll(socket, "\n");
         return;
     }
     EnterCriticalSection(&sampleLock);
     Sample copy = sample;
     Surface ray = surface;
+    char sessionJson[768];
+    session::ExpireOwner();
+    session::Render(sessionJson, sizeof(sessionJson));
     LeaveCriticalSection(&sampleLock);
-    char response[2048], age[16], pawn[256], result[512];
+    // Serve runs serially on the sole RPC worker; keep the large public JSON
+    // buffer off its stack without introducing a CRT stack-probe dependency.
+    static char response[4096];
+    char age[16], pawn[256], result[512];
     if (copy.sequence) _snprintf(age, sizeof(age), "%lu", GetTickCount() - copy.time);
     else strcpy(age, "null");
     if (copy.pawn) _snprintf(pawn, sizeof(pawn),
@@ -232,15 +252,15 @@ void Serve(SOCKET socket, const char* token) {
         ray.hit.normal.x, ray.hit.normal.y, ray.hit.normal.z, ray.hit.time, ray.hit.item, ray.hit.primitive, ray.hit.material);
     else strcpy(result, "null");
     _snprintf(response, sizeof(response),
-        "{\"protocol\":\"c4-agent-p0/1\",\"profile\":\"%s\",\"pid\":%lu,\"sequence\":%lu,\"ageMs\":%s,\"tickThread\":%lu,\"epoch\":%lu,\"engine\":\"%p\",\"viewportActor\":\"%p\",\"level\":\"%p\",\"pawn\":%s,\"capabilities\":[\"health\",\"native_tick_sample\",\"surface\"],\"surface\":{\"requestId\":%lu,\"epoch\":%lu,\"status\":\"%s\",\"nativeReturn\":%d,\"mask\":%lu,\"extent\":[0,0,0],\"start\":[%.6f,%.6f,%.6f],\"end\":[%.6f,%.6f,%.6f],\"hit\":%s}}\n",
-        c4::Profile, GetCurrentProcessId(), copy.sequence, age, copy.thread, copy.epoch, copy.engine, copy.viewportActor, copy.level, pawn,
+        "{\"protocol\":\"c4-agent/1\",\"profile\":\"%s\",\"pid\":%lu,\"sequence\":%lu,\"ageMs\":%s,\"tickThread\":%lu,\"epoch\":%lu,\"engine\":\"%p\",\"viewportActor\":\"%p\",\"level\":\"%p\",\"pawn\":%s,\"session\":%s,\"capabilities\":[\"health\",\"native_tick_sample\",\"surface\",\"session_observe\",\"native_login\"],\"surface\":{\"requestId\":%lu,\"epoch\":%lu,\"status\":\"%s\",\"nativeReturn\":%d,\"mask\":%lu,\"extent\":[0,0,0],\"start\":[%.6f,%.6f,%.6f],\"end\":[%.6f,%.6f,%.6f],\"hit\":%s}}\n",
+        c4::Profile, GetCurrentProcessId(), copy.sequence, age, copy.thread, copy.epoch, copy.engine, copy.viewportActor, copy.level, pawn, sessionJson,
         ray.id, ray.epoch, statuses[ray.status], ray.nativeReturn, WorldTraceMask,
         ray.start.x, ray.start.y, ray.start.z, ray.end.x, ray.end.y, ray.end.z, result);
     SendAll(socket, response);
 }
 
 DWORD Fail(DWORD stage) {
-    fprintf(stderr, "C4 P0: DLL setup failed at stage %lu (Windows error %lu).\n", stage, GetLastError());
+    fprintf(stderr, "C4 agent: DLL setup failed at stage %lu (Windows error %lu).\n", stage, GetLastError());
     fflush(stderr);
     return stage;
 }
@@ -267,8 +287,8 @@ DWORD WINAPI Worker(void*) {
     if (!InstallTick()) { closesocket(listener); return Fail(6); }
     char descriptor[512];
     int length = _snprintf(descriptor, sizeof(descriptor),
-        "{\"protocol\":\"c4-agent-p0/1\",\"profile\":\"%s\",\"pid\":%lu,\"host\":\"127.0.0.1\",\"port\":%u,\"token\":\"%s\"}\n",
-        c4::Profile, GetCurrentProcessId(), ntohs(address.sin_port), token);
+        "{\"protocol\":\"%s\",\"profile\":\"%s\",\"pid\":%lu,\"host\":\"127.0.0.1\",\"port\":%u,\"token\":\"%s\"}\n",
+        c4::Protocol, c4::Profile, GetCurrentProcessId(), ntohs(address.sin_port), token);
     // The host creates this file with mode 0600 before launch. Do not create a
     // token-bearing file with Wine's inherited/default Unix permissions.
     HANDLE file = CreateFileA(session, GENERIC_WRITE, 0, nullptr, TRUNCATE_EXISTING, 0, nullptr);

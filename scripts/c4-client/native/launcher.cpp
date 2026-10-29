@@ -13,11 +13,11 @@ static int Launch() {
     char session[MAX_PATH];
     DWORD sessionLength = GetEnvironmentVariableA("C4_AGENT_SESSION", session, sizeof(session));
     if (!sessionLength || sessionLength >= sizeof(session)) {
-        fprintf(stderr, "C4 P0: C4_AGENT_SESSION must name a precreated private descriptor file.\n");
+        fprintf(stderr, "C4 agent: C4_AGENT_SESSION must name a precreated private descriptor file.\n");
         return 1;
     }
     if (!c4::VerifyBuild(false)) {
-        fprintf(stderr, "C4 P0: unsupported or unreadable client identity; no child launched.\n");
+        fprintf(stderr, "C4 agent: unsupported or unreadable client identity; no child launched.\n");
         return 2;
     }
     char dll[MAX_PATH];
@@ -73,14 +73,14 @@ static int Launch() {
     if (ready) CloseHandle(ready);
     CloseHandle(child.hThread);
     if (!ok) {
-        fprintf(stderr, "C4 P0: child setup failed (Windows error %lu).\n", GetLastError());
+        fprintf(stderr, "C4 agent: child setup failed (Windows error %lu).\n", GetLastError());
         TerminateProcess(child.hProcess, 6);
         WaitForSingleObject(child.hProcess, 10000);
         CloseHandle(child.hProcess);
         DeleteFileA(session);
         return 6;
     }
-    printf("C4 P0: owned client PID %lu; profile %s.\n", child.dwProcessId, c4::Profile);
+    printf("C4 agent: owned client PID %lu; profile %s.\n", child.dwProcessId, c4::Profile);
     fflush(stdout);
     WaitForSingleObject(child.hProcess, INFINITE);
     DWORD code = 0;
