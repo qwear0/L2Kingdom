@@ -314,19 +314,21 @@ function stateProfiles(state, options = {}) {
 // when a new profile is added.
 const VERDICT_PROFILE_LIMIT = 4096;
 const VERDICT_PROFILE_IDLE_MS = 10 * 60 * 1000;
+// Budget tracked shared verdict/spot entries, not heap bytes: weak spot counts
+// are upper bounds, and profile arrays may still retain evicted maps.
+const VERDICT_ENTRY_BUDGET = 786432;
 const npcVerdicts = new WeakMap();
 const sharedVerdicts = new Map();
 const uniqueVerdicts = new Map();
 let verdictSource, verdictCount = 0;
 
-// Developer diagnostics count shared fingerprints, not profile-array identity hits.
-// Gauges cover tracked shared groups; evictions subtract their counts even when
-// old arrays retain the maps. fingerprintChars uses String.length, not byte size.
-// WeakMap GC is unobservable here, so spotStores is only an upper bound for those
-// groups, not a count of live spot results or total cache memory.
+// Budget accounting must work without diagnostics; removed groups stop counting
+// even if profile arrays retain them. fingerprintChars uses String.length.
+// Hit/miss and pool-clear counters remain diagnostic-only; fingerprint hits
+// exclude identity hits. budgetEvictions counts drops not already due to idle/count.
 const stats = { fingerprintChars: 0, optionMaps: 0, verdictEntries: 0, spotStores: 0, fingerprintHits: 0,
     fingerprintMisses: 0, verdictHits: 0, verdictMisses: 0, spotHits: 0, spotMisses: 0, evictions: 0,
-    sourceResets: 0, verdictPoolClears: 0, spotPoolClears: 0 };
+    sourceResets: 0, verdictPoolClears: 0, spotPoolClears: 0, budgetEvictions: 0 };
 const entryCounts = new WeakMap();
 function cacheStats() {
     return { fingerprints: sharedVerdicts.size, uniqueVerdicts: uniqueVerdicts.size,
@@ -372,11 +374,9 @@ function verdictsFor(profiles) {
     if (verdicts) return verdicts;
     const source = dataCache().npcs || [];
     if (verdictSource !== source || verdictCount !== source.length) {
-        if (DiagnosticConfig.developerDiagnostics) {
-            for (const entry of sharedVerdicts.values()) { const held = entryCounts.get(entry.verdicts); if (held) held.live = false; }
-            if (verdictSource !== undefined) stats.sourceResets += 1;
-            stats.fingerprintChars = stats.optionMaps = stats.verdictEntries = stats.spotStores = 0;
-        }
+        for (const entry of sharedVerdicts.values()) { const held = entryCounts.get(entry.verdicts); if (held) held.live = false; }
+        if (verdictSource !== undefined) stats.sourceResets += 1;
+        stats.fingerprintChars = stats.optionMaps = stats.verdictEntries = stats.spotStores = 0;
         verdictSource = source;
         verdictCount = source.length;
         sharedVerdicts.clear();
@@ -397,27 +397,34 @@ function verdictsFor(profiles) {
         DiagnosticConfig.developerDiagnostics && (stats.fingerprintMisses += 1);
         if (fingerprint !== null) {
             sharedVerdicts.set(fingerprint, { verdicts, usedAt: now });
-            if (DiagnosticConfig.developerDiagnostics) {
-                entryCounts.set(verdicts, { chars: fingerprint.length, maps: 0, entries: 0, spots: 0, live: true });
-                stats.fingerprintChars += fingerprint.length;
-            }
-            for (const [key, entry] of sharedVerdicts) {
-                if (sharedVerdicts.size <= VERDICT_PROFILE_LIMIT && now - entry.usedAt < VERDICT_PROFILE_IDLE_MS) break;
-                sharedVerdicts.delete(key);
-                if (DiagnosticConfig.developerDiagnostics) {
-                    stats.evictions += 1;
-                    const held = entryCounts.get(entry.verdicts);
-                    if (held) {
-                        held.live = false;
-                        stats.fingerprintChars -= held.chars; stats.optionMaps -= held.maps;
-                        stats.verdictEntries -= held.entries; stats.spotStores -= held.spots;
-                    }
-                }
-            }
+            entryCounts.set(verdicts, { chars: fingerprint.length, maps: 0, entries: 0, spots: 0, live: true });
+            stats.fingerprintChars += fingerprint.length;
+            trimSharedVerdicts(now, verdicts);
         }
     }
     npcVerdicts.set(profiles, verdicts);
     return verdicts;
+}
+
+// Stop at the current group so the active search keeps its shared cache.
+// Identity hits do not refresh shared order, so keep need not be newest;
+// this best-effort policy can leave entries above budget, even in later groups.
+function trimSharedVerdicts(now, keep) {
+    for (const [key, entry] of sharedVerdicts) {
+        if (entry.verdicts === keep) break;
+        if (sharedVerdicts.size <= VERDICT_PROFILE_LIMIT && now - entry.usedAt < VERDICT_PROFILE_IDLE_MS) {
+            if (stats.verdictEntries + stats.spotStores <= VERDICT_ENTRY_BUDGET) break;
+            stats.budgetEvictions += 1;
+        }
+        sharedVerdicts.delete(key);
+        stats.evictions += 1;
+        const held = entryCounts.get(entry.verdicts);
+        if (held?.live) {
+            held.live = false;
+            stats.fingerprintChars -= held.chars; stats.optionMaps -= held.maps;
+            stats.verdictEntries -= held.entries; stats.spotStores -= held.spots;
+        }
+    }
 }
 
 function npcVerdict(verdicts, selfId, options) {
@@ -465,14 +472,14 @@ function spotMatchup(spot, profiles, options = {}) {
     let total = 0, effective = 0, eligible = false, safe = 0;
     const byOptions = verdictsFor(profiles);
     // Counts of this fingerprint; unshared (unfingerprinted) arrays have none.
-    const held = DiagnosticConfig.developerDiagnostics ? entryCounts.get(byOptions) : null;
+    const held = entryCounts.get(byOptions);
     const optionsKey = `${options.soloSafety ? 1 : 0}:${options.maxTargetLevel || 0}`;
     let verdicts = byOptions.get(optionsKey);
     if (!verdicts) {
         byOptions.set(optionsKey, verdicts = new Map());
         if (held?.live) { held.maps += 1; stats.optionMaps += 1; }
     }
-    const entriesBefore = DiagnosticConfig.developerDiagnostics ? verdicts.size : 0;
+    const entriesBefore = verdicts.size;
     let bySpot = spotMatchups.get(verdicts);
     if (!bySpot) spotMatchups.set(verdicts, bySpot = new WeakMap());
     const known = bySpot.get(spot);
@@ -497,6 +504,7 @@ function spotMatchup(spot, profiles, options = {}) {
         const added = verdicts.size - entriesBefore;
         held.entries += added; held.spots += 1;
         stats.verdictEntries += added; stats.spotStores += 1;
+        if (stats.verdictEntries + stats.spotStores > VERDICT_ENTRY_BUDGET) trimSharedVerdicts(Date.now(), byOptions);
     }
     const efficiency = total ? effective / total : 1;
     const safeFraction = total ? safe / total : 1;
@@ -522,6 +530,6 @@ function damageRate(profiles, target = {}) {
         .map(attack => (attack.survivalWeight ?? attack.weight) * attack.modifier)), 0);
 }
 
-module.exports = { MIN_EFFICIENCY, VERDICT_PROFILE_LIMIT, actorProfiles, coldProfiles, targetView, skillModifier, damageRate,
+module.exports = { MIN_EFFICIENCY, VERDICT_PROFILE_LIMIT, VERDICT_ENTRY_BUDGET, actorProfiles, coldProfiles, targetView, skillModifier, damageRate,
     profileStats, skillStats, evaluate, soloSurvival, soloCanHunt, soloSpotUpperBound, stateProfiles, spotMatchup,
     cacheStats, sharedVerdictProfiles: () => sharedVerdicts.size, uniqueVerdictCount: () => uniqueVerdicts.size };
