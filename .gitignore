@@ -2,6 +2,7 @@ node_modules
 package-lock.json
 data/Geodata/
 /C4Client/
+/tools/
 config/local.ini
 tmp/
 /.codex-remote-attachments
