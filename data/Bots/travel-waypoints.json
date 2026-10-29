@@ -1,0 +1,728 @@
+{
+  "schemaVersion": 1,
+  "state": "requirements_only",
+  "sources": {
+    "gatherAreas": "src/GameServer/Lord/GatherAreas.js",
+    "polygonSpawns": "data/Npcs/Spawns/spawns.json",
+    "registeredResources": "src/GameServer/DataCache.js",
+    "towns": "src/GameServer/World/TownRespawn.js",
+    "townGates": "src/GameServer/Bot/AI/TownGateCatalog.js",
+    "services": "src/GameServer/Bot/Economy/TownServiceCatalog.js",
+    "castellan": "src/GameServer/Lord/CastellanAccess.js",
+    "gatekeeperRoutes": "src/GameServer/Bot/Travel/TravelRoutes.js",
+    "excludedDungeons": "src/GameServer/World/WorldAreaCatalog.js",
+    "excludedRaids": "src/GameServer/RaidBoss/RaidBossBalance.js"
+  },
+  "requiredAreas": [
+    {
+      "id": "ruins_of_agony",
+      "name": "Ruins of Agony",
+      "polygonCount": 18
+    },
+    {
+      "id": "ruins_of_despair",
+      "name": "Ruins of Despair",
+      "polygonCount": 9
+    },
+    {
+      "id": "abandoned_camp",
+      "name": "Abandoned Camp",
+      "polygonCount": 37
+    },
+    {
+      "id": "langk_lizardmen",
+      "name": "Langk Lizardmen (Gludin)",
+      "polygonCount": 26
+    },
+    {
+      "id": "wasteland",
+      "name": "Wasteland",
+      "polygonCount": 99
+    }
+  ],
+  "requiredPolygons": [
+    {"areaId":"ruins_of_agony","spawnId":"gludio_t18_21_008","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"ruins_of_agony","spawnId":"gludio_t18_21_014","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"ruins_of_agony","spawnId":"gludio_t18_21_015","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"ruins_of_agony","spawnId":"gludio_t18_21_016","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"ruins_of_agony","spawnId":"gludio_t18_21_021","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"ruins_of_agony","spawnId":"gludio_t18_21_022","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"ruins_of_agony","spawnId":"gludio_t18_21_023","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"ruins_of_agony","spawnId":"gludio_t18_21_024","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"ruins_of_agony","spawnId":"gludio_t18_21_025","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"ruins_of_agony","spawnId":"gludio_t18_21_026","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"ruins_of_agony","spawnId":"gludio_t18_21_027","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"ruins_of_agony","spawnId":"t18_21_028","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"ruins_of_agony","spawnId":"gludio_t18_21_029","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"ruins_of_agony","spawnId":"gludio_t18_21_030","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"ruins_of_agony","spawnId":"gludio_t18_21_031","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"ruins_of_agony","spawnId":"gludio_t18_21_032","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"ruins_of_agony","spawnId":"gludio_t18_21_033","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"ruins_of_agony","spawnId":"gludio_t18_21_034","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"ruins_of_despair","spawnId":"gludio_t19_22_060","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"ruins_of_despair","spawnId":"gludio_t19_22_061","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"ruins_of_despair","spawnId":"gludio_t19_22_062","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"ruins_of_despair","spawnId":"gludio_t19_22_063","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"ruins_of_despair","spawnId":"gludio_t19_22_064","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"ruins_of_despair","spawnId":"gludio_t19_22_065","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"ruins_of_despair","spawnId":"gludio_t19_22_066","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"ruins_of_despair","spawnId":"gludio_t19_22_067","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"ruins_of_despair","spawnId":"gludio_t19_22_068","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"abandoned_camp","spawnId":"gludio_t18_22_018","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"abandoned_camp","spawnId":"gludio_t18_22_019","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"abandoned_camp","spawnId":"gludio_t18_22_020","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"abandoned_camp","spawnId":"gludio_t18_22_027","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"abandoned_camp","spawnId":"gludio_t18_22_028","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"abandoned_camp","spawnId":"gludio_t18_22_029","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"abandoned_camp","spawnId":"gludio_t18_22_030","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"abandoned_camp","spawnId":"gludio_t18_22_031","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"abandoned_camp","spawnId":"gludio_t18_22_032","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"abandoned_camp","spawnId":"gludio_t18_22_033","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"abandoned_camp","spawnId":"gludio_t18_22_034","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"abandoned_camp","spawnId":"gludio_t18_022_035","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"abandoned_camp","spawnId":"gludio_t18_22_036","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"abandoned_camp","spawnId":"gludio_t18_22_037","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"abandoned_camp","spawnId":"glduio_t18_22_038","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"abandoned_camp","spawnId":"gludio_t18_22_039","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"abandoned_camp","spawnId":"gludio_t18_22_040","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"abandoned_camp","spawnId":"gludio_t18_22_041","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"abandoned_camp","spawnId":"gludio_t18_22_042","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"abandoned_camp","spawnId":"gludio_t18_22_043","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"abandoned_camp","spawnId":"gludio_t18_22_044","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"abandoned_camp","spawnId":"gludio_t18_22_045","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"abandoned_camp","spawnId":"gludio_t18_22_046","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"abandoned_camp","spawnId":"gludio_t18_22_047","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"abandoned_camp","spawnId":"gludio_t18_22_048","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"abandoned_camp","spawnId":"gludio_t18_22_049","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"abandoned_camp","spawnId":"gludio_t18_22_050","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"abandoned_camp","spawnId":"gludio_t18_22_051","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"abandoned_camp","spawnId":"gludio_t18_22_052","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"abandoned_camp","spawnId":"glduio_t18_22_053","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"abandoned_camp","spawnId":"gludio_t18_22_054","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"abandoned_camp","spawnId":"gludio_t18_22_055","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"abandoned_camp","spawnId":"gludio_t18_22_056","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"abandoned_camp","spawnId":"gludio_t18_22_057","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"abandoned_camp","spawnId":"gludio_t18_22_058","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"abandoned_camp","spawnId":"gludio_t18_22_059","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"abandoned_camp","spawnId":"gludio_t18_22_060","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"langk_lizardmen","spawnId":"gludio_t18_24_001","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"langk_lizardmen","spawnId":"gludio_t18_24_002","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"langk_lizardmen","spawnId":"gludio_t18_24_003","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"langk_lizardmen","spawnId":"gludio_t18_24_004","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"langk_lizardmen","spawnId":"gludio_t18_24_005","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"langk_lizardmen","spawnId":"gludio_t18_24_006","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"langk_lizardmen","spawnId":"gludio_t18_24_007","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"langk_lizardmen","spawnId":"gludio_t18_24_008","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"langk_lizardmen","spawnId":"gludio_t18_24_009","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"langk_lizardmen","spawnId":"gludio_t18_24_010","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"langk_lizardmen","spawnId":"gludio_t18_24_011","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"langk_lizardmen","spawnId":"gludio_t18_24_011_02","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"langk_lizardmen","spawnId":"gludio_t18_24_012","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"langk_lizardmen","spawnId":"gludio_t18_24_013","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"langk_lizardmen","spawnId":"gludio_t18_24_014","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"langk_lizardmen","spawnId":"gludio_t18_24_015","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"langk_lizardmen","spawnId":"gludio_t18_24_016","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"langk_lizardmen","spawnId":"gludio_t18_24_020","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"langk_lizardmen","spawnId":"gludio_t18_24_021","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"langk_lizardmen","spawnId":"gludio_t18_24_022","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"langk_lizardmen","spawnId":"gludio_t18_24_023","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"langk_lizardmen","spawnId":"gludio_t18_24_024","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"langk_lizardmen","spawnId":"gludio_t18_24_025","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"langk_lizardmen","spawnId":"gludio_t18_24_026","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"langk_lizardmen","spawnId":"gludio_t18_24_027","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"langk_lizardmen","spawnId":"gludio_t18_24_028","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w18_23_001","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w18_23_002","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w18_23_003","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w18_23_004","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w18_23_005","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w18_23_006","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w18_23_007","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w18_23_008","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w18_23_009","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w18_23_010","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w18_23_011","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w18_23_012","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w18_23_013","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w18_23_014","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w18_23_015","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w18_23_016","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w18_23_017","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w18_23_018","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w18_23_019","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w18_23_020","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w18_23_021","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w18_23_022","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w18_23_023","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w18_23_024","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w18_23_025","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w18_23_026","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w18_23_027","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w18_23_028","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w18_23_029","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w18_23_030","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w18_23_031","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w18_23_032","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w18_23_033","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w19_23_001","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w19_23_002","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w19_23_003","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w19_23_004","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w19_23_005","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w19_23_006","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w19_23_007","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w19_23_008","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w19_23_009","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w19_23_010","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w19_23_011","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w19_23_012","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w19_23_013","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w19_23_014","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w19_23_015","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w19_23_016","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w19_23_017","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w19_23_018","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w19_23_019","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w19_23_020","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w19_23_021","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w19_23_022","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w19_23_023","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w19_23_024","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w19_23_025","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w19_23_026","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w19_23_027","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w19_23_028","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w19_23_029","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w19_23_030","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w19_23_031","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w19_23_032","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w19_23_033","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w19_23_034","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w19_23_035","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w19_23_036","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w19_23_037","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w19_23_038","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w19_23_039","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w19_23_040","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w19_23_041","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w19_23_042","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w19_23_043","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w19_24_001","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w19_24_002","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w19_24_003","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w19_24_004","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w19_24_005","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w19_24_006","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w19_24_007","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w19_24_008","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w19_24_009","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w19_24_010","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w19_24_011","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w19_24_012","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w19_24_013","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w19_24_014","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w19_24_015","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w19_24_016","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w19_24_017","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w19_24_018","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w19_24_019","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w19_24_020","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w19_24_021","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w19_24_022","status":"unresolved","reason":"component_scan_pending"},
+    {"areaId":"wasteland","spawnId":"w19_24_023","status":"unresolved","reason":"component_scan_pending"}
+  ],
+  "requiredTowns": [
+    {
+      "townKey": "aden_town",
+      "name": "Aden",
+      "seedKind": "town_seed",
+      "seedPoint": {
+        "locX": 146737,
+        "locY": 25807,
+        "locZ": -2008
+      },
+      "restartTownKey": "aden_town",
+      "gatekeeperNpcId": 7848,
+      "status": "unresolved",
+      "reason": "town_access_pending"
+    },
+    {
+      "townKey": "de_village",
+      "name": "Dark Elven Village",
+      "seedKind": "town_seed",
+      "seedPoint": {
+        "locX": 9670,
+        "locY": 15537,
+        "locZ": -4576
+      },
+      "restartTownKey": "de_village",
+      "gatekeeperNpcId": 7134,
+      "status": "unresolved",
+      "reason": "town_access_pending"
+    },
+    {
+      "townKey": "dion_town",
+      "name": "Dion",
+      "seedKind": "town_seed",
+      "seedPoint": {
+        "locX": 15631,
+        "locY": 142885,
+        "locZ": -2704
+      },
+      "restartTownKey": "dion_town",
+      "gatekeeperNpcId": 7059,
+      "status": "unresolved",
+      "reason": "town_access_pending"
+    },
+    {
+      "townKey": "dwarven_village",
+      "name": "Dwarven Village",
+      "seedKind": "town_seed",
+      "seedPoint": {
+        "locX": 115072,
+        "locY": -178176,
+        "locZ": -880
+      },
+      "restartTownKey": "dwarven_village",
+      "gatekeeperNpcId": 7540,
+      "status": "unresolved",
+      "reason": "town_access_pending"
+    },
+    {
+      "townKey": "elven_village",
+      "name": "Elven Village",
+      "seedKind": "town_seed",
+      "seedPoint": {
+        "locX": 46926,
+        "locY": 51511,
+        "locZ": -2976
+      },
+      "restartTownKey": "elven_village",
+      "gatekeeperNpcId": 7146,
+      "status": "unresolved",
+      "reason": "town_access_pending"
+    },
+    {
+      "townKey": "floran_village",
+      "name": "Floran Village",
+      "seedKind": "town_seed",
+      "seedPoint": {
+        "locX": 17144,
+        "locY": 170156,
+        "locZ": -3504
+      },
+      "restartTownKey": "dion_town",
+      "gatekeeperNpcId": null,
+      "status": "unresolved",
+      "reason": "town_access_pending"
+    },
+    {
+      "townKey": "giran_town",
+      "name": "Giran",
+      "seedKind": "town_seed",
+      "seedPoint": {
+        "locX": 83396,
+        "locY": 147904,
+        "locZ": -3400
+      },
+      "restartTownKey": "giran_town",
+      "gatekeeperNpcId": 7080,
+      "status": "unresolved",
+      "reason": "town_access_pending"
+    },
+    {
+      "townKey": "gludin_village",
+      "name": "Gludin",
+      "seedKind": "town_seed",
+      "seedPoint": {
+        "locX": -80752,
+        "locY": 149776,
+        "locZ": -3040
+      },
+      "restartTownKey": "gludin_village",
+      "gatekeeperNpcId": 7320,
+      "status": "unresolved",
+      "reason": "town_access_pending"
+    },
+    {
+      "townKey": "gludio_town",
+      "name": "Gludio",
+      "seedKind": "town_seed",
+      "seedPoint": {
+        "locX": -12736,
+        "locY": 122816,
+        "locZ": -3112
+      },
+      "restartTownKey": "gludio_town",
+      "gatekeeperNpcId": 7256,
+      "status": "unresolved",
+      "reason": "town_access_pending"
+    },
+    {
+      "townKey": "goddard_town",
+      "name": "Goddard",
+      "seedKind": "town_seed",
+      "seedPoint": {
+        "locX": 147966,
+        "locY": -55228,
+        "locZ": -2728
+      },
+      "restartTownKey": "goddard_town",
+      "gatekeeperNpcId": 8275,
+      "status": "unresolved",
+      "reason": "town_access_pending"
+    },
+    {
+      "townKey": "hunters_village",
+      "name": "Hunter's Village",
+      "seedKind": "town_seed",
+      "seedPoint": {
+        "locX": 117129,
+        "locY": 76917,
+        "locZ": -2688
+      },
+      "restartTownKey": "hunters_village",
+      "gatekeeperNpcId": 7233,
+      "status": "unresolved",
+      "reason": "town_access_pending"
+    },
+    {
+      "townKey": "innadril_town",
+      "name": "Heine",
+      "seedKind": "town_seed",
+      "seedPoint": {
+        "locX": 111386,
+        "locY": 219413,
+        "locZ": -3544
+      },
+      "restartTownKey": "innadril_town",
+      "gatekeeperNpcId": 7899,
+      "status": "unresolved",
+      "reason": "town_access_pending"
+    },
+    {
+      "townKey": "orc_village",
+      "name": "Orc Village",
+      "seedKind": "town_seed",
+      "seedPoint": {
+        "locX": -45264,
+        "locY": -112512,
+        "locZ": -256
+      },
+      "restartTownKey": "orc_village",
+      "gatekeeperNpcId": 7576,
+      "status": "unresolved",
+      "reason": "town_access_pending"
+    },
+    {
+      "townKey": "oren_town",
+      "name": "Oren",
+      "seedKind": "town_seed",
+      "seedPoint": {
+        "locX": 82992,
+        "locY": 53171,
+        "locZ": -1496
+      },
+      "restartTownKey": "oren_town",
+      "gatekeeperNpcId": 7177,
+      "status": "unresolved",
+      "reason": "town_access_pending"
+    },
+    {
+      "townKey": "rune_town",
+      "name": "Rune",
+      "seedKind": "town_seed",
+      "seedPoint": {
+        "locX": 43824,
+        "locY": -47664,
+        "locZ": -792
+      },
+      "restartTownKey": "rune_town",
+      "gatekeeperNpcId": 8320,
+      "status": "unresolved",
+      "reason": "town_access_pending"
+    },
+    {
+      "townKey": "ti_village",
+      "name": "Talking Island",
+      "seedKind": "town_seed",
+      "seedPoint": {
+        "locX": -84108,
+        "locY": 244604,
+        "locZ": -3728
+      },
+      "restartTownKey": "ti_village",
+      "gatekeeperNpcId": 7006,
+      "status": "unresolved",
+      "reason": "town_access_pending"
+    }
+  ],
+  "waypointSeeds": [
+    {
+      "id": "ti_village:east",
+      "source": "townGates",
+      "townKey": "ti_village",
+      "gateId": "east",
+      "sides": [
+        "inside",
+        "passage",
+        "outside"
+      ]
+    },
+    {
+      "id": "ti_village:west",
+      "source": "townGates",
+      "townKey": "ti_village",
+      "gateId": "west",
+      "sides": [
+        "inside",
+        "passage",
+        "outside"
+      ]
+    },
+    {
+      "id": "ti_village:southwest",
+      "source": "townGates",
+      "townKey": "ti_village",
+      "gateId": "southwest",
+      "sides": [
+        "inside",
+        "passage",
+        "outside"
+      ]
+    },
+    {
+      "id": "ti_village:southeast",
+      "source": "townGates",
+      "townKey": "ti_village",
+      "gateId": "southeast",
+      "sides": [
+        "inside",
+        "passage",
+        "outside"
+      ]
+    },
+    {
+      "id": "gludin_village:east",
+      "source": "townGates",
+      "townKey": "gludin_village",
+      "gateId": "east",
+      "sides": [
+        "inside",
+        "passage",
+        "outside"
+      ]
+    },
+    {
+      "id": "gludin_village:northeast",
+      "source": "townGates",
+      "townKey": "gludin_village",
+      "gateId": "northeast",
+      "sides": [
+        "inside",
+        "passage",
+        "outside"
+      ]
+    },
+    {
+      "id": "gludin_village:southwest",
+      "source": "townGates",
+      "townKey": "gludin_village",
+      "gateId": "southwest",
+      "sides": [
+        "inside",
+        "passage",
+        "outside"
+      ]
+    },
+    {
+      "id": "gludio_town:east",
+      "source": "townGates",
+      "townKey": "gludio_town",
+      "gateId": "east",
+      "sides": [
+        "inside",
+        "passage",
+        "outside"
+      ]
+    },
+    {
+      "id": "gludio_town:north",
+      "source": "townGates",
+      "townKey": "gludio_town",
+      "gateId": "north",
+      "sides": [
+        "inside",
+        "passage",
+        "outside"
+      ]
+    },
+    {
+      "id": "gludio_town:west",
+      "source": "townGates",
+      "townKey": "gludio_town",
+      "gateId": "west",
+      "sides": [
+        "inside",
+        "passage",
+        "outside"
+      ]
+    },
+    {
+      "id": "gludio_town:southwest",
+      "source": "townGates",
+      "townKey": "gludio_town",
+      "gateId": "southwest",
+      "sides": [
+        "inside",
+        "passage",
+        "outside"
+      ]
+    },
+    {
+      "id": "dion_town:east",
+      "source": "townGates",
+      "townKey": "dion_town",
+      "gateId": "east",
+      "sides": [
+        "inside",
+        "passage",
+        "outside"
+      ]
+    },
+    {
+      "id": "dion_town:northwest",
+      "source": "townGates",
+      "townKey": "dion_town",
+      "gateId": "northwest",
+      "sides": [
+        "inside",
+        "passage",
+        "outside"
+      ]
+    },
+    {
+      "id": "dion_town:west-inner",
+      "source": "townGates",
+      "townKey": "dion_town",
+      "gateId": "west-inner",
+      "sides": [
+        "inside",
+        "passage",
+        "outside"
+      ]
+    },
+    {
+      "id": "dion_town:south",
+      "source": "townGates",
+      "townKey": "dion_town",
+      "gateId": "south",
+      "sides": [
+        "inside",
+        "passage",
+        "outside"
+      ]
+    },
+    {
+      "id": "giran_town:northwest",
+      "source": "townGates",
+      "townKey": "giran_town",
+      "gateId": "northwest",
+      "sides": [
+        "inside",
+        "passage",
+        "outside"
+      ]
+    },
+    {
+      "id": "giran_town:west",
+      "source": "townGates",
+      "townKey": "giran_town",
+      "gateId": "west",
+      "sides": [
+        "inside",
+        "passage",
+        "outside"
+      ]
+    },
+    {
+      "id": "giran_town:southwest",
+      "source": "townGates",
+      "townKey": "giran_town",
+      "gateId": "southwest",
+      "sides": [
+        "inside",
+        "passage",
+        "outside"
+      ]
+    },
+    {
+      "id": "giran_town:south",
+      "source": "townGates",
+      "townKey": "giran_town",
+      "gateId": "south",
+      "sides": [
+        "inside",
+        "passage",
+        "outside"
+      ]
+    },
+    {
+      "id": "giran_town:east",
+      "source": "townGates",
+      "townKey": "giran_town",
+      "gateId": "east",
+      "sides": [
+        "inside",
+        "passage",
+        "outside"
+      ]
+    },
+    {
+      "id": "oren_town:south",
+      "source": "townGates",
+      "townKey": "oren_town",
+      "gateId": "south",
+      "sides": [
+        "inside",
+        "passage",
+        "outside"
+      ]
+    },
+    {
+      "id": "oren_town:north",
+      "source": "townGates",
+      "townKey": "oren_town",
+      "gateId": "north",
+      "sides": [
+        "inside",
+        "passage",
+        "outside"
+      ]
+    },
+    {
+      "id": "oren_town:west",
+      "source": "townGates",
+      "townKey": "oren_town",
+      "gateId": "west",
+      "sides": [
+        "inside",
+        "passage",
+        "outside"
+      ]
+    }
+  ],
+  "serviceSeedSelection": {
+    "roles": [
+      "gatekeeper",
+      "seller",
+      "generic_merchant",
+      "warehouse"
+    ],
+    "includeCastellan": true
+  },
+  "acceptedTransitRegions": [],
+  "rejectedTransitRegions": [],
+  "waypoints": [],
+  "trunks": []
+}

@@ -14,6 +14,7 @@ Read this before adding game data, regenerating exports or changing NPC/quest/pr
 | Clan-hall definitions | `data/ClanHalls/catalog.json` | `ClanHall/Policy.js`, repository and runtime |
 | Generated knowledge exports | `scripts/generate-knowledge-base.js` → `data/KnowledgeBase/` | Native knowledge UI and WorldObserver |
 | Downloaded geodata | Bootstrap → ignored local region files | `Geodata/GeodataEngine.js` |
+| Cached vassal-travel requirements (P1 only) | `data/Bots/travel-waypoints.json`; [frozen contract](../data/Bots/TRAVEL_CATALOG.md) | None yet; candidate seeds and unresolved coverage, not runnable road data |
 | Durable world/history | SQLite owners, not authored resources | [Persistence flow](persistence.md) |
 
 Paths without a full prefix in the consumer column are under `src/GameServer/`.

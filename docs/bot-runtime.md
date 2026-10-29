@@ -90,6 +90,8 @@ The source-adjacent [class policy](../src/GameServer/Bot/AI/CLASS_POLICY.md) des
 
 ## Journey planning catalogue
 
+The [cached physical-travel P1 contract](../data/Bots/TRAVEL_CATALOG.md) and `data/Bots/travel-waypoints.json` freeze future coverage/interfaces only. They are not loaded by this runtime; cached trunks, component proofs and chunked execution are not implemented by that P1 work. The current behavior below remains authoritative.
+
 `Bot/Travel/TravelRoutes.js` retains the existing cheapest-fare `route`/`between` and hop-only `teleportPoints` APIs. Its additive `exitRoutes(townKey)` returns cached, immutable city-prefix-plus-native-exit routes, including competing offers to the same landing. Each step has the source city/NPC, destination ID/label, native fare and authored XYZ. Only mapped city gatekeepers supply edges; field landings do not invent reverse services. Routes are a bounded candidate family, not globally fastest paths.
 
 `Bot/Travel/JourneyPlanner.js` has no live-world or gameplay effects. Construct one shared planner per process **after** service data is loaded with `JourneyPlanner.create(TownServiceCatalog.rows(TownServiceCatalog.ROLES.GATEKEEPER))`; use authored rows, not the catalogue's live-target resolver. The planner precomputes source-spawn bindings, inter-hop walking endpoints and the minimum wallet needed for each hop list. `JourneyExecutor.js` consumes this planner for independent `VassalOrders` gathering, return and service journeys. Local NPC staging/contact and combat/follow/loot movement do not create journeys.
