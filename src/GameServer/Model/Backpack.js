@@ -1,4 +1,5 @@
 const EnchantRules = invoke('GameServer/Items/C4EnchantRules');
+const FishingData = require('../Fishing/FishingData');
 const FORMAL_WEAR_CONFLICT_SLOTS = Object.freeze([6, 7, 8, 9, 10, 11, 12, 14, 15]);
 
 function armorStat(item, method, fallback) {
@@ -37,7 +38,8 @@ class BackpackModel {
         }
         if (!equipped.size) return { paperdoll, repaired };
         for (let slot = 0; slot < paperdoll.length; slot++) paperdoll[slot] = {};
-        if (equipped.has(14) && equipped.has(8)) remove(equipped.get(8));
+        if (equipped.has(14) && equipped.has(8)
+            && !FishingData.isPair(equipped.get(14).selfId, equipped.get(8).selfId)) remove(equipped.get(8));
 
         const dress = equipped.get(17);
         if (dress) {

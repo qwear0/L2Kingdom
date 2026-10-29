@@ -1,4 +1,6 @@
 module.exports = {
+    acquireSkillInfo: require('./AcquireSkillInfo'),
+    acquireSkill: require('./AcquireSkill'),
     skillCoolTime: require('./SkillCoolTime'),
                action: require('./Action'),
             actionUse: require('./ActionUse'),

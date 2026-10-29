@@ -331,6 +331,9 @@ function moveTo(session, actor, coords) {
         return;
     }
 
+    if (!previewOnly && (actor.fishing || actor.fishingMutation || session.activeFishingTraining))
+        require('../../Fishing/FishingService').dispose(session, actor);
+
     const isBot = session && (session.constructor.name === 'BotSession' || (session.accountId && session.accountId.startsWith('bot_')));
     const requestedTo = { ...coords.to };
     const arrivalRadius = Math.min(COMPANION_MAX_ARRIVAL_RADIUS, Math.max(0, Number(coords.arrivalRadius || 0)));

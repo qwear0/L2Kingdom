@@ -3,6 +3,7 @@ const BeginnerShots = require('../Items/C4BeginnerShots');
 const DiagnosticConfig = invoke('GameServer/Bot/Population/PopulationConfig');
 const ConsumptionDiagnostics = require('../Bot/Economy/ConsumptionDiagnostics');
 const ItemTemplateIndex = require('../Item/ItemTemplateIndex');
+const FishingData = require('../Fishing/FishingData');
 const ServerResponse = invoke('GameServer/Network/Response');
 const BackpackModel  = invoke('GameServer/Model/Backpack');
 const SkillModel     = invoke('GameServer/Model/Skill');
@@ -91,6 +92,8 @@ class Backpack extends BackpackModel {
 
         this.fetchItem(id, (item) => {
             if (item.fetchPetLocked?.()) return;
+            if (session.actor.fishing && (FishingData.isRod(item) || FishingData.isLure(item)))
+                require('../Fishing/FishingService').dispose(session, session.actor);
             const total = item.fetchAmount() - amount;
             const diagnosticBefore = diagnosticReason && DiagnosticConfig.developerDiagnostics === true && session?.accountId?.startsWith?.('bot_') ? total + amount : null;
             this.inventoryRevision = Number(this.inventoryRevision || 0) + 1;
@@ -516,6 +519,10 @@ class Backpack extends BackpackModel {
     }
 
     useExtractableItem(session, id, extractableItem) {
+        if (FishingData.isCatch(this.fetchItemRaw(id)?.fetchSelfId())) {
+            require('../Fishing/FishingService').open(session, session.actor, id);
+            return true;
+        }
         const products = C4ExtractableItems.rollProducts(extractableItem);
         this.deleteItem(session, id, 1, () => {
             products.forEach((item) => {
@@ -769,6 +776,10 @@ class Backpack extends BackpackModel {
 
     useFishShotItem(session, id, itemSkill, skill) {
         const weapon = this.fetchEquippedWeapon();
+        if (this.fetchItemRaw(id)?.fetchSelfId() === FishingData.shotId && weapon?.fetchSelfId() === FishingData.rod.itemId) {
+            require('../Fishing/FishingService').charge(session, session.actor, id, skill);
+            return true;
+        }
         if (!this.isFishingRod(weapon)) {
             return true;
         }
@@ -1516,6 +1527,9 @@ class Backpack extends BackpackModel {
             return false;
         }
 
+        if (session.actor.fishing || session.actor.fishingMutation || session.actor.fishingChargedRod)
+            require('../Fishing/FishingService').dispose(session, session.actor);
+
         // Intermediate removals still persist/notify each physical item, but stats
         // and equipment-dependent toggles must see only the final outfit.
         const batch = { recalculate: false, syncToggles: false };
@@ -1526,12 +1540,14 @@ class Backpack extends BackpackModel {
         }
 
         if (slot === equip.weapon || slot === equip.shield) {
-            this.unequipGear(session, equip.dual, batch);
+            if (slot !== equip.shield || !FishingData.isPair(this.fetchPaperdollSelfId(equip.dual), item.fetchSelfId()))
+                this.unequipGear(session, equip.dual, batch);
         }
-        else // Unequip both hands
+        else // Unequip both hands, except the supported rod/lure pair.
         if (slot === equip.dual) {
             this.unequipGear(session, equip.weapon, batch);
-            this.unequipGear(session, equip.shield, batch);
+            if (!FishingData.isPair(item.fetchSelfId(), this.fetchPaperdollSelfId(equip.shield)))
+                this.unequipGear(session, equip.shield, batch);
         }
         else // Unequip one-piece armor
         if (slot === equip.chest || slot === equip.pants) {
@@ -1599,6 +1615,8 @@ class Backpack extends BackpackModel {
         if (equippedItems.length === 0) {
             return;
         }
+        if (session.actor.fishing || session.actor.fishingMutation || session.actor.fishingChargedRod)
+            require('../Fishing/FishingService').dispose(session, session.actor);
 
         // Unequip from actor
         this.unequipPaperdoll(slot);

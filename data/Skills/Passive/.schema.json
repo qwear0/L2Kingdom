@@ -31,7 +31,7 @@
                             "type": "integer"
                         },
                         "power": {
-                            "type": "integer"
+                            "type": "number"
                         },
                         "mp": {
                             "type": "integer"

@@ -132,6 +132,10 @@ const CONTROL_STACK_FAMILY_BY_EFFECT = Object.freeze({
 });
 
 const RULES = {
+    1312: { skillType: 'fishing', trait: 'fishing', target: 'self', effect: null, effectType: null, isMagic: false, ssBoost: 0, staticReuse: true, staticHitTime: true },
+    1313: { skillType: 'fishing', trait: 'fishing', target: 'self', effect: null, effectType: null, isMagic: false, ssBoost: 0, staticReuse: true, staticHitTime: true },
+    1314: { skillType: 'fishing', trait: 'fishing', target: 'self', effect: null, effectType: null, isMagic: false, ssBoost: 0, staticReuse: true, staticHitTime: true },
+    1315: { skillType: PASSIVE, trait: 'fishing', target: 'self', effect: null, effectType: null, stats: {} },
     // Lisvus effect time is one period; lifetime is count * time. NPC support
     // skills also need their periodic payload/stat bonuses, not name inference.
     4028: {skillType: EFFECT,trait: 'buff',effect: 'enhance_p_atk',effectType: 'buff',target: 'self',isMagic: false,ssBoost: 0,baseLandRate: 100,durationMs: 1200000,mpConsumeByLevel: [10,18,33],hitTime: 1800,reuseTime: 8000,stackFamily: 'pAtk',stackOrderByLevel: [1.08,1.12,1.15],statsByLevel: {pAtkMul: [1.08,1.12,1.15]}},

@@ -1,0 +1,30 @@
+[
+    {
+        "selfId": 6529,
+        "template": {
+            "kind": "Weapon.FishingRod",
+            "name": "Baby Duck Rod",
+            "class1": 0,
+            "class2": 0,
+            "mass": 1000,
+            "price": 30000
+        },
+        "stats": {
+            "pAtk": 1,
+            "pAtkRnd": 1,
+            "mAtk": 1,
+            "atkSpd": 325,
+            "crit": 0,
+            "accur": -3.75,
+            "attackRange": 80
+        },
+        "etc": {
+            "slot": 14,
+            "mp": 0,
+            "soulshot": 0,
+            "spiritshot": 0,
+            "rank": "none",
+            "cristals": 0
+        }
+    }
+]

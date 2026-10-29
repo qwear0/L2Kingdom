@@ -622219,6 +622219,2795 @@
   },
   {
     "grade": "none",
+    "id": 6411,
+    "kind": "Other.None",
+    "name": "Small green nimble fish",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6411,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Small green nimble fish",
+        "price": 138
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6412,
+    "kind": "Other.None",
+    "name": "Small green ugly fish",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6412,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Small green ugly fish",
+        "price": 141
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6413,
+    "kind": "Other.None",
+    "name": "Small green fat fish",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6413,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Small green fat fish",
+        "price": 153
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6414,
+    "kind": "Other.None",
+    "name": "Green nimble fish",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6414,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Green nimble fish",
+        "price": 167
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6415,
+    "kind": "Other.None",
+    "name": "Green ugly fish",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6415,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Green ugly fish",
+        "price": 187
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6416,
+    "kind": "Other.None",
+    "name": "Green fat fish",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6416,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Green fat fish",
+        "price": 208
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6417,
+    "kind": "Other.None",
+    "name": "Big nimble green fish",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6417,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Big nimble green fish",
+        "price": 225
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6418,
+    "kind": "Other.None",
+    "name": "Big green ugly fish",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6418,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Big green ugly fish",
+        "price": 248
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6419,
+    "kind": "Other.None",
+    "name": "Big green fat fish",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6419,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Big green fat fish",
+        "price": 265
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6420,
+    "kind": "Other.None",
+    "name": "Small jade nimble fish",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6420,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Small jade nimble fish",
+        "price": 285
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6421,
+    "kind": "Other.None",
+    "name": "Small jade ugly fish",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6421,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Small jade ugly fish",
+        "price": 295
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6422,
+    "kind": "Other.None",
+    "name": "Small jade fat fish",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6422,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Small jade fat fish",
+        "price": 310
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6423,
+    "kind": "Other.None",
+    "name": "Jade nimble fish",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6423,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Jade nimble fish",
+        "price": 325
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6424,
+    "kind": "Other.None",
+    "name": "Jade ugly fish",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6424,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Jade ugly fish",
+        "price": 340
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6425,
+    "kind": "Other.None",
+    "name": "Jade fat fish",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6425,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Jade fat fish",
+        "price": 355
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6426,
+    "kind": "Other.None",
+    "name": "Big jade nimble fish",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6426,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Big jade nimble fish",
+        "price": 365
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6427,
+    "kind": "Other.None",
+    "name": "Big jade ugly fish",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6427,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Big jade ugly fish",
+        "price": 375
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6428,
+    "kind": "Other.None",
+    "name": "Big jade fat fish",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6428,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Big jade fat fish",
+        "price": 385
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6429,
+    "kind": "Other.None",
+    "name": "Small blue nimble fish",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6429,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Small blue nimble fish",
+        "price": 395
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6430,
+    "kind": "Other.None",
+    "name": "Small blue ugly fish",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6430,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Small blue ugly fish",
+        "price": 400
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6431,
+    "kind": "Other.None",
+    "name": "Small blue fat fish",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6431,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Small blue fat fish",
+        "price": 410
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6432,
+    "kind": "Other.None",
+    "name": "Blue nimble fish",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6432,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Blue nimble fish",
+        "price": 415
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6433,
+    "kind": "Other.None",
+    "name": "Blue ugly fish",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6433,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Blue ugly fish",
+        "price": 418
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6434,
+    "kind": "Other.None",
+    "name": "Blue fat fish",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6434,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Blue fat fish",
+        "price": 420
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6435,
+    "kind": "Other.None",
+    "name": "Big blue nimble fish",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6435,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Big blue nimble fish",
+        "price": 425
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6436,
+    "kind": "Other.None",
+    "name": "Big blue ugly fish",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6436,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Big blue ugly fish",
+        "price": 431
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6437,
+    "kind": "Other.None",
+    "name": "Big blue fat fish",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6437,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Big blue fat fish",
+        "price": 435
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6438,
+    "kind": "Other.None",
+    "name": "Small yellow nimble fish",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6438,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Small yellow nimble fish",
+        "price": 442
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6439,
+    "kind": "Other.None",
+    "name": "Small yellow ugly fish",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6439,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Small yellow ugly fish",
+        "price": 447
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6440,
+    "kind": "Other.None",
+    "name": "Small yellow fat fish",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6440,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Small yellow fat fish",
+        "price": 452
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6441,
+    "kind": "Other.None",
+    "name": "Yellow nimble fish",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6441,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Yellow nimble fish",
+        "price": 540
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6442,
+    "kind": "Other.None",
+    "name": "Yellow ugly fish",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6442,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Yellow ugly fish",
+        "price": 553
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6443,
+    "kind": "Other.None",
+    "name": "Yellow fat fish",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6443,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Yellow fat fish",
+        "price": 568
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6444,
+    "kind": "Other.None",
+    "name": "Big yellow nimble fish",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6444,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Big yellow nimble fish",
+        "price": 580
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6445,
+    "kind": "Other.None",
+    "name": "Big yellow ugly fish",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6445,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Big yellow ugly fish",
+        "price": 594
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6446,
+    "kind": "Other.None",
+    "name": "Big yellow fat fish",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6446,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Big yellow fat fish",
+        "price": 608
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6447,
+    "kind": "Other.None",
+    "name": "Small orange nimble fish",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6447,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Small orange nimble fish",
+        "price": 622
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6448,
+    "kind": "Other.None",
+    "name": "Small orange ugly fish",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6448,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Small orange ugly fish",
+        "price": 635
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6449,
+    "kind": "Other.None",
+    "name": "Small orange fat fish",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6449,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Small orange fat fish",
+        "price": 649
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6450,
+    "kind": "Other.None",
+    "name": "Orange nimble fish",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6450,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Orange nimble fish",
+        "price": 663
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6451,
+    "kind": "Other.None",
+    "name": "Orange ugly fish",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6451,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Orange ugly fish",
+        "price": 776
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6452,
+    "kind": "Other.None",
+    "name": "Orange fat fish",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6452,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Orange fat fish",
+        "price": 792
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6453,
+    "kind": "Other.None",
+    "name": "Big orange nimble fish",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6453,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Big orange nimble fish",
+        "price": 816
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6454,
+    "kind": "Other.None",
+    "name": "Big orange ugly fish",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6454,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Big orange ugly fish",
+        "price": 840
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6455,
+    "kind": "Other.None",
+    "name": "Big orange fat fish",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6455,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Big orange fat fish",
+        "price": 858
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6456,
+    "kind": "Other.None",
+    "name": "Small Purple nimble fish",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6456,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Small Purple nimble fish",
+        "price": 875
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6457,
+    "kind": "Other.None",
+    "name": "Small Purple ugly fish",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6457,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Small Purple ugly fish",
+        "price": 893
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6458,
+    "kind": "Other.None",
+    "name": "Small Purple fat fish",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6458,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Small Purple fat fish",
+        "price": 910
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6459,
+    "kind": "Other.None",
+    "name": "Purple nimble fish",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6459,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Purple nimble fish",
+        "price": 930
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6460,
+    "kind": "Other.None",
+    "name": "Purple ugly fish",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6460,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Purple ugly fish",
+        "price": 948
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6461,
+    "kind": "Other.None",
+    "name": "Purple fat fish",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6461,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Purple fat fish",
+        "price": 1090
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6462,
+    "kind": "Other.None",
+    "name": "Big purple nimble fish",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6462,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Big purple nimble fish",
+        "price": 1111
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6463,
+    "kind": "Other.None",
+    "name": "Big purple ugly fish",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6463,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Big purple ugly fish",
+        "price": 1133
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6464,
+    "kind": "Other.None",
+    "name": "Big purple fat fish",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6464,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Big purple fat fish",
+        "price": 1157
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6465,
+    "kind": "Other.None",
+    "name": "Small red nimble fish",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6465,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Small red nimble fish",
+        "price": 1277
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6466,
+    "kind": "Other.None",
+    "name": "Small red ugly fish",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6466,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Small red ugly fish",
+        "price": 1301
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6467,
+    "kind": "Other.None",
+    "name": "Small red fat fish",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6467,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Small red fat fish",
+        "price": 1326
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6468,
+    "kind": "Other.None",
+    "name": "Red nimble fish",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6468,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Red nimble fish",
+        "price": 1351
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6469,
+    "kind": "Other.None",
+    "name": "Red ugly fish",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6469,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Red ugly fish",
+        "price": 1376
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6470,
+    "kind": "Other.None",
+    "name": "Red fat fish",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6470,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Red fat fish",
+        "price": 1402
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6471,
+    "kind": "Other.None",
+    "name": "Big red nimble fish",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6471,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Big red nimble fish",
+        "price": 1577
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6472,
+    "kind": "Other.None",
+    "name": "Big red ugly fish",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6472,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Big red ugly fish",
+        "price": 1608
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6473,
+    "kind": "Other.None",
+    "name": "Big red fat fish",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6473,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Big red fat fish",
+        "price": 1715
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6474,
+    "kind": "Other.None",
+    "name": "Small white nimble fish",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6474,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Small white nimble fish",
+        "price": 1747
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6475,
+    "kind": "Other.None",
+    "name": "Small white ugly fish",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6475,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Small white ugly fish",
+        "price": 1781
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6476,
+    "kind": "Other.None",
+    "name": "Small white fat fish",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6476,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Small white fat fish",
+        "price": 1814
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6477,
+    "kind": "Other.None",
+    "name": "White nimble fish",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6477,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "White nimble fish",
+        "price": 1849
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6478,
+    "kind": "Other.None",
+    "name": "White ugly fish",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6478,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "White ugly fish",
+        "price": 1887
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6479,
+    "kind": "Other.None",
+    "name": "White fat fish",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6479,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "White fat fish",
+        "price": 1923
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6480,
+    "kind": "Other.None",
+    "name": "Big white nimble fish",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6480,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Big white nimble fish",
+        "price": 1961
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6481,
+    "kind": "Other.None",
+    "name": "Big white ugly fish",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6481,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Big white ugly fish",
+        "price": 2000
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6482,
+    "kind": "Other.None",
+    "name": "Big white fat fish",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6482,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Big white fat fish",
+        "price": 2039
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6483,
+    "kind": "Other.None",
+    "name": "Small black nimble fish",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6483,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Small black nimble fish",
+        "price": 2081
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6484,
+    "kind": "Other.None",
+    "name": "Small black ugly fish",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6484,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Small black ugly fish",
+        "price": 2123
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6485,
+    "kind": "Other.None",
+    "name": "Small black fat fish",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6485,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Small black fat fish",
+        "price": 2166
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6486,
+    "kind": "Other.None",
+    "name": "Black nimble fish",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6486,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Black nimble fish",
+        "price": 2309
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6487,
+    "kind": "Other.None",
+    "name": "Black ugly fish",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6487,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Black ugly fish",
+        "price": 2357
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6488,
+    "kind": "Other.None",
+    "name": "Black fat fish",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6488,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Black fat fish",
+        "price": 2403
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6489,
+    "kind": "Other.None",
+    "name": "Big black nimble fish",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6489,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Big black nimble fish",
+        "price": 2452
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6490,
+    "kind": "Other.None",
+    "name": "Big black ugly fish",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6490,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Big black ugly fish",
+        "price": 2502
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6491,
+    "kind": "Other.None",
+    "name": "Big black fat fish",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6491,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Big black fat fish",
+        "price": 2552
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6492,
+    "kind": "Other.None",
+    "name": "Small green treasure chest",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6492,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Small green treasure chest",
+        "price": 153
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6493,
+    "kind": "Other.None",
+    "name": "green treasure chest",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6493,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "green treasure chest",
+        "price": 208
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6494,
+    "kind": "Other.None",
+    "name": "Big green treasure chest",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6494,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Big green treasure chest",
+        "price": 265
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6495,
+    "kind": "Other.None",
+    "name": "Small jade treasure chest",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6495,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Small jade treasure chest",
+        "price": 285
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6496,
+    "kind": "Other.None",
+    "name": "jade treasure chest",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6496,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "jade treasure chest",
+        "price": 315
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6497,
+    "kind": "Other.None",
+    "name": "Big jade treasure chest",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6497,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Big jade treasure chest",
+        "price": 345
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6498,
+    "kind": "Other.None",
+    "name": "Small blue treasure chest",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6498,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Small blue treasure chest",
+        "price": 395
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6499,
+    "kind": "Other.None",
+    "name": "blue treasure chest",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6499,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "blue treasure chest",
+        "price": 419
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6500,
+    "kind": "Other.None",
+    "name": "Big blue treasure chest",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6500,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Big blue treasure chest",
+        "price": 435
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6501,
+    "kind": "Other.None",
+    "name": "Small yellow treasure chest",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6501,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Small yellow treasure chest",
+        "price": 452
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6502,
+    "kind": "Other.None",
+    "name": "yellow treasure chest",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6502,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "yellow treasure chest",
+        "price": 568
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6503,
+    "kind": "Other.None",
+    "name": "Big yellow treasure chest",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6503,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Big yellow treasure chest",
+        "price": 608
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6504,
+    "kind": "Other.None",
+    "name": "Small orange treasure chest",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6504,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Small orange treasure chest",
+        "price": 649
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6505,
+    "kind": "Other.None",
+    "name": "orange treasure chest",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6505,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "orange treasure chest",
+        "price": 792
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6506,
+    "kind": "Other.None",
+    "name": "Big orange treasure chest",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6506,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Big orange treasure chest",
+        "price": 858
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6507,
+    "kind": "Other.None",
+    "name": "Small Purple treasure chest",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6507,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Small Purple treasure chest",
+        "price": 910
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6508,
+    "kind": "Other.None",
+    "name": "Purple treasure chest",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6508,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Purple treasure chest",
+        "price": 1090
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6509,
+    "kind": "Other.None",
+    "name": "Big Purple treasure chest",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6509,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Big Purple treasure chest",
+        "price": 1157
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6510,
+    "kind": "Other.None",
+    "name": "Small red treasure chest",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6510,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Small red treasure chest",
+        "price": 1326
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6511,
+    "kind": "Other.None",
+    "name": "red treasure chest",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6511,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "red treasure chest",
+        "price": 1402
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6512,
+    "kind": "Other.None",
+    "name": "Big red treasure chest",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6512,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Big red treasure chest",
+        "price": 1715
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6513,
+    "kind": "Other.None",
+    "name": "Small white treasure chest",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6513,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Small white treasure chest",
+        "price": 1814
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6514,
+    "kind": "Other.None",
+    "name": "white treasure chest",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6514,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "white treasure chest",
+        "price": 1923
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6515,
+    "kind": "Other.None",
+    "name": "Big white treasure chest",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6515,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Big white treasure chest",
+        "price": 2039
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6516,
+    "kind": "Other.None",
+    "name": "Small black treasure chest",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6516,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Small black treasure chest",
+        "price": 2166
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6517,
+    "kind": "Other.None",
+    "name": "black treasure chest",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6517,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "black treasure chest",
+        "price": 2403
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6518,
+    "kind": "Other.None",
+    "name": "Big black treasure chest",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6518,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 100,
+        "name": "Big black treasure chest",
+        "price": 2552
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6521,
+    "kind": "Other.Lure",
+    "name": "Green Colored Lure - High Grade",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": false,
+        "slot": 8,
+        "stackable": true
+      },
+      "selfId": 6521,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.Lure",
+        "mass": 3,
+        "name": "Green Colored Lure - High Grade",
+        "price": 150
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6529,
+    "kind": "Weapon.FishingRod",
+    "name": "Baby Duck Rod",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "cristals": 0,
+        "mp": 0,
+        "rank": "none",
+        "slot": 14,
+        "soulshot": 0,
+        "spiritshot": 0
+      },
+      "selfId": 6529,
+      "stats": {
+        "accur": -3.75,
+        "atkSpd": 325,
+        "attackRange": 80,
+        "crit": 0,
+        "mAtk": 1,
+        "pAtk": 1,
+        "pAtkRnd": 1
+      },
+      "template": {
+        "class1": 0,
+        "class2": 0,
+        "kind": "Weapon.FishingRod",
+        "mass": 1000,
+        "name": "Baby Duck Rod",
+        "price": 30000
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6535,
+    "kind": "Other.None",
+    "name": "Fishing Shot: non-grade",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": true,
+        "stackable": true
+      },
+      "selfId": 6535,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 3,
+        "name": "Fishing Shot: non-grade",
+        "price": 3
+      }
+    }
+  },
+  {
+    "grade": "none",
     "id": 6569,
     "kind": "Other",
     "name": "Blessed Scroll: Enchant Weapon (A)",
@@ -638017,6 +640806,381 @@
   },
   {
     "grade": "none",
+    "id": 6904,
+    "kind": "Other.None",
+    "name": "Party Mask Fabric",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": false,
+        "stackable": true
+      },
+      "selfId": 6904,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 60,
+        "name": "Party Mask Fabric",
+        "price": 5000
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6905,
+    "kind": "Other.None",
+    "name": "Hair Pin Piece",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": false,
+        "stackable": true
+      },
+      "selfId": 6905,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 60,
+        "name": "Hair Pin Piece",
+        "price": 5000
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6906,
+    "kind": "Other.None",
+    "name": "Eye Patch of Pirate Piece",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": false,
+        "stackable": true
+      },
+      "selfId": 6906,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 60,
+        "name": "Eye Patch of Pirate Piece",
+        "price": 5000
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6907,
+    "kind": "Other.None",
+    "name": "Monocle Piece",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": false,
+        "stackable": true
+      },
+      "selfId": 6907,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 60,
+        "name": "Monocle Piece",
+        "price": 5000
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6908,
+    "kind": "Other.None",
+    "name": "Fish Oil",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": false,
+        "stackable": true
+      },
+      "selfId": 6908,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 60,
+        "name": "Fish Oil",
+        "price": 50
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6909,
+    "kind": "Other.None",
+    "name": "Greater Fish Oil",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": false,
+        "stackable": true
+      },
+      "selfId": 6909,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 60,
+        "name": "Greater Fish Oil",
+        "price": 250
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6910,
+    "kind": "Other.None",
+    "name": "Premium Fish Oil",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": false,
+        "stackable": true
+      },
+      "selfId": 6910,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 60,
+        "name": "Premium Fish Oil",
+        "price": 1250
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6911,
+    "kind": "Other.None",
+    "name": "Fish Scale",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": false,
+        "stackable": true
+      },
+      "selfId": 6911,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 60,
+        "name": "Fish Scale",
+        "price": 200
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6912,
+    "kind": "Other.None",
+    "name": "Shiny Fish Scale",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": false,
+        "stackable": true
+      },
+      "selfId": 6912,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 60,
+        "name": "Shiny Fish Scale",
+        "price": 300
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6913,
+    "kind": "Other.None",
+    "name": "Fish Gem",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": false,
+        "stackable": true
+      },
+      "selfId": 6913,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 60,
+        "name": "Fish Gem",
+        "price": 500
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6914,
+    "kind": "Other.None",
+    "name": "Shiny Fish Gem",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": false,
+        "stackable": true
+      },
+      "selfId": 6914,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 60,
+        "name": "Shiny Fish Gem",
+        "price": 1000
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6915,
+    "kind": "Other.None",
+    "name": "Thin Fish Bone",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": false,
+        "stackable": true
+      },
+      "selfId": 6915,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 60,
+        "name": "Thin Fish Bone",
+        "price": 300
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6916,
+    "kind": "Other.None",
+    "name": "Thick Fish Bone",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": false,
+        "stackable": true
+      },
+      "selfId": 6916,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 60,
+        "name": "Thick Fish Bone",
+        "price": 450
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6920,
+    "kind": "Other.None",
+    "name": "Recipe: Greater Fish Oil (100%)",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": false,
+        "stackable": true
+      },
+      "selfId": 6920,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 30,
+        "name": "Recipe: Greater Fish Oil (100%)",
+        "price": 50
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 6921,
+    "kind": "Other.None",
+    "name": "Recipe: Premium Fish Oil(100%)",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": false,
+        "stackable": true
+      },
+      "selfId": 6921,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 30,
+        "name": "Recipe: Premium Fish Oil(100%)",
+        "price": 250
+      }
+    }
+  },
+  {
+    "grade": "none",
     "id": 7076,
     "kind": "Other.Quest",
     "name": "Mysterious Cloth",
@@ -640360,6 +643524,31 @@
   },
   {
     "grade": "none",
+    "id": 7609,
+    "kind": "Other.None",
+    "name": "Proof of Catching a Fish",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": false,
+        "stackable": true
+      },
+      "selfId": 7609,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 0,
+        "name": "Proof of Catching a Fish",
+        "price": 0
+      }
+    }
+  },
+  {
+    "grade": "none",
     "id": 7638,
     "kind": "Other",
     "name": "Spellbook - Mass Summon Storm Cubic",
@@ -642486,6 +645675,106 @@
         "mass": 10,
         "name": "Rabbit Ear",
         "price": 500000
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 7685,
+    "kind": "Other.None",
+    "name": "Outlaw's Eyepatch Strap",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": false,
+        "stackable": true
+      },
+      "selfId": 7685,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 60,
+        "name": "Outlaw's Eyepatch Strap",
+        "price": 5000
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 7686,
+    "kind": "Other.None",
+    "name": "Maiden's Hairpin Piece",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": false,
+        "stackable": true
+      },
+      "selfId": 7686,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 60,
+        "name": "Maiden's Hairpin Piece",
+        "price": 5000
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 7697,
+    "kind": "Other.None",
+    "name": "Piece of Forget-me-not Hairpin",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": false,
+        "stackable": true
+      },
+      "selfId": 7697,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 60,
+        "name": "Piece of Forget-me-not Hairpin",
+        "price": 5000
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 7698,
+    "kind": "Other.None",
+    "name": "Piece of Daisy Hairpin",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": false,
+        "stackable": true
+      },
+      "selfId": 7698,
+      "template": {
+        "class1": 4,
+        "class2": 5,
+        "kind": "Other.None",
+        "mass": 60,
+        "name": "Piece of Daisy Hairpin",
+        "price": 5000
       }
     }
   },

@@ -27,6 +27,8 @@ function die(session, actor, context = {}) {
     }
 
     const victimSession = actor.session || session;
+    if (actor.fishing || actor.fishingMutation || actor.fishingChargedRod || victimSession.activeFishingTraining)
+        require('../../Fishing/FishingService').dispose(victimSession, actor);
     const ArenaDuelService = invoke('GameServer/World/ArenaDuelService');
     if (!ArenaDuelService.duelForActor?.(actor)) require('./PkDeathDrop').drop(victimSession, actor);
     if (typeof actor.fetchExp === 'function' && typeof actor.setExpSp === 'function' && !actor.fetchKind) {

@@ -121,6 +121,10 @@ class Attack {
 
     meleeHit(session, creature, options = {}) {
         if (session?.pvpHandoffPending) return;
+        if (session?.actor?.backpack?.fetchPaperdollSelfId(14) === 6529 || session?.actor?.fishing) {
+            session.dataSendToMe?.(ServerResponse.actionFailed());
+            return;
+        }
         const actor = session.actor;
         const owner = options.actionOwner;
         if (!invoke('GameServer/Actor/PlayerActionOwner').current(session, actor, owner)) return;
@@ -341,6 +345,10 @@ class Attack {
 
     remoteHit(session, creature, skill, options = {}) {
         if (session?.pvpHandoffPending) return;
+        if (skill.fetchSkillType?.() === 'fishing') {
+            session.dataSendToMe?.(ServerResponse.actionFailed());
+            return;
+        }
         const actor = session.actor;
         const owner = options.actionOwner;
         if (!invoke('GameServer/Actor/PlayerActionOwner').current(session, actor, owner)) return;

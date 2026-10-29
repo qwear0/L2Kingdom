@@ -104,6 +104,18 @@ The enforced population policy bypasses cold workers, board reviews, repairs and
 
 `src/EconomyJournal.js` aggregates main-connection deltas before asynchronous history transfer. It is diagnostic flow history, not authorization or a complete crash-proof audit. See [persistence](persistence.md) and [observer projections](world-observer.md).
 
+## Basic manual fishing
+
+`src/GameServer/Fishing/FishingService.js` owns connected-human-player fishing with Baby Duck Rod `6529`, Green Colored Lure — High Grade `6521` and optional non-grade Fishing Shot `6535`. Rod and lure occupy native slots 14 and 8 together; other two-hand/shield and Formal Wear conflicts remain unchanged in live equipment and pure restoration projection. The rod is not an ordinary offensive weapon and is excluded by existing bot weapon-kind whitelists. This does not enable autonomous bot/vassal fishing or expand vendor catalogues.
+
+`FishingTraining.js` offers paid skills only at Hilgendorf `8578` and Klaus `8579`: Fishing `1312:1`, Pumping/Reeling/Expertise `1313/1314/1315:1–26`. A nearby current NPC dialogue and issued next-rank selection are revalidated before charging the source character-level/Adena price. This is separate from automatic zero-SP class training; no free fishing ranks or SP substitution are introduced.
+
+`Database.settleFishing` flushes the character write queue, validates the original live actor/inventory and performs each bait deduction, shot deduction, catch grant, catch opening or paid rank purchase in one native serialized transaction. `FishingService` retains a single live mutation owner through post-commit inventory/skill publication; callbacks cannot grant to a replacement actor or recharge a moved/replaced rod. Catch/product grants validate projected stack counts, slots and weight. Learning and consumption-only operations do not require new inventory capacity. This fishing-specific owner does not make unrelated extractables atomic.
+
+The 108 ordinary catches `6411–6518` use the **existing local** `C4ExtractableItems` CSV and inclusive/integer roller, not the different source extraction probabilities. Opening deletes one catch and grants all rolled products atomically. The 20 immediate products are `6904–6916`, `6920/6921`, `7609`, `7685/7686`, `7697/7698`; existing recipes `6920→680` and `6921→681` convert fish oil through `6908→6909→6910`. Ordinary permitted custody/trade/sale remains native. `7609` is collectible only here: there is no new proof exchange, expansion skill or complete accessory chain.
+
+The first slice intentionally has **no caught-monster branch**: a successful fight grants the selected fish/chest. Removing the source's six-outcome monster roll increases catch receipts; it is an approved local balance deviation, not retail-completeness evidence. Attempts, hook coordinates, timers and charged fishing shots are transient, not quest state or a new persistence schema. Cancellation, movement, death, teleport, equipment changes and actor teardown fence in-flight work. Real-client casting, inventory/shot presentation, disconnect timing and live transaction behavior still require separate runtime acceptance.
+
 ## Update together
 
 Check service admission, native request/bypass consumers, buffered flushes, database transaction/replay guards, inventory publication and journals together. Storage changes also affect account/clan ownership and observer collections. Real-client proximity, duplicate confirmation and failure recovery remain separate behavioral checks, not claims established by this documentation.

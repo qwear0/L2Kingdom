@@ -93,6 +93,8 @@ function teleportTo(session, actor, coords, options = {}) {
             && (run.nativePending || run.asyncPending);
         if (!settling && !invoke('GameServer/Actor/PlayerActionOwner').current(session, actor, owner)) return false;
     } else session.mcpControl?.preempt('native_teleport');
+    if (actor.fishing || actor.fishingMutation || actor.fishingChargedRod || session.activeFishingTraining)
+        require('../../Fishing/FishingService').dispose(session, actor);
     actor.playerAutoFight?.dispose('teleported');
     if (!isBotSession(session)) invoke('GameServer/Bot/AI/BotRaidSafety').endPlayerPartyRaid(session);
 

@@ -1,0 +1,1676 @@
+{
+    "source": "mobius-c4:a4c31517cd0c428783650e008e199f2ac42a8434",
+    "rod": {
+        "itemId": 6529,
+        "level": 20,
+        "damage": 20.0
+    },
+    "lureId": 6521,
+    "shotId": 6535,
+    "fishes": [
+        {
+            "itemId": 6411,
+            "level": 1,
+            "group": 1,
+            "hp": 100,
+            "regen": 4.0,
+            "startCombatTime": 20,
+            "duration": 24,
+            "guts": 50.0,
+            "checkTime": 5
+        },
+        {
+            "itemId": 6412,
+            "level": 1,
+            "group": 2,
+            "hp": 116,
+            "regen": 4.0,
+            "startCombatTime": 20,
+            "duration": 27,
+            "guts": 50.2,
+            "checkTime": 5
+        },
+        {
+            "itemId": 6413,
+            "level": 1,
+            "group": 0,
+            "hp": 132,
+            "regen": 4.0,
+            "startCombatTime": 20,
+            "duration": 31,
+            "guts": 50.4,
+            "checkTime": 5
+        },
+        {
+            "itemId": 6414,
+            "level": 2,
+            "group": 1,
+            "hp": 150,
+            "regen": 6.0,
+            "startCombatTime": 20,
+            "duration": 25,
+            "guts": 50.6,
+            "checkTime": 5
+        },
+        {
+            "itemId": 6415,
+            "level": 2,
+            "group": 2,
+            "hp": 168,
+            "regen": 6.0,
+            "startCombatTime": 20,
+            "duration": 28,
+            "guts": 50.8,
+            "checkTime": 5
+        },
+        {
+            "itemId": 6416,
+            "level": 2,
+            "group": 0,
+            "hp": 188,
+            "regen": 6.0,
+            "startCombatTime": 20,
+            "duration": 31,
+            "guts": 51.0,
+            "checkTime": 5
+        },
+        {
+            "itemId": 6417,
+            "level": 3,
+            "group": 1,
+            "hp": 208,
+            "regen": 8.0,
+            "startCombatTime": 20,
+            "duration": 26,
+            "guts": 51.2,
+            "checkTime": 5
+        },
+        {
+            "itemId": 6418,
+            "level": 3,
+            "group": 2,
+            "hp": 230,
+            "regen": 8.0,
+            "startCombatTime": 20,
+            "duration": 29,
+            "guts": 51.4,
+            "checkTime": 5
+        },
+        {
+            "itemId": 6419,
+            "level": 3,
+            "group": 0,
+            "hp": 252,
+            "regen": 8.0,
+            "startCombatTime": 20,
+            "duration": 32,
+            "guts": 51.6,
+            "checkTime": 5
+        },
+        {
+            "itemId": 6420,
+            "level": 4,
+            "group": 1,
+            "hp": 276,
+            "regen": 10.0,
+            "startCombatTime": 20,
+            "duration": 28,
+            "guts": 51.8,
+            "checkTime": 5
+        },
+        {
+            "itemId": 6421,
+            "level": 4,
+            "group": 2,
+            "hp": 300,
+            "regen": 10.0,
+            "startCombatTime": 20,
+            "duration": 31,
+            "guts": 52.0,
+            "checkTime": 5
+        },
+        {
+            "itemId": 6422,
+            "level": 4,
+            "group": 0,
+            "hp": 310,
+            "regen": 10.0,
+            "startCombatTime": 20,
+            "duration": 32,
+            "guts": 52.2,
+            "checkTime": 5
+        },
+        {
+            "itemId": 6423,
+            "level": 5,
+            "group": 1,
+            "hp": 320,
+            "regen": 11.0,
+            "startCombatTime": 20,
+            "duration": 30,
+            "guts": 52.4,
+            "checkTime": 5
+        },
+        {
+            "itemId": 6424,
+            "level": 5,
+            "group": 2,
+            "hp": 330,
+            "regen": 11.0,
+            "startCombatTime": 20,
+            "duration": 31,
+            "guts": 52.6,
+            "checkTime": 4
+        },
+        {
+            "itemId": 6425,
+            "level": 5,
+            "group": 0,
+            "hp": 340,
+            "regen": 11.0,
+            "startCombatTime": 20,
+            "duration": 32,
+            "guts": 52.8,
+            "checkTime": 4
+        },
+        {
+            "itemId": 6426,
+            "level": 6,
+            "group": 1,
+            "hp": 350,
+            "regen": 12.0,
+            "startCombatTime": 20,
+            "duration": 30,
+            "guts": 53.0,
+            "checkTime": 4
+        },
+        {
+            "itemId": 6427,
+            "level": 6,
+            "group": 2,
+            "hp": 360,
+            "regen": 12.0,
+            "startCombatTime": 20,
+            "duration": 31,
+            "guts": 53.2,
+            "checkTime": 4
+        },
+        {
+            "itemId": 6428,
+            "level": 6,
+            "group": 0,
+            "hp": 370,
+            "regen": 12.0,
+            "startCombatTime": 20,
+            "duration": 32,
+            "guts": 53.4,
+            "checkTime": 4
+        },
+        {
+            "itemId": 6429,
+            "level": 7,
+            "group": 1,
+            "hp": 380,
+            "regen": 12.0,
+            "startCombatTime": 20,
+            "duration": 31,
+            "guts": 53.6,
+            "checkTime": 4
+        },
+        {
+            "itemId": 6430,
+            "level": 7,
+            "group": 2,
+            "hp": 390,
+            "regen": 13.0,
+            "startCombatTime": 20,
+            "duration": 31,
+            "guts": 53.8,
+            "checkTime": 4
+        },
+        {
+            "itemId": 6431,
+            "level": 7,
+            "group": 0,
+            "hp": 400,
+            "regen": 13.0,
+            "startCombatTime": 20,
+            "duration": 32,
+            "guts": 54.0,
+            "checkTime": 4
+        },
+        {
+            "itemId": 6432,
+            "level": 8,
+            "group": 1,
+            "hp": 410,
+            "regen": 13.0,
+            "startCombatTime": 20,
+            "duration": 31,
+            "guts": 54.2,
+            "checkTime": 4
+        },
+        {
+            "itemId": 6433,
+            "level": 8,
+            "group": 2,
+            "hp": 420,
+            "regen": 13.0,
+            "startCombatTime": 20,
+            "duration": 32,
+            "guts": 54.4,
+            "checkTime": 4
+        },
+        {
+            "itemId": 6434,
+            "level": 8,
+            "group": 0,
+            "hp": 430,
+            "regen": 14.0,
+            "startCombatTime": 20,
+            "duration": 31,
+            "guts": 54.6,
+            "checkTime": 4
+        },
+        {
+            "itemId": 6435,
+            "level": 9,
+            "group": 1,
+            "hp": 506,
+            "regen": 17.0,
+            "startCombatTime": 20,
+            "duration": 29,
+            "guts": 54.8,
+            "checkTime": 4
+        },
+        {
+            "itemId": 6436,
+            "level": 9,
+            "group": 2,
+            "hp": 518,
+            "regen": 17.0,
+            "startCombatTime": 20,
+            "duration": 30,
+            "guts": 55.0,
+            "checkTime": 4
+        },
+        {
+            "itemId": 6437,
+            "level": 9,
+            "group": 0,
+            "hp": 529,
+            "regen": 17.0,
+            "startCombatTime": 20,
+            "duration": 31,
+            "guts": 55.2,
+            "checkTime": 4
+        },
+        {
+            "itemId": 6438,
+            "level": 10,
+            "group": 1,
+            "hp": 541,
+            "regen": 18.0,
+            "startCombatTime": 20,
+            "duration": 30,
+            "guts": 55.4,
+            "checkTime": 4
+        },
+        {
+            "itemId": 6439,
+            "level": 10,
+            "group": 2,
+            "hp": 552,
+            "regen": 18.0,
+            "startCombatTime": 20,
+            "duration": 30,
+            "guts": 55.6,
+            "checkTime": 4
+        },
+        {
+            "itemId": 6440,
+            "level": 10,
+            "group": 0,
+            "hp": 564,
+            "regen": 18.0,
+            "startCombatTime": 20,
+            "duration": 31,
+            "guts": 55.8,
+            "checkTime": 4
+        },
+        {
+            "itemId": 6441,
+            "level": 11,
+            "group": 1,
+            "hp": 575,
+            "regen": 19.0,
+            "startCombatTime": 20,
+            "duration": 30,
+            "guts": 56.0,
+            "checkTime": 4
+        },
+        {
+            "itemId": 6442,
+            "level": 11,
+            "group": 2,
+            "hp": 587,
+            "regen": 19.0,
+            "startCombatTime": 20,
+            "duration": 31,
+            "guts": 56.2,
+            "checkTime": 4
+        },
+        {
+            "itemId": 6443,
+            "level": 11,
+            "group": 0,
+            "hp": 598,
+            "regen": 19.0,
+            "startCombatTime": 20,
+            "duration": 31,
+            "guts": 56.4,
+            "checkTime": 4
+        },
+        {
+            "itemId": 6444,
+            "level": 12,
+            "group": 1,
+            "hp": 610,
+            "regen": 20.0,
+            "startCombatTime": 20,
+            "duration": 30,
+            "guts": 56.6,
+            "checkTime": 4
+        },
+        {
+            "itemId": 6445,
+            "level": 12,
+            "group": 2,
+            "hp": 621,
+            "regen": 20.0,
+            "startCombatTime": 20,
+            "duration": 31,
+            "guts": 56.8,
+            "checkTime": 4
+        },
+        {
+            "itemId": 6446,
+            "level": 12,
+            "group": 0,
+            "hp": 633,
+            "regen": 20.0,
+            "startCombatTime": 20,
+            "duration": 31,
+            "guts": 57.0,
+            "checkTime": 4
+        },
+        {
+            "itemId": 6447,
+            "level": 13,
+            "group": 1,
+            "hp": 644,
+            "regen": 21.0,
+            "startCombatTime": 20,
+            "duration": 30,
+            "guts": 57.2,
+            "checkTime": 4
+        },
+        {
+            "itemId": 6448,
+            "level": 13,
+            "group": 2,
+            "hp": 656,
+            "regen": 21.0,
+            "startCombatTime": 20,
+            "duration": 31,
+            "guts": 57.4,
+            "checkTime": 4
+        },
+        {
+            "itemId": 6449,
+            "level": 13,
+            "group": 0,
+            "hp": 667,
+            "regen": 21.0,
+            "startCombatTime": 20,
+            "duration": 32,
+            "guts": 57.6,
+            "checkTime": 3
+        },
+        {
+            "itemId": 6450,
+            "level": 14,
+            "group": 1,
+            "hp": 679,
+            "regen": 22.0,
+            "startCombatTime": 20,
+            "duration": 31,
+            "guts": 57.8,
+            "checkTime": 3
+        },
+        {
+            "itemId": 6451,
+            "level": 14,
+            "group": 2,
+            "hp": 690,
+            "regen": 22.0,
+            "startCombatTime": 20,
+            "duration": 31,
+            "guts": 58.0,
+            "checkTime": 3
+        },
+        {
+            "itemId": 6452,
+            "level": 14,
+            "group": 0,
+            "hp": 702,
+            "regen": 22.0,
+            "startCombatTime": 20,
+            "duration": 32,
+            "guts": 58.2,
+            "checkTime": 3
+        },
+        {
+            "itemId": 6453,
+            "level": 15,
+            "group": 1,
+            "hp": 713,
+            "regen": 25.0,
+            "startCombatTime": 20,
+            "duration": 29,
+            "guts": 58.4,
+            "checkTime": 3
+        },
+        {
+            "itemId": 6454,
+            "level": 15,
+            "group": 2,
+            "hp": 819,
+            "regen": 27.0,
+            "startCombatTime": 20,
+            "duration": 30,
+            "guts": 58.6,
+            "checkTime": 3
+        },
+        {
+            "itemId": 6455,
+            "level": 15,
+            "group": 0,
+            "hp": 832,
+            "regen": 28.0,
+            "startCombatTime": 20,
+            "duration": 30,
+            "guts": 58.8,
+            "checkTime": 3
+        },
+        {
+            "itemId": 6456,
+            "level": 16,
+            "group": 1,
+            "hp": 845,
+            "regen": 29.0,
+            "startCombatTime": 20,
+            "duration": 29,
+            "guts": 59.0,
+            "checkTime": 3
+        },
+        {
+            "itemId": 6457,
+            "level": 16,
+            "group": 2,
+            "hp": 858,
+            "regen": 29.0,
+            "startCombatTime": 20,
+            "duration": 30,
+            "guts": 59.2,
+            "checkTime": 3
+        },
+        {
+            "itemId": 6458,
+            "level": 16,
+            "group": 0,
+            "hp": 871,
+            "regen": 29.0,
+            "startCombatTime": 20,
+            "duration": 30,
+            "guts": 59.4,
+            "checkTime": 3
+        },
+        {
+            "itemId": 6459,
+            "level": 17,
+            "group": 1,
+            "hp": 884,
+            "regen": 29.0,
+            "startCombatTime": 20,
+            "duration": 30,
+            "guts": 59.6,
+            "checkTime": 3
+        },
+        {
+            "itemId": 6460,
+            "level": 17,
+            "group": 2,
+            "hp": 897,
+            "regen": 30.0,
+            "startCombatTime": 20,
+            "duration": 30,
+            "guts": 59.8,
+            "checkTime": 3
+        },
+        {
+            "itemId": 6461,
+            "level": 17,
+            "group": 0,
+            "hp": 910,
+            "regen": 29.0,
+            "startCombatTime": 20,
+            "duration": 31,
+            "guts": 60.0,
+            "checkTime": 3
+        },
+        {
+            "itemId": 6462,
+            "level": 18,
+            "group": 1,
+            "hp": 923,
+            "regen": 31.0,
+            "startCombatTime": 20,
+            "duration": 30,
+            "guts": 60.2,
+            "checkTime": 3
+        },
+        {
+            "itemId": 6463,
+            "level": 18,
+            "group": 2,
+            "hp": 936,
+            "regen": 31.0,
+            "startCombatTime": 20,
+            "duration": 30,
+            "guts": 60.4,
+            "checkTime": 3
+        },
+        {
+            "itemId": 6464,
+            "level": 18,
+            "group": 0,
+            "hp": 949,
+            "regen": 31.0,
+            "startCombatTime": 20,
+            "duration": 31,
+            "guts": 60.6,
+            "checkTime": 3
+        },
+        {
+            "itemId": 6465,
+            "level": 19,
+            "group": 1,
+            "hp": 962,
+            "regen": 34.0,
+            "startCombatTime": 20,
+            "duration": 28,
+            "guts": 60.8,
+            "checkTime": 3
+        },
+        {
+            "itemId": 6466,
+            "level": 19,
+            "group": 2,
+            "hp": 1125,
+            "regen": 39.0,
+            "startCombatTime": 20,
+            "duration": 29,
+            "guts": 61.0,
+            "checkTime": 3
+        },
+        {
+            "itemId": 6467,
+            "level": 19,
+            "group": 0,
+            "hp": 1140,
+            "regen": 39.0,
+            "startCombatTime": 20,
+            "duration": 29,
+            "guts": 61.2,
+            "checkTime": 3
+        },
+        {
+            "itemId": 6468,
+            "level": 20,
+            "group": 1,
+            "hp": 1155,
+            "regen": 40.0,
+            "startCombatTime": 20,
+            "duration": 29,
+            "guts": 61.4,
+            "checkTime": 3
+        },
+        {
+            "itemId": 6469,
+            "level": 20,
+            "group": 2,
+            "hp": 1170,
+            "regen": 40.0,
+            "startCombatTime": 20,
+            "duration": 29,
+            "guts": 61.6,
+            "checkTime": 3
+        },
+        {
+            "itemId": 6470,
+            "level": 20,
+            "group": 0,
+            "hp": 1185,
+            "regen": 40.0,
+            "startCombatTime": 20,
+            "duration": 30,
+            "guts": 61.8,
+            "checkTime": 3
+        },
+        {
+            "itemId": 6471,
+            "level": 21,
+            "group": 1,
+            "hp": 1200,
+            "regen": 41.0,
+            "startCombatTime": 20,
+            "duration": 29,
+            "guts": 62.0,
+            "checkTime": 3
+        },
+        {
+            "itemId": 6472,
+            "level": 21,
+            "group": 2,
+            "hp": 1215,
+            "regen": 42.0,
+            "startCombatTime": 20,
+            "duration": 29,
+            "guts": 62.2,
+            "checkTime": 3
+        },
+        {
+            "itemId": 6473,
+            "level": 21,
+            "group": 0,
+            "hp": 1230,
+            "regen": 46.0,
+            "startCombatTime": 20,
+            "duration": 27,
+            "guts": 62.4,
+            "checkTime": 3
+        },
+        {
+            "itemId": 6474,
+            "level": 22,
+            "group": 1,
+            "hp": 1453,
+            "regen": 56.0,
+            "startCombatTime": 20,
+            "duration": 26,
+            "guts": 62.6,
+            "checkTime": 2
+        },
+        {
+            "itemId": 6475,
+            "level": 22,
+            "group": 2,
+            "hp": 1470,
+            "regen": 54.0,
+            "startCombatTime": 20,
+            "duration": 27,
+            "guts": 62.8,
+            "checkTime": 2
+        },
+        {
+            "itemId": 6476,
+            "level": 22,
+            "group": 0,
+            "hp": 1488,
+            "regen": 55.0,
+            "startCombatTime": 20,
+            "duration": 27,
+            "guts": 63.0,
+            "checkTime": 2
+        },
+        {
+            "itemId": 6477,
+            "level": 23,
+            "group": 1,
+            "hp": 1505,
+            "regen": 56.0,
+            "startCombatTime": 20,
+            "duration": 27,
+            "guts": 63.2,
+            "checkTime": 2
+        },
+        {
+            "itemId": 6478,
+            "level": 23,
+            "group": 2,
+            "hp": 1523,
+            "regen": 56.0,
+            "startCombatTime": 20,
+            "duration": 27,
+            "guts": 63.4,
+            "checkTime": 2
+        },
+        {
+            "itemId": 6479,
+            "level": 23,
+            "group": 0,
+            "hp": 1540,
+            "regen": 57.0,
+            "startCombatTime": 20,
+            "duration": 27,
+            "guts": 63.6,
+            "checkTime": 2
+        },
+        {
+            "itemId": 6480,
+            "level": 24,
+            "group": 1,
+            "hp": 1558,
+            "regen": 58.0,
+            "startCombatTime": 20,
+            "duration": 27,
+            "guts": 63.8,
+            "checkTime": 2
+        },
+        {
+            "itemId": 6481,
+            "level": 24,
+            "group": 2,
+            "hp": 1575,
+            "regen": 58.0,
+            "startCombatTime": 20,
+            "duration": 27,
+            "guts": 64.0,
+            "checkTime": 2
+        },
+        {
+            "itemId": 6482,
+            "level": 24,
+            "group": 0,
+            "hp": 1593,
+            "regen": 59.0,
+            "startCombatTime": 20,
+            "duration": 27,
+            "guts": 64.2,
+            "checkTime": 2
+        },
+        {
+            "itemId": 6483,
+            "level": 25,
+            "group": 1,
+            "hp": 1610,
+            "regen": 60.0,
+            "startCombatTime": 20,
+            "duration": 27,
+            "guts": 64.4,
+            "checkTime": 2
+        },
+        {
+            "itemId": 6484,
+            "level": 25,
+            "group": 2,
+            "hp": 1628,
+            "regen": 60.0,
+            "startCombatTime": 20,
+            "duration": 27,
+            "guts": 64.6,
+            "checkTime": 2
+        },
+        {
+            "itemId": 6485,
+            "level": 25,
+            "group": 0,
+            "hp": 1645,
+            "regen": 59.0,
+            "startCombatTime": 20,
+            "duration": 28,
+            "guts": 64.8,
+            "checkTime": 2
+        },
+        {
+            "itemId": 6486,
+            "level": 26,
+            "group": 1,
+            "hp": 1663,
+            "regen": 67.0,
+            "startCombatTime": 20,
+            "duration": 25,
+            "guts": 65.0,
+            "checkTime": 2
+        },
+        {
+            "itemId": 6487,
+            "level": 26,
+            "group": 2,
+            "hp": 1872,
+            "regen": 75.0,
+            "startCombatTime": 20,
+            "duration": 25,
+            "guts": 65.2,
+            "checkTime": 2
+        },
+        {
+            "itemId": 6488,
+            "level": 26,
+            "group": 0,
+            "hp": 1892,
+            "regen": 76.0,
+            "startCombatTime": 20,
+            "duration": 25,
+            "guts": 65.4,
+            "checkTime": 2
+        },
+        {
+            "itemId": 6489,
+            "level": 27,
+            "group": 1,
+            "hp": 1911,
+            "regen": 76.0,
+            "startCombatTime": 20,
+            "duration": 25,
+            "guts": 65.6,
+            "checkTime": 2
+        },
+        {
+            "itemId": 6490,
+            "level": 27,
+            "group": 2,
+            "hp": 1931,
+            "regen": 77.0,
+            "startCombatTime": 20,
+            "duration": 25,
+            "guts": 65.8,
+            "checkTime": 2
+        },
+        {
+            "itemId": 6491,
+            "level": 27,
+            "group": 0,
+            "hp": 1950,
+            "regen": 78.0,
+            "startCombatTime": 20,
+            "duration": 25,
+            "guts": 65.8,
+            "checkTime": 2
+        },
+        {
+            "itemId": 6492,
+            "level": 1,
+            "group": 3,
+            "hp": 132,
+            "regen": 4.0,
+            "startCombatTime": 20,
+            "duration": 31,
+            "guts": 50.4,
+            "checkTime": 5
+        },
+        {
+            "itemId": 6493,
+            "level": 2,
+            "group": 3,
+            "hp": 188,
+            "regen": 6.0,
+            "startCombatTime": 20,
+            "duration": 31,
+            "guts": 51.0,
+            "checkTime": 5
+        },
+        {
+            "itemId": 6494,
+            "level": 3,
+            "group": 3,
+            "hp": 252,
+            "regen": 8.0,
+            "startCombatTime": 20,
+            "duration": 32,
+            "guts": 51.6,
+            "checkTime": 5
+        },
+        {
+            "itemId": 6495,
+            "level": 4,
+            "group": 3,
+            "hp": 310,
+            "regen": 10.0,
+            "startCombatTime": 20,
+            "duration": 32,
+            "guts": 52.2,
+            "checkTime": 5
+        },
+        {
+            "itemId": 6496,
+            "level": 5,
+            "group": 3,
+            "hp": 340,
+            "regen": 11.0,
+            "startCombatTime": 20,
+            "duration": 32,
+            "guts": 52.8,
+            "checkTime": 4
+        },
+        {
+            "itemId": 6497,
+            "level": 6,
+            "group": 3,
+            "hp": 370,
+            "regen": 12.0,
+            "startCombatTime": 20,
+            "duration": 32,
+            "guts": 53.4,
+            "checkTime": 4
+        },
+        {
+            "itemId": 6498,
+            "level": 7,
+            "group": 3,
+            "hp": 400,
+            "regen": 13.0,
+            "startCombatTime": 20,
+            "duration": 32,
+            "guts": 54.0,
+            "checkTime": 4
+        },
+        {
+            "itemId": 6499,
+            "level": 8,
+            "group": 3,
+            "hp": 430,
+            "regen": 14.0,
+            "startCombatTime": 20,
+            "duration": 31,
+            "guts": 54.6,
+            "checkTime": 4
+        },
+        {
+            "itemId": 6500,
+            "level": 9,
+            "group": 3,
+            "hp": 529,
+            "regen": 17.0,
+            "startCombatTime": 20,
+            "duration": 31,
+            "guts": 55.2,
+            "checkTime": 4
+        },
+        {
+            "itemId": 6501,
+            "level": 10,
+            "group": 3,
+            "hp": 564,
+            "regen": 18.0,
+            "startCombatTime": 20,
+            "duration": 31,
+            "guts": 55.8,
+            "checkTime": 4
+        },
+        {
+            "itemId": 6502,
+            "level": 11,
+            "group": 3,
+            "hp": 598,
+            "regen": 19.0,
+            "startCombatTime": 20,
+            "duration": 31,
+            "guts": 56.4,
+            "checkTime": 4
+        },
+        {
+            "itemId": 6503,
+            "level": 12,
+            "group": 3,
+            "hp": 633,
+            "regen": 20.0,
+            "startCombatTime": 20,
+            "duration": 31,
+            "guts": 57.0,
+            "checkTime": 4
+        },
+        {
+            "itemId": 6504,
+            "level": 13,
+            "group": 3,
+            "hp": 667,
+            "regen": 21.0,
+            "startCombatTime": 20,
+            "duration": 32,
+            "guts": 57.6,
+            "checkTime": 3
+        },
+        {
+            "itemId": 6505,
+            "level": 14,
+            "group": 3,
+            "hp": 702,
+            "regen": 22.0,
+            "startCombatTime": 20,
+            "duration": 32,
+            "guts": 58.2,
+            "checkTime": 3
+        },
+        {
+            "itemId": 6506,
+            "level": 15,
+            "group": 3,
+            "hp": 832,
+            "regen": 28.0,
+            "startCombatTime": 20,
+            "duration": 30,
+            "guts": 58.8,
+            "checkTime": 3
+        },
+        {
+            "itemId": 6507,
+            "level": 16,
+            "group": 3,
+            "hp": 871,
+            "regen": 29.0,
+            "startCombatTime": 20,
+            "duration": 30,
+            "guts": 59.4,
+            "checkTime": 3
+        },
+        {
+            "itemId": 6508,
+            "level": 17,
+            "group": 3,
+            "hp": 910,
+            "regen": 29.0,
+            "startCombatTime": 20,
+            "duration": 31,
+            "guts": 60.0,
+            "checkTime": 3
+        },
+        {
+            "itemId": 6509,
+            "level": 18,
+            "group": 3,
+            "hp": 949,
+            "regen": 31.0,
+            "startCombatTime": 20,
+            "duration": 31,
+            "guts": 60.6,
+            "checkTime": 3
+        },
+        {
+            "itemId": 6510,
+            "level": 19,
+            "group": 3,
+            "hp": 1140,
+            "regen": 39.0,
+            "startCombatTime": 20,
+            "duration": 29,
+            "guts": 61.2,
+            "checkTime": 3
+        },
+        {
+            "itemId": 6511,
+            "level": 20,
+            "group": 3,
+            "hp": 1185,
+            "regen": 40.0,
+            "startCombatTime": 20,
+            "duration": 30,
+            "guts": 61.8,
+            "checkTime": 3
+        },
+        {
+            "itemId": 6512,
+            "level": 21,
+            "group": 3,
+            "hp": 1230,
+            "regen": 46.0,
+            "startCombatTime": 20,
+            "duration": 27,
+            "guts": 62.4,
+            "checkTime": 3
+        },
+        {
+            "itemId": 6513,
+            "level": 22,
+            "group": 3,
+            "hp": 1488,
+            "regen": 55.0,
+            "startCombatTime": 20,
+            "duration": 27,
+            "guts": 63.0,
+            "checkTime": 2
+        },
+        {
+            "itemId": 6514,
+            "level": 23,
+            "group": 3,
+            "hp": 1540,
+            "regen": 57.0,
+            "startCombatTime": 20,
+            "duration": 27,
+            "guts": 63.6,
+            "checkTime": 2
+        },
+        {
+            "itemId": 6515,
+            "level": 24,
+            "group": 3,
+            "hp": 1593,
+            "regen": 59.0,
+            "startCombatTime": 20,
+            "duration": 27,
+            "guts": 64.2,
+            "checkTime": 2
+        },
+        {
+            "itemId": 6516,
+            "level": 25,
+            "group": 3,
+            "hp": 1645,
+            "regen": 59.0,
+            "startCombatTime": 20,
+            "duration": 28,
+            "guts": 64.8,
+            "checkTime": 2
+        },
+        {
+            "itemId": 6517,
+            "level": 26,
+            "group": 3,
+            "hp": 1892,
+            "regen": 76.0,
+            "startCombatTime": 20,
+            "duration": 25,
+            "guts": 65.4,
+            "checkTime": 2
+        },
+        {
+            "itemId": 6518,
+            "level": 27,
+            "group": 3,
+            "hp": 1950,
+            "regen": 78.0,
+            "startCombatTime": 20,
+            "duration": 25,
+            "guts": 65.8,
+            "checkTime": 2
+        }
+    ],
+    "training": [
+        {
+            "skillId": 1312,
+            "level": 1,
+            "playerLevel": 1,
+            "adena": 1000
+        },
+        {
+            "skillId": 1315,
+            "level": 1,
+            "playerLevel": 1,
+            "adena": 10
+        },
+        {
+            "skillId": 1315,
+            "level": 2,
+            "playerLevel": 4,
+            "adena": 50
+        },
+        {
+            "skillId": 1315,
+            "level": 3,
+            "playerLevel": 7,
+            "adena": 200
+        },
+        {
+            "skillId": 1315,
+            "level": 4,
+            "playerLevel": 10,
+            "adena": 300
+        },
+        {
+            "skillId": 1315,
+            "level": 5,
+            "playerLevel": 13,
+            "adena": 500
+        },
+        {
+            "skillId": 1315,
+            "level": 6,
+            "playerLevel": 16,
+            "adena": 800
+        },
+        {
+            "skillId": 1315,
+            "level": 7,
+            "playerLevel": 19,
+            "adena": 1600
+        },
+        {
+            "skillId": 1315,
+            "level": 8,
+            "playerLevel": 22,
+            "adena": 2600
+        },
+        {
+            "skillId": 1315,
+            "level": 9,
+            "playerLevel": 25,
+            "adena": 4000
+        },
+        {
+            "skillId": 1315,
+            "level": 10,
+            "playerLevel": 28,
+            "adena": 6700
+        },
+        {
+            "skillId": 1315,
+            "level": 11,
+            "playerLevel": 31,
+            "adena": 8000
+        },
+        {
+            "skillId": 1315,
+            "level": 12,
+            "playerLevel": 34,
+            "adena": 10000
+        },
+        {
+            "skillId": 1315,
+            "level": 13,
+            "playerLevel": 37,
+            "adena": 16000
+        },
+        {
+            "skillId": 1315,
+            "level": 14,
+            "playerLevel": 40,
+            "adena": 23000
+        },
+        {
+            "skillId": 1315,
+            "level": 15,
+            "playerLevel": 43,
+            "adena": 30000
+        },
+        {
+            "skillId": 1315,
+            "level": 16,
+            "playerLevel": 46,
+            "adena": 40000
+        },
+        {
+            "skillId": 1315,
+            "level": 17,
+            "playerLevel": 49,
+            "adena": 53000
+        },
+        {
+            "skillId": 1315,
+            "level": 18,
+            "playerLevel": 52,
+            "adena": 66000
+        },
+        {
+            "skillId": 1315,
+            "level": 19,
+            "playerLevel": 55,
+            "adena": 80000
+        },
+        {
+            "skillId": 1315,
+            "level": 20,
+            "playerLevel": 58,
+            "adena": 93000
+        },
+        {
+            "skillId": 1315,
+            "level": 21,
+            "playerLevel": 61,
+            "adena": 100000
+        },
+        {
+            "skillId": 1315,
+            "level": 22,
+            "playerLevel": 64,
+            "adena": 120000
+        },
+        {
+            "skillId": 1315,
+            "level": 23,
+            "playerLevel": 67,
+            "adena": 130000
+        },
+        {
+            "skillId": 1315,
+            "level": 24,
+            "playerLevel": 70,
+            "adena": 140000
+        },
+        {
+            "skillId": 1315,
+            "level": 25,
+            "playerLevel": 73,
+            "adena": 160000
+        },
+        {
+            "skillId": 1315,
+            "level": 26,
+            "playerLevel": 76,
+            "adena": 173000
+        },
+        {
+            "skillId": 1314,
+            "level": 1,
+            "playerLevel": 1,
+            "adena": 10
+        },
+        {
+            "skillId": 1314,
+            "level": 2,
+            "playerLevel": 4,
+            "adena": 50
+        },
+        {
+            "skillId": 1314,
+            "level": 3,
+            "playerLevel": 7,
+            "adena": 200
+        },
+        {
+            "skillId": 1314,
+            "level": 4,
+            "playerLevel": 10,
+            "adena": 300
+        },
+        {
+            "skillId": 1314,
+            "level": 5,
+            "playerLevel": 13,
+            "adena": 500
+        },
+        {
+            "skillId": 1314,
+            "level": 6,
+            "playerLevel": 16,
+            "adena": 800
+        },
+        {
+            "skillId": 1314,
+            "level": 7,
+            "playerLevel": 19,
+            "adena": 1600
+        },
+        {
+            "skillId": 1314,
+            "level": 8,
+            "playerLevel": 22,
+            "adena": 2600
+        },
+        {
+            "skillId": 1314,
+            "level": 9,
+            "playerLevel": 25,
+            "adena": 4000
+        },
+        {
+            "skillId": 1314,
+            "level": 10,
+            "playerLevel": 28,
+            "adena": 6700
+        },
+        {
+            "skillId": 1314,
+            "level": 11,
+            "playerLevel": 31,
+            "adena": 8000
+        },
+        {
+            "skillId": 1314,
+            "level": 12,
+            "playerLevel": 34,
+            "adena": 10000
+        },
+        {
+            "skillId": 1314,
+            "level": 13,
+            "playerLevel": 37,
+            "adena": 16000
+        },
+        {
+            "skillId": 1314,
+            "level": 14,
+            "playerLevel": 40,
+            "adena": 23000
+        },
+        {
+            "skillId": 1314,
+            "level": 15,
+            "playerLevel": 43,
+            "adena": 30000
+        },
+        {
+            "skillId": 1314,
+            "level": 16,
+            "playerLevel": 46,
+            "adena": 40000
+        },
+        {
+            "skillId": 1314,
+            "level": 17,
+            "playerLevel": 49,
+            "adena": 53000
+        },
+        {
+            "skillId": 1314,
+            "level": 18,
+            "playerLevel": 52,
+            "adena": 66000
+        },
+        {
+            "skillId": 1314,
+            "level": 19,
+            "playerLevel": 55,
+            "adena": 80000
+        },
+        {
+            "skillId": 1314,
+            "level": 20,
+            "playerLevel": 58,
+            "adena": 93000
+        },
+        {
+            "skillId": 1314,
+            "level": 21,
+            "playerLevel": 61,
+            "adena": 100000
+        },
+        {
+            "skillId": 1314,
+            "level": 22,
+            "playerLevel": 64,
+            "adena": 120000
+        },
+        {
+            "skillId": 1314,
+            "level": 23,
+            "playerLevel": 67,
+            "adena": 130000
+        },
+        {
+            "skillId": 1314,
+            "level": 24,
+            "playerLevel": 70,
+            "adena": 140000
+        },
+        {
+            "skillId": 1314,
+            "level": 25,
+            "playerLevel": 73,
+            "adena": 160000
+        },
+        {
+            "skillId": 1314,
+            "level": 26,
+            "playerLevel": 76,
+            "adena": 173000
+        },
+        {
+            "skillId": 1313,
+            "level": 1,
+            "playerLevel": 1,
+            "adena": 10
+        },
+        {
+            "skillId": 1313,
+            "level": 2,
+            "playerLevel": 4,
+            "adena": 50
+        },
+        {
+            "skillId": 1313,
+            "level": 3,
+            "playerLevel": 7,
+            "adena": 200
+        },
+        {
+            "skillId": 1313,
+            "level": 4,
+            "playerLevel": 10,
+            "adena": 300
+        },
+        {
+            "skillId": 1313,
+            "level": 5,
+            "playerLevel": 13,
+            "adena": 500
+        },
+        {
+            "skillId": 1313,
+            "level": 6,
+            "playerLevel": 16,
+            "adena": 800
+        },
+        {
+            "skillId": 1313,
+            "level": 7,
+            "playerLevel": 19,
+            "adena": 1600
+        },
+        {
+            "skillId": 1313,
+            "level": 8,
+            "playerLevel": 22,
+            "adena": 2600
+        },
+        {
+            "skillId": 1313,
+            "level": 9,
+            "playerLevel": 25,
+            "adena": 4000
+        },
+        {
+            "skillId": 1313,
+            "level": 10,
+            "playerLevel": 28,
+            "adena": 6700
+        },
+        {
+            "skillId": 1313,
+            "level": 11,
+            "playerLevel": 31,
+            "adena": 8000
+        },
+        {
+            "skillId": 1313,
+            "level": 12,
+            "playerLevel": 34,
+            "adena": 10000
+        },
+        {
+            "skillId": 1313,
+            "level": 13,
+            "playerLevel": 37,
+            "adena": 16000
+        },
+        {
+            "skillId": 1313,
+            "level": 14,
+            "playerLevel": 40,
+            "adena": 23000
+        },
+        {
+            "skillId": 1313,
+            "level": 15,
+            "playerLevel": 43,
+            "adena": 30000
+        },
+        {
+            "skillId": 1313,
+            "level": 16,
+            "playerLevel": 46,
+            "adena": 40000
+        },
+        {
+            "skillId": 1313,
+            "level": 17,
+            "playerLevel": 49,
+            "adena": 53000
+        },
+        {
+            "skillId": 1313,
+            "level": 18,
+            "playerLevel": 52,
+            "adena": 66000
+        },
+        {
+            "skillId": 1313,
+            "level": 19,
+            "playerLevel": 55,
+            "adena": 80000
+        },
+        {
+            "skillId": 1313,
+            "level": 20,
+            "playerLevel": 58,
+            "adena": 93000
+        },
+        {
+            "skillId": 1313,
+            "level": 21,
+            "playerLevel": 61,
+            "adena": 100000
+        },
+        {
+            "skillId": 1313,
+            "level": 22,
+            "playerLevel": 64,
+            "adena": 120000
+        },
+        {
+            "skillId": 1313,
+            "level": 23,
+            "playerLevel": 67,
+            "adena": 130000
+        },
+        {
+            "skillId": 1313,
+            "level": 24,
+            "playerLevel": 70,
+            "adena": 140000
+        },
+        {
+            "skillId": 1313,
+            "level": 25,
+            "playerLevel": 73,
+            "adena": 160000
+        },
+        {
+            "skillId": 1313,
+            "level": 26,
+            "playerLevel": 76,
+            "adena": 173000
+        }
+    ]
+}

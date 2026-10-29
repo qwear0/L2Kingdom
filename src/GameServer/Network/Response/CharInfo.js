@@ -129,10 +129,10 @@ function charInfo(actor) {
         .writeD(Pledge.largeCrestId(actor))  // Clan large crest ID
         .writeC(0x00)  // Noble
         .writeC(0x00)  // Hero
-        .writeC(0x00)  // Fishing
-        .writeD(0x00)  // Fishing X
-        .writeD(0x00)  // Fishing Y
-        .writeD(0x00)  // Fishing Z
+        .writeC(actor.fishing?.visible ? 1 : 0)
+        .writeD(actor.fishing?.visible ? actor.fishing.hook.locX : 0)
+        .writeD(actor.fishing?.visible ? actor.fishing.hook.locY : 0)
+        .writeD(actor.fishing?.visible ? actor.fishing.hook.locZ : 0)
         .writeD(0xffffff); // Name color
 
     const buffer = packet.fetchBuffer();

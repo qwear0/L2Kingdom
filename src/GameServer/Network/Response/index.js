@@ -1,4 +1,11 @@
 module.exports = {
+    acquireSkillList: require('./AcquireSkillList'),
+    acquireSkillInfo: require('./AcquireSkillInfo'),
+    acquireSkillDone: require('./AcquireSkillDone'),
+    exFishingStart: require('./ExFishingStart'),
+    exFishingEnd: require('./ExFishingEnd'),
+    exFishingStartCombat: require('./ExFishingStartCombat'),
+    exFishingHpRegen: require('./ExFishingHpRegen'),
     beginRotation: require('./BeginRotation'),
     stopRotation: require('./StopRotation'),
     skillCoolTime: require('./SkillCoolTime'),

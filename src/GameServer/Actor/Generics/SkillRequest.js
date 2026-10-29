@@ -1,8 +1,11 @@
 const ActionOwner = invoke('GameServer/Actor/PlayerActionOwner');
+const FishingData = require('../../Fishing/FishingData');
 
 function skillRequest(session, actor, data) {
     if (!ActionOwner.current(session, actor, data.actionOwner)) return;
     if (!data.actionOwner) ActionOwner.takeover(session, actor);
+    if (FishingData.isSkill(Number(data.selfId))
+        && require('../../Fishing/FishingService').dispatch(session, actor, data)) return;
     const Generics = invoke(path.actor);
     const EffectRestrictions = invoke('GameServer/Effects/EffectRestrictions');
     const ToggleSkills = invoke('GameServer/Skills/ToggleSkills');

@@ -66,6 +66,16 @@ Automatic hunting requests carry explicit run/action ownership, not a fake bot a
 
 UseItem/UnequipItem publish UserInfo to self and CharInfo to existing visible recipients, retaining inventory refresh. Explicit MCP equip/unequip publishes the same appearance after an actual successful change; authority, receipt meanings and queued-persistence status are unchanged. Existing bot-upgrade/Lord publication remains separate and is not duplicated in intermediate Backpack removals. Character selection and live reconstruction share the [equipment projection](economy.md#equipment-and-style-restoration); observer projections are not native appearance acceptance. Race/sex rendering, another client's view and reconnect/selection behavior still require separately authorized C4-client checks.
 
+## Manual fishing and paid fishing skills
+
+`FishingTraining.js` binds the `fish-skill-list` bypass to current nearby Hilgendorf/Klaus dialogue, actor identity, NPC HTML generation, eligible next rank and a server-issued selection. Requests `0x6b` (AcquireSkillInfo) and `0x6c` (AcquireSkill) accept the 13-byte skill/level/type layout and only fishing acquire type `1`; they do not introduce paid class training. Responses are `0x8a` AcquireSkillList, `0x8b` AcquireSkillInfo and `0x8e` AcquireSkillDone. The requirement count in AcquireSkillInfo is an integer Q encoded as low/high D, not the packet helper's floating-point F. Adena and learned rank settle atomically; see [economy](economy.md#basic-manual-fishing).
+
+Active skills `1312–1314` route to `FishingService`, not ordinary combat hit execution. The basic manual slice supports rod `6529`, lure `6521` and optional shot `6535`. Extended server responses are `FE:13` ExFishingStart, `FE:14` ExFishingEnd, `FE:15` ExFishingStartCombat and `FE:16` ExFishingHpRegen. Bite/fight/end and action animations use native visible-recipient publication; periodic HP updates go only to the fishing owner. Pumping animation is `1`, Reeling is `2`, following actual source execution rather than contradictory descriptive source comments.
+
+UserInfo/CharInfo reuse existing fishing flag and hook XYZ fields; no field/packet length is appended. Late viewers can reconstruct the active hook. After an attempt ends those fields are cleared. Session dispatch blocks incompatible custody/store/crafting requests while a fishing attempt or settlement is active, including requests deferred during entry; item use is also blocked during settlement. Movement/cancel/lifecycle/equipment invalidation fences pending callbacks rather than transferring them to the next actor.
+
+The geometry gate requires native geodata, LOS and the imported fishing/water bounds before bait deduction; it never treats missing-geodata navigation fallback as valid water. Ordinary green lure stays ordinary at night. This implementation has no observer/MCP/frontend controls, autonomous fishing, auto-shot reload or caught monsters. Packet/source verification is not C4-client acceptance; cast/fight rendering, late-viewer appearance and lifecycle behavior remain separately authorized runtime checks.
+
 ## Update together and open checks
 
 - Packet changes: opcode table → request export/parser → gameplay validation → response export/layout → framing/session assumptions.

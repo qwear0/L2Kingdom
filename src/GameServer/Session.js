@@ -58,6 +58,8 @@ const CLIENT_PACKET_NAMES = {
     0x64: 'QuestAbort',
     0x66: 'RequestPledgeInfo',
     0x68: 'RequestPledgeCrest',
+    0x6b: 'AcquireSkillInfo',
+    0x6c: 'AcquireSkill',
     0x6d: 'RestartPoint',
     0x9d: 'RequestSkillCoolTime',
     0xaa: 'UserCommand',
@@ -124,7 +126,9 @@ const SERVER_PACKET_NAMES = {
     0x80: 'QuestList',
     0x7e: 'TradeDone',
     0x87: 'PrivateStoreListSell',
-    0x8b: 'PrivateStoreListBuy',
+    0x8a: 'AcquireSkillList',
+    0x8b: 'AcquireSkillInfo',
+    0x8e: 'AcquireSkillDone',
     0x8c: 'PrivateStoreMsg',
     0x8d: 'ShowMiniMap',
     0x8f: 'TutorialShowHtml',
@@ -177,6 +181,9 @@ class Session {
     }
 
     setActor(properties) {
+        if (this.actor && (this.actor.fishing || this.actor.fishingMutation || this.actor.fishingChargedRod || this.activeFishingTraining))
+            require('./Fishing/FishingService').dispose(this, this.actor);
+        this.activeFishingTraining = null;
         this.actor?.playerAutoFight?.dispose('character_replaced');
         World.retireUserActor(this, this.actor);
         // The connection survives returning to character selection.
@@ -206,13 +213,18 @@ class Session {
         // Weird, sometimes the packet is sent twofold/duplicated. I had to limit it based on the header size...
         const packet = data.slice(2, data.readInt16LE());
         if (invoke('GameServer/Bot/Population/PopulationConfig').developerDiagnostics === true) this.tracePacket('in', packet, packetName(CLIENT_PACKET_NAMES, packetOpcode(packet)));
+        const dispatch = () => {
+            if ((this.actor?.fishing || this.actor?.fishingMutation)
+                && require('./Fishing/FishingService').rejectPacket(this, this.actor, packet[0])) return;
+            return Opcodes.table[packet[0]](this, packet);
+        };
         if (this.enterWorldReady) {
             const actor = this.actor;
             return this.enterWorldReady.then(() => {
-                if (this.actor === actor) return Opcodes.table[packet[0]](this, packet);
+                if (this.actor === actor) return dispatch();
             }).catch(error => utils.infoWarn('Character', 'login packet deferred: %s', error.message));
         }
-        return Opcodes.table[packet[0]](this, packet);
+        return dispatch();
     }
 
     dataSendToMe(data) {
@@ -222,7 +234,10 @@ class Session {
         const packet = this.packData(data);
         // All NPC HTML dialogs share one client window, regardless of their owner.
         // A newer page must revoke pending asynchronous redraws of the old one.
-        if (packetOpcode(data) === 0x0f) ++this.npcHtmlGeneration;
+        if (packetOpcode(data) === 0x0f) {
+            ++this.npcHtmlGeneration;
+            this.activeFishingTraining = null;
+        }
         this.socket.write(packet);
     }
 

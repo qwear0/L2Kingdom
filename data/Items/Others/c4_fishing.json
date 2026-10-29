@@ -1,0 +1,1953 @@
+[
+    {
+        "selfId": 6411,
+        "template": {
+            "kind": "Other.None",
+            "name": "Small green nimble fish",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 138
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6412,
+        "template": {
+            "kind": "Other.None",
+            "name": "Small green ugly fish",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 141
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6413,
+        "template": {
+            "kind": "Other.None",
+            "name": "Small green fat fish",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 153
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6414,
+        "template": {
+            "kind": "Other.None",
+            "name": "Green nimble fish",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 167
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6415,
+        "template": {
+            "kind": "Other.None",
+            "name": "Green ugly fish",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 187
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6416,
+        "template": {
+            "kind": "Other.None",
+            "name": "Green fat fish",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 208
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6417,
+        "template": {
+            "kind": "Other.None",
+            "name": "Big nimble green fish",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 225
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6418,
+        "template": {
+            "kind": "Other.None",
+            "name": "Big green ugly fish",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 248
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6419,
+        "template": {
+            "kind": "Other.None",
+            "name": "Big green fat fish",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 265
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6420,
+        "template": {
+            "kind": "Other.None",
+            "name": "Small jade nimble fish",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 285
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6421,
+        "template": {
+            "kind": "Other.None",
+            "name": "Small jade ugly fish",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 295
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6422,
+        "template": {
+            "kind": "Other.None",
+            "name": "Small jade fat fish",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 310
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6423,
+        "template": {
+            "kind": "Other.None",
+            "name": "Jade nimble fish",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 325
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6424,
+        "template": {
+            "kind": "Other.None",
+            "name": "Jade ugly fish",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 340
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6425,
+        "template": {
+            "kind": "Other.None",
+            "name": "Jade fat fish",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 355
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6426,
+        "template": {
+            "kind": "Other.None",
+            "name": "Big jade nimble fish",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 365
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6427,
+        "template": {
+            "kind": "Other.None",
+            "name": "Big jade ugly fish",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 375
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6428,
+        "template": {
+            "kind": "Other.None",
+            "name": "Big jade fat fish",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 385
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6429,
+        "template": {
+            "kind": "Other.None",
+            "name": "Small blue nimble fish",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 395
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6430,
+        "template": {
+            "kind": "Other.None",
+            "name": "Small blue ugly fish",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 400
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6431,
+        "template": {
+            "kind": "Other.None",
+            "name": "Small blue fat fish",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 410
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6432,
+        "template": {
+            "kind": "Other.None",
+            "name": "Blue nimble fish",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 415
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6433,
+        "template": {
+            "kind": "Other.None",
+            "name": "Blue ugly fish",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 418
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6434,
+        "template": {
+            "kind": "Other.None",
+            "name": "Blue fat fish",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 420
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6435,
+        "template": {
+            "kind": "Other.None",
+            "name": "Big blue nimble fish",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 425
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6436,
+        "template": {
+            "kind": "Other.None",
+            "name": "Big blue ugly fish",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 431
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6437,
+        "template": {
+            "kind": "Other.None",
+            "name": "Big blue fat fish",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 435
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6438,
+        "template": {
+            "kind": "Other.None",
+            "name": "Small yellow nimble fish",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 442
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6439,
+        "template": {
+            "kind": "Other.None",
+            "name": "Small yellow ugly fish",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 447
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6440,
+        "template": {
+            "kind": "Other.None",
+            "name": "Small yellow fat fish",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 452
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6441,
+        "template": {
+            "kind": "Other.None",
+            "name": "Yellow nimble fish",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 540
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6442,
+        "template": {
+            "kind": "Other.None",
+            "name": "Yellow ugly fish",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 553
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6443,
+        "template": {
+            "kind": "Other.None",
+            "name": "Yellow fat fish",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 568
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6444,
+        "template": {
+            "kind": "Other.None",
+            "name": "Big yellow nimble fish",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 580
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6445,
+        "template": {
+            "kind": "Other.None",
+            "name": "Big yellow ugly fish",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 594
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6446,
+        "template": {
+            "kind": "Other.None",
+            "name": "Big yellow fat fish",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 608
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6447,
+        "template": {
+            "kind": "Other.None",
+            "name": "Small orange nimble fish",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 622
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6448,
+        "template": {
+            "kind": "Other.None",
+            "name": "Small orange ugly fish",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 635
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6449,
+        "template": {
+            "kind": "Other.None",
+            "name": "Small orange fat fish",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 649
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6450,
+        "template": {
+            "kind": "Other.None",
+            "name": "Orange nimble fish",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 663
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6451,
+        "template": {
+            "kind": "Other.None",
+            "name": "Orange ugly fish",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 776
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6452,
+        "template": {
+            "kind": "Other.None",
+            "name": "Orange fat fish",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 792
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6453,
+        "template": {
+            "kind": "Other.None",
+            "name": "Big orange nimble fish",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 816
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6454,
+        "template": {
+            "kind": "Other.None",
+            "name": "Big orange ugly fish",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 840
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6455,
+        "template": {
+            "kind": "Other.None",
+            "name": "Big orange fat fish",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 858
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6456,
+        "template": {
+            "kind": "Other.None",
+            "name": "Small Purple nimble fish",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 875
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6457,
+        "template": {
+            "kind": "Other.None",
+            "name": "Small Purple ugly fish",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 893
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6458,
+        "template": {
+            "kind": "Other.None",
+            "name": "Small Purple fat fish",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 910
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6459,
+        "template": {
+            "kind": "Other.None",
+            "name": "Purple nimble fish",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 930
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6460,
+        "template": {
+            "kind": "Other.None",
+            "name": "Purple ugly fish",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 948
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6461,
+        "template": {
+            "kind": "Other.None",
+            "name": "Purple fat fish",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 1090
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6462,
+        "template": {
+            "kind": "Other.None",
+            "name": "Big purple nimble fish",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 1111
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6463,
+        "template": {
+            "kind": "Other.None",
+            "name": "Big purple ugly fish",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 1133
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6464,
+        "template": {
+            "kind": "Other.None",
+            "name": "Big purple fat fish",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 1157
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6465,
+        "template": {
+            "kind": "Other.None",
+            "name": "Small red nimble fish",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 1277
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6466,
+        "template": {
+            "kind": "Other.None",
+            "name": "Small red ugly fish",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 1301
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6467,
+        "template": {
+            "kind": "Other.None",
+            "name": "Small red fat fish",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 1326
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6468,
+        "template": {
+            "kind": "Other.None",
+            "name": "Red nimble fish",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 1351
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6469,
+        "template": {
+            "kind": "Other.None",
+            "name": "Red ugly fish",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 1376
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6470,
+        "template": {
+            "kind": "Other.None",
+            "name": "Red fat fish",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 1402
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6471,
+        "template": {
+            "kind": "Other.None",
+            "name": "Big red nimble fish",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 1577
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6472,
+        "template": {
+            "kind": "Other.None",
+            "name": "Big red ugly fish",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 1608
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6473,
+        "template": {
+            "kind": "Other.None",
+            "name": "Big red fat fish",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 1715
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6474,
+        "template": {
+            "kind": "Other.None",
+            "name": "Small white nimble fish",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 1747
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6475,
+        "template": {
+            "kind": "Other.None",
+            "name": "Small white ugly fish",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 1781
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6476,
+        "template": {
+            "kind": "Other.None",
+            "name": "Small white fat fish",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 1814
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6477,
+        "template": {
+            "kind": "Other.None",
+            "name": "White nimble fish",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 1849
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6478,
+        "template": {
+            "kind": "Other.None",
+            "name": "White ugly fish",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 1887
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6479,
+        "template": {
+            "kind": "Other.None",
+            "name": "White fat fish",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 1923
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6480,
+        "template": {
+            "kind": "Other.None",
+            "name": "Big white nimble fish",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 1961
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6481,
+        "template": {
+            "kind": "Other.None",
+            "name": "Big white ugly fish",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 2000
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6482,
+        "template": {
+            "kind": "Other.None",
+            "name": "Big white fat fish",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 2039
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6483,
+        "template": {
+            "kind": "Other.None",
+            "name": "Small black nimble fish",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 2081
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6484,
+        "template": {
+            "kind": "Other.None",
+            "name": "Small black ugly fish",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 2123
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6485,
+        "template": {
+            "kind": "Other.None",
+            "name": "Small black fat fish",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 2166
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6486,
+        "template": {
+            "kind": "Other.None",
+            "name": "Black nimble fish",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 2309
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6487,
+        "template": {
+            "kind": "Other.None",
+            "name": "Black ugly fish",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 2357
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6488,
+        "template": {
+            "kind": "Other.None",
+            "name": "Black fat fish",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 2403
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6489,
+        "template": {
+            "kind": "Other.None",
+            "name": "Big black nimble fish",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 2452
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6490,
+        "template": {
+            "kind": "Other.None",
+            "name": "Big black ugly fish",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 2502
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6491,
+        "template": {
+            "kind": "Other.None",
+            "name": "Big black fat fish",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 2552
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6492,
+        "template": {
+            "kind": "Other.None",
+            "name": "Small green treasure chest",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 153
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6493,
+        "template": {
+            "kind": "Other.None",
+            "name": "green treasure chest",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 208
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6494,
+        "template": {
+            "kind": "Other.None",
+            "name": "Big green treasure chest",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 265
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6495,
+        "template": {
+            "kind": "Other.None",
+            "name": "Small jade treasure chest",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 285
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6496,
+        "template": {
+            "kind": "Other.None",
+            "name": "jade treasure chest",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 315
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6497,
+        "template": {
+            "kind": "Other.None",
+            "name": "Big jade treasure chest",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 345
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6498,
+        "template": {
+            "kind": "Other.None",
+            "name": "Small blue treasure chest",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 395
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6499,
+        "template": {
+            "kind": "Other.None",
+            "name": "blue treasure chest",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 419
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6500,
+        "template": {
+            "kind": "Other.None",
+            "name": "Big blue treasure chest",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 435
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6501,
+        "template": {
+            "kind": "Other.None",
+            "name": "Small yellow treasure chest",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 452
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6502,
+        "template": {
+            "kind": "Other.None",
+            "name": "yellow treasure chest",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 568
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6503,
+        "template": {
+            "kind": "Other.None",
+            "name": "Big yellow treasure chest",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 608
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6504,
+        "template": {
+            "kind": "Other.None",
+            "name": "Small orange treasure chest",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 649
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6505,
+        "template": {
+            "kind": "Other.None",
+            "name": "orange treasure chest",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 792
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6506,
+        "template": {
+            "kind": "Other.None",
+            "name": "Big orange treasure chest",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 858
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6507,
+        "template": {
+            "kind": "Other.None",
+            "name": "Small Purple treasure chest",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 910
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6508,
+        "template": {
+            "kind": "Other.None",
+            "name": "Purple treasure chest",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 1090
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6509,
+        "template": {
+            "kind": "Other.None",
+            "name": "Big Purple treasure chest",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 1157
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6510,
+        "template": {
+            "kind": "Other.None",
+            "name": "Small red treasure chest",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 1326
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6511,
+        "template": {
+            "kind": "Other.None",
+            "name": "red treasure chest",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 1402
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6512,
+        "template": {
+            "kind": "Other.None",
+            "name": "Big red treasure chest",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 1715
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6513,
+        "template": {
+            "kind": "Other.None",
+            "name": "Small white treasure chest",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 1814
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6514,
+        "template": {
+            "kind": "Other.None",
+            "name": "white treasure chest",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 1923
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6515,
+        "template": {
+            "kind": "Other.None",
+            "name": "Big white treasure chest",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 2039
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6516,
+        "template": {
+            "kind": "Other.None",
+            "name": "Small black treasure chest",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 2166
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6517,
+        "template": {
+            "kind": "Other.None",
+            "name": "black treasure chest",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 2403
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6518,
+        "template": {
+            "kind": "Other.None",
+            "name": "Big black treasure chest",
+            "class1": 4,
+            "class2": 5,
+            "mass": 100,
+            "price": 2552
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6521,
+        "template": {
+            "kind": "Other.Lure",
+            "name": "Green Colored Lure - High Grade",
+            "class1": 4,
+            "class2": 5,
+            "mass": 3,
+            "price": 150
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": false,
+            "slot": 8
+        }
+    },
+    {
+        "selfId": 6535,
+        "template": {
+            "kind": "Other.None",
+            "name": "Fishing Shot: non-grade",
+            "class1": 4,
+            "class2": 5,
+            "mass": 3,
+            "price": 3
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": true
+        }
+    },
+    {
+        "selfId": 6904,
+        "template": {
+            "kind": "Other.None",
+            "name": "Party Mask Fabric",
+            "class1": 4,
+            "class2": 5,
+            "mass": 60,
+            "price": 5000
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": false
+        }
+    },
+    {
+        "selfId": 6905,
+        "template": {
+            "kind": "Other.None",
+            "name": "Hair Pin Piece",
+            "class1": 4,
+            "class2": 5,
+            "mass": 60,
+            "price": 5000
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": false
+        }
+    },
+    {
+        "selfId": 6906,
+        "template": {
+            "kind": "Other.None",
+            "name": "Eye Patch of Pirate Piece",
+            "class1": 4,
+            "class2": 5,
+            "mass": 60,
+            "price": 5000
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": false
+        }
+    },
+    {
+        "selfId": 6907,
+        "template": {
+            "kind": "Other.None",
+            "name": "Monocle Piece",
+            "class1": 4,
+            "class2": 5,
+            "mass": 60,
+            "price": 5000
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": false
+        }
+    },
+    {
+        "selfId": 6908,
+        "template": {
+            "kind": "Other.None",
+            "name": "Fish Oil",
+            "class1": 4,
+            "class2": 5,
+            "mass": 60,
+            "price": 50
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": false
+        }
+    },
+    {
+        "selfId": 6909,
+        "template": {
+            "kind": "Other.None",
+            "name": "Greater Fish Oil",
+            "class1": 4,
+            "class2": 5,
+            "mass": 60,
+            "price": 250
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": false
+        }
+    },
+    {
+        "selfId": 6910,
+        "template": {
+            "kind": "Other.None",
+            "name": "Premium Fish Oil",
+            "class1": 4,
+            "class2": 5,
+            "mass": 60,
+            "price": 1250
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": false
+        }
+    },
+    {
+        "selfId": 6911,
+        "template": {
+            "kind": "Other.None",
+            "name": "Fish Scale",
+            "class1": 4,
+            "class2": 5,
+            "mass": 60,
+            "price": 200
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": false
+        }
+    },
+    {
+        "selfId": 6912,
+        "template": {
+            "kind": "Other.None",
+            "name": "Shiny Fish Scale",
+            "class1": 4,
+            "class2": 5,
+            "mass": 60,
+            "price": 300
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": false
+        }
+    },
+    {
+        "selfId": 6913,
+        "template": {
+            "kind": "Other.None",
+            "name": "Fish Gem",
+            "class1": 4,
+            "class2": 5,
+            "mass": 60,
+            "price": 500
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": false
+        }
+    },
+    {
+        "selfId": 6914,
+        "template": {
+            "kind": "Other.None",
+            "name": "Shiny Fish Gem",
+            "class1": 4,
+            "class2": 5,
+            "mass": 60,
+            "price": 1000
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": false
+        }
+    },
+    {
+        "selfId": 6915,
+        "template": {
+            "kind": "Other.None",
+            "name": "Thin Fish Bone",
+            "class1": 4,
+            "class2": 5,
+            "mass": 60,
+            "price": 300
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": false
+        }
+    },
+    {
+        "selfId": 6916,
+        "template": {
+            "kind": "Other.None",
+            "name": "Thick Fish Bone",
+            "class1": 4,
+            "class2": 5,
+            "mass": 60,
+            "price": 450
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": false
+        }
+    },
+    {
+        "selfId": 6920,
+        "template": {
+            "kind": "Other.None",
+            "name": "Recipe: Greater Fish Oil (100%)",
+            "class1": 4,
+            "class2": 5,
+            "mass": 30,
+            "price": 50
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": false
+        }
+    },
+    {
+        "selfId": 6921,
+        "template": {
+            "kind": "Other.None",
+            "name": "Recipe: Premium Fish Oil(100%)",
+            "class1": 4,
+            "class2": 5,
+            "mass": 30,
+            "price": 250
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": false
+        }
+    },
+    {
+        "selfId": 7609,
+        "template": {
+            "kind": "Other.None",
+            "name": "Proof of Catching a Fish",
+            "class1": 4,
+            "class2": 5,
+            "mass": 0,
+            "price": 0
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": false
+        }
+    },
+    {
+        "selfId": 7685,
+        "template": {
+            "kind": "Other.None",
+            "name": "Outlaw's Eyepatch Strap",
+            "class1": 4,
+            "class2": 5,
+            "mass": 60,
+            "price": 5000
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": false
+        }
+    },
+    {
+        "selfId": 7686,
+        "template": {
+            "kind": "Other.None",
+            "name": "Maiden's Hairpin Piece",
+            "class1": 4,
+            "class2": 5,
+            "mass": 60,
+            "price": 5000
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": false
+        }
+    },
+    {
+        "selfId": 7697,
+        "template": {
+            "kind": "Other.None",
+            "name": "Piece of Forget-me-not Hairpin",
+            "class1": 4,
+            "class2": 5,
+            "mass": 60,
+            "price": 5000
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": false
+        }
+    },
+    {
+        "selfId": 7698,
+        "template": {
+            "kind": "Other.None",
+            "name": "Piece of Daisy Hairpin",
+            "class1": 4,
+            "class2": 5,
+            "mass": 60,
+            "price": 5000
+        },
+        "etc": {
+            "stackable": true,
+            "consumable": false
+        }
+    }
+]

@@ -218,6 +218,7 @@ const DataCache = {
             ...validateModel(path + 'Items/Armors/c4_s_grade'),
             ...validateModel(path + 'Items/Armors/c4_unsealed'),
             ...validateModel(path + 'Items/Weapons/weapons'),
+            ...validateModel(path + 'Items/Weapons/c4_fishing'),
             ...validateModel(path + 'Items/Weapons/c4_special_ability_weapons'),
             ...validateModel(path + 'Items/Weapons/c4_sa_catalog'),
             ...validateModel(path + 'Items/Weapons/c4_sa_base_weapons'),
@@ -225,6 +226,7 @@ const DataCache = {
             ...validateModel(path + 'Items/Weapons/c4_necropolis_of_sacrifice'),
             ...validateModel(path + 'Items/Weapons/c4_raid_bosses'),
             ...validateModel(path + 'Items/Others/others'),
+            ...validateModel(path + 'Items/Others/c4_fishing'),
             ...validateModel(path + 'Items/Others/c4_soul_crystals'),
             ...validateModel(path + 'Items/Others/c4_sa_exchange_materials'),
             ...validateModel(path + 'Items/Others/c4_a_grade'),
@@ -285,7 +287,9 @@ const DataCache = {
 
         DataCache.skills = invoke('GameServer/Skills/C4SkillRules').expandSourcedLevels([
             ...validateModel(path + 'Skills/Active/active'),
+            ...validateModel(path + 'Skills/Active/c4_fishing'),
             ...validateModel(path + 'Skills/Passive/passive'),
+            ...validateModel(path + 'Skills/Passive/c4_fishing'),
             ...validateModel(path + 'Skills/Switch/switch')
         ]);
 

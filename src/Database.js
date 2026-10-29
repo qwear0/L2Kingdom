@@ -7761,6 +7761,99 @@ const Database = {
             return { ...item, selfId: target, petData: state };
         }, 'pet:evolution'));
     },
+    settleFishing(characterId, action, validate) {
+        return withCharacterFlush(characterId, () => inTransaction(() => {
+            const Fishing = require('./GameServer/Fishing/FishingData');
+            const Data = invoke('GameServer/DataCache');
+            const Index = require('./GameServer/Item/ItemTemplateIndex');
+            const rows = all('SELECT * FROM items WHERE characterId = ? ORDER BY id', [characterId]);
+            const live = validate(rows);
+            const changed = new Map();
+            const take = (row, amount, equipped = false) => {
+                if (!row || !Number.isSafeInteger(amount) || amount <= 0 || row.amount < amount
+                    || (!equipped && row.equipped)) throw Error('fishing_item_changed');
+                row.amount -= amount;
+                if (row.amount) write('UPDATE items SET amount = ? WHERE id = ? AND characterId = ?', [row.amount, row.id, characterId]);
+                else write('DELETE FROM items WHERE id = ? AND characterId = ?', [row.id, characterId]);
+                changed.set(row.id, { ...row });
+            };
+            let products = [], learned = null;
+            if (action.kind === 'learn') {
+                const rank = Fishing.rank(action.skillId, action.level);
+                const previous = one('SELECT level FROM skills WHERE characterId = ? AND selfId = ?', [characterId, action.skillId]);
+                const character = one('SELECT level FROM characters WHERE id = ?', [characterId]);
+                if (!rank || Number(previous?.level || 0) + 1 !== rank.level
+                    || Number(character?.level) < rank.playerLevel || live.level < rank.playerLevel) throw Error('fishing_rank_changed');
+                const money = rows.filter(row => row.selfId === 57 && !row.equipped && row.amount > 0);
+                if (money.reduce((sum, row) => sum + row.amount, 0) < rank.adena) throw Error('fishing_not_enough_adena');
+                let remaining = rank.adena;
+                for (const wallet of money) {
+                    const count = Math.min(remaining, wallet.amount);
+                    if (count) take(wallet, count);
+                    remaining -= count;
+                }
+                const definition = Index.findStrictRequired(Data.skills, rank.skillId);
+                if (!definition?.levels.some(row => row.level === rank.level)) throw Error('fishing_skill_missing');
+                learned = { selfId: rank.skillId, level: rank.level, name: definition.template.name,
+                    passive: definition.template.passive };
+                write(`INSERT INTO skills(selfId, name, passive, level, characterId) VALUES (?, ?, ?, ?, ?)
+                    ON CONFLICT(selfId, characterId) DO UPDATE SET level = excluded.level`,
+                [learned.selfId, learned.name, learned.passive ? 1 : 0, learned.level, characterId]);
+            } else if (action.kind === 'catch') {
+                if (!Fishing.isCatch(action.itemId)) throw Error('fishing_catch_missing');
+                products = [{ selfId: action.itemId, amount: 1 }];
+            } else {
+                const source = rows.find(row => row.id === action.itemId);
+                if (action.kind === 'bait') {
+                    if (source?.selfId !== Fishing.lureId || !source.equipped || source.slot !== 8) throw Error('fishing_lure_changed');
+                    take(source, 1, true);
+                } else if (action.kind === 'shot') {
+                    if (source?.selfId !== Fishing.shotId) throw Error('fishing_shot_changed');
+                    take(source, 1);
+                } else if (action.kind === 'open') {
+                    if (!Fishing.isCatch(source?.selfId)) throw Error('fishing_catch_changed');
+                    const Extractable = invoke('GameServer/Items/C4ExtractableItems');
+                    const definition = Extractable.resolve(source.selfId);
+                    if (!definition) throw Error('fishing_extraction_missing');
+                    take(source, 1);
+                    // Preserve the local roller and draw only after admission.
+                    // Input and all outputs roll back together on any failure.
+                    products = Extractable.rollProducts(definition);
+                } else throw Error('invalid_fishing_action');
+            }
+            for (const product of products) {
+                const template = Index.findStrictRequired(Data.items, product.selfId);
+                if (!template || !template.etc.stackable || !Number.isSafeInteger(product.amount) || product.amount <= 0)
+                    throw Error('fishing_product_missing');
+                let row = rows.find(item => item.selfId === product.selfId && item.amount > 0 && !item.equipped);
+                if (row) {
+                    row.amount += product.amount;
+                    if (!Number.isSafeInteger(row.amount) || row.amount > 2147483647) throw Error('fishing_amount_limit');
+                    write('UPDATE items SET amount = ? WHERE id = ? AND characterId = ?', [row.amount, row.id, characterId]);
+                } else {
+                    const id = Number(write('INSERT INTO items(selfId, name, amount, equipped, slot, characterId) VALUES (?, ?, ?, 0, 0, ?)',
+                        [product.selfId, template.template.name, product.amount, characterId]).insertId);
+                    row = { id, selfId: product.selfId, name: template.template.name, amount: product.amount, equipped: 0, slot: 0, characterId };
+                    rows.push(row);
+                }
+                changed.set(row.id, { ...row });
+            }
+            if (products.length) {
+                const character = one('SELECT race FROM characters WHERE id = ?', [characterId]);
+                const expansion = one('SELECT level FROM skills WHERE characterId = ? AND selfId = 1372', [characterId]);
+                const capacity = require('./GameServer/Inventory/InventoryLimits').capacity(character?.race, expansion?.level || 0);
+                const held = rows.filter(row => row.amount > 0);
+                if (held.length > capacity) throw Error('fishing_inventory_full');
+                const weight = held.reduce((sum, row) => {
+                    const template = Index.findStrictRequired(Data.items, row.selfId);
+                    if (!template) throw Error('fishing_inventory_template_missing');
+                    return sum + template.template.mass * row.amount;
+                }, 0);
+                if (!Number.isFinite(live.maxLoad) || weight > live.maxLoad) throw Error('fishing_weight_limit');
+            }
+            return { rows: [...changed.values()], learned, products };
+        }, 'fishing:settle'));
+    },
     replaceSoulCrystal(characterId, id, expectedSelfId, selfId, name, crystalIds, isStillValid) {
         return withCharacterFlush(characterId, () => inTransaction(() => {
             if (!isStillValid()) return false;

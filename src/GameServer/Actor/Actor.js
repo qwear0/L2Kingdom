@@ -5,6 +5,7 @@ const Skillset       = invoke('GameServer/Actor/Skillset');
 const Backpack       = invoke('GameServer/Actor/Backpack');
 const Automation     = invoke('GameServer/Automation');
 const EffectStats    = invoke('GameServer/Effects/EffectStats');
+const FishingData = require('../Fishing/FishingData');
 
 class Actor extends ActorModel {
     constructor(session, data) {
@@ -48,6 +49,8 @@ class Actor extends ActorModel {
     // Stop native producers without retiring the actor or unsummoning its pet:
     // shutdown still needs their original identities for final persistence.
     quiesce() {
+        if (this.fishing || this.fishingMutation || this.fishingChargedRod || this.session?.activeFishingTraining)
+            require('../Fishing/FishingService').dispose(this.session, this);
         this.playerAutoFight?.dispose('actor_disposed');
         invoke('GameServer/Skills/ChargeLifecycle').dispose(this);
         invoke(path.actor).clearStoredActions(this.session, this);
@@ -106,7 +109,14 @@ class Actor extends ActorModel {
     }
 
     canUseSkill(skill, now = Date.now()) {
-        return (this.skillReuseUntil.get(skill.fetchSelfId()) || 0) <= now;
+        const id = skill.fetchSelfId();
+        if ((this.skillReuseUntil.get(id) || 0) > now) return false;
+        if (this.fishing && !FishingData.isSkill(id) && id !== 2181) return false;
+        // Paperdoll lookup is constant-time on this very hot bot/player path.
+        // The newly supported rod is equipment, never an offensive weapon.
+        if (this.backpack.fetchPaperdollSelfId(14) === FishingData.rod.itemId
+            && ['enemy', 'corpse_mob'].includes(skill.fetchTargetKind?.())) return false;
+        return true;
     }
 
     markSkillReuse(skill, now = Date.now()) {
