@@ -1,6 +1,4 @@
-const disabledReasons = new Map([
-  [39, "Quest proof/reward templates and native fishing reward support are absent"],
-]);
+const disabledReasons = new Map();
 
 const entries = [
   ...[

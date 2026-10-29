@@ -435,32 +435,38 @@ async function partyKill(session, actor, npc, source, handlers, context) {
   })));
   if (session.actor !== actor) return;
   for (const quest of handlers) {
-    const { condition, killerWeight, rangeAfterSelection } = quest.partyKill;
-    const eligible = member => {
-      if (!currentKillMember(member)) return false;
-      const state = states(member.session).get(quest.id);
-      return state?.isStarted() && state.getInt("cond") === condition;
-    };
-    const candidates = [];
-    for (const member of context.members) {
-      if (!eligible(member)) continue;
-      if (!rangeAfterSelection && context.inParty && !inQuestPartyRange(member.actor, context.targetLocation)) continue;
-      const weight = member.session === session ? killerWeight : 1;
-      for (let i = 0; i < weight; i++) candidates.push(member);
+    const { killerWeight, rangeAfterSelection } = quest.partyKill;
+    for (const stage of quest.partyKill.stages || [quest.partyKill]) {
+      const eligible = member => {
+        if (!currentKillMember(member)) return false;
+        const state = states(member.session).get(quest.id);
+        return state?.isStarted() && state.getInt("cond") === stage.condition;
+      };
+      const candidates = [];
+      for (const member of context.members) {
+        if (!eligible(member)) continue;
+        if (!rangeAfterSelection && context.inParty && !inQuestPartyRange(member.actor, context.targetLocation)) continue;
+        const weight = member.session === session ? killerWeight : 1;
+        for (let i = 0; i < weight; i++) candidates.push(member);
+      }
+      if (!candidates.length) continue;
+      const selected = candidates[Math.floor(Math.random() * candidates.length)];
+      // Q32/Q39 draw first and check range afterwards, without rerolling.
+      // Q35 instead filters around the killer's selected target before drawing.
+      if (rangeAfterSelection && !inQuestPartyRange(selected.actor, context.npcLocation, true)) continue;
+      if (stage.excludedNpcs?.includes(Number(npc.fetchSelfId()))) continue;
+      await mutate(selected.session, async () => {
+        if (session.actor !== actor || !eligible(selected)) return;
+        const ownerId = Number(npc.questSpawn?.ownerId) || 0;
+        if (ownerId && ownerId !== Number(selected.actor.fetchId())) return;
+        const before = activeQuestSnapshot(selected.session);
+        await quest.onKill(states(selected.session).get(quest.id), npc, source);
+        if (before !== activeQuestSnapshot(selected.session)) syncActiveQuests(selected.session);
+      });
+      // Q39's fallback is an else branch, not another item roll. A matched
+      // stage owns this kill even if capped, unlucky, or stale in its queue.
+      break;
     }
-    if (!candidates.length) continue;
-    const selected = candidates[Math.floor(Math.random() * candidates.length)];
-    // Q32's source draws first and checks range afterwards, without rerolling.
-    // Q35 instead filters around the killer's selected target before drawing.
-    if (rangeAfterSelection && !inQuestPartyRange(selected.actor, context.npcLocation, true)) continue;
-    await mutate(selected.session, async () => {
-      if (session.actor !== actor || !eligible(selected)) return;
-      const ownerId = Number(npc.questSpawn?.ownerId) || 0;
-      if (ownerId && ownerId !== Number(selected.actor.fetchId())) return;
-      const before = activeQuestSnapshot(selected.session);
-      await quest.onKill(states(selected.session).get(quest.id), npc, source);
-      if (before !== activeQuestSnapshot(selected.session)) syncActiveQuests(selected.session);
-    });
   }
 }
 

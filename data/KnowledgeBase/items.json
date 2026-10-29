@@ -642131,6 +642131,106 @@
   },
   {
     "grade": "none",
+    "id": 7178,
+    "kind": "Other.Quest",
+    "name": "Black Bone Necklace",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": false,
+        "stackable": true
+      },
+      "selfId": 7178,
+      "template": {
+        "class1": 4,
+        "class2": 3,
+        "kind": "Other.Quest",
+        "mass": 0,
+        "name": "Black Bone Necklace",
+        "price": 0
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 7179,
+    "kind": "Other.Quest",
+    "name": "Red Bone Necklace",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": false,
+        "stackable": true
+      },
+      "selfId": 7179,
+      "template": {
+        "class1": 4,
+        "class2": 3,
+        "kind": "Other.Quest",
+        "mass": 0,
+        "name": "Red Bone Necklace",
+        "price": 0
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 7180,
+    "kind": "Other.Quest",
+    "name": "Incense Pouch",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": false,
+        "stackable": true
+      },
+      "selfId": 7180,
+      "template": {
+        "class1": 4,
+        "class2": 3,
+        "kind": "Other.Quest",
+        "mass": 0,
+        "name": "Incense Pouch",
+        "price": 0
+      }
+    }
+  },
+  {
+    "grade": "none",
+    "id": 7181,
+    "kind": "Other.Quest",
+    "name": "Gem of Maille Lizardman",
+    "sources": {
+      "drops": [],
+      "spoils": []
+    },
+    "template": {
+      "etc": {
+        "consumable": false,
+        "stackable": true
+      },
+      "selfId": 7181,
+      "template": {
+        "class1": 4,
+        "class2": 3,
+        "kind": "Other.Quest",
+        "mass": 0,
+        "name": "Gem of Maille Lizardman",
+        "price": 0
+      }
+    }
+  },
+  {
+    "grade": "none",
     "id": 7182,
     "kind": "Other.Quest",
     "name": "Patrol's Report",
