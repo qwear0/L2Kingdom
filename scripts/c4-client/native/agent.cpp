@@ -35,7 +35,9 @@ struct Sample {
     void* viewportActor;
     void* level;
     void* pawn;
-    Vector origin;
+    Vector origin, velocity;
+    int heading;
+    BYTE physics;
     float radius, height;
 };
 Sample sample;
@@ -107,9 +109,12 @@ void __fastcall OnTick(void* engine, void*, float delta) {
                 : (isA(actor, controllerClass) ? PointerAt(actor, 0x3a8) : nullptr);
             if (Readable(pawn, 0x2f8) && isA(pawn, pawnClass) && getLevel(pawn) == next.level) {
                 next.origin = *reinterpret_cast<Vector*>(static_cast<BYTE*>(pawn) + 0x1bc);
+                next.velocity = *reinterpret_cast<Vector*>(static_cast<BYTE*>(pawn) + c4::ActorVelocity);
+                next.heading = *reinterpret_cast<int*>(static_cast<BYTE*>(pawn) + c4::ActorYaw);
+                next.physics = *reinterpret_cast<BYTE*>(static_cast<BYTE*>(pawn) + c4::ActorPhysics);
                 next.radius = *reinterpret_cast<float*>(static_cast<BYTE*>(pawn) + 0x2f0);
                 next.height = *reinterpret_cast<float*>(static_cast<BYTE*>(pawn) + 0x2f4);
-                if (Finite(next.origin) && next.radius > 0 && next.radius < 512 && next.height > 0 && next.height < 512) next.pawn = pawn;
+                if (Finite(next.origin) && Finite(next.velocity) && next.radius > 0 && next.radius < 512 && next.height > 0 && next.height < 512) next.pawn = pawn;
             }
         }
     }
@@ -119,7 +124,7 @@ void __fastcall OnTick(void* engine, void*, float delta) {
     next.sequence = sample.sequence + 1;
     next.epoch = sample.epoch + (next.engine != sample.engine || next.level != sample.level || next.viewportActor != sample.viewportActor || next.pawn != sample.pawn);
     sample = next;
-    session::Tick(engine, next.epoch, next.pawn != nullptr);
+    session::Tick(engine, next);
     if (surface.status == 1) {
         if (!next.pawn || surface.epoch != next.epoch || requestedPawn != next.pawn) surface.status = 4;
         else {
@@ -158,7 +163,7 @@ bool InstallTick() {
     lineCheck = reinterpret_cast<LineCheck>(GetProcAddress(engine, "?SingleLineCheck@ULevel@@UAEHAAUFCheckResult@@PAVAActor@@ABVFVector@@2KV4@@Z"));
     if (!table || !tick || !getLevel || !isA || !actorStaticClass || !pawnStaticClass || !controllerStaticClass || !lineCheck
         || !Readable(table, 0x68) || table[0x64 / 4] != reinterpret_cast<void*>(tick)) return false;
-    if (!session::Install(engine)) return false;
+    if (!session::Install(engine) || !session::InstallMovement(engine)) return false;
     originalTick = reinterpret_cast<Tick>(tick);
     DWORD protection = 0;
     if (!VirtualProtect(table + 0x64 / 4, sizeof(void*), PAGE_READWRITE, &protection)) return false;
@@ -232,19 +237,21 @@ void Serve(SOCKET socket, const char* token) {
     EnterCriticalSection(&sampleLock);
     Sample copy = sample;
     Surface ray = surface;
-    static char sessionJson[4096];
+    static char sessionJson[4096], movementJson[1024];
     session::ExpireOwner();
     session::Render(sessionJson, sizeof(sessionJson));
+    session::RenderMovement(movementJson, sizeof(movementJson));
     LeaveCriticalSection(&sampleLock);
     // Serve runs serially on the sole RPC worker; keep the large public JSON
     // buffer off its stack without introducing a CRT stack-probe dependency.
     static char response[8192];
-    char age[16], pawn[256], result[512];
+    char age[16], pawn[512], result[512];
     if (copy.sequence) _snprintf(age, sizeof(age), "%lu", GetTickCount() - copy.time);
     else strcpy(age, "null");
     if (copy.pawn) _snprintf(pawn, sizeof(pawn),
-        "{\"id\":\"%p\",\"origin\":[%.6f,%.6f,%.6f],\"radius\":%.6f,\"height\":%.6f}",
-        copy.pawn, copy.origin.x, copy.origin.y, copy.origin.z, copy.radius, copy.height);
+        "{\"id\":\"%p\",\"origin\":[%.6f,%.6f,%.6f],\"velocity\":[%.6f,%.6f,%.6f],\"headingRaw\":%d,\"physicsRaw\":%u,\"radius\":%.6f,\"height\":%.6f}",
+        copy.pawn, copy.origin.x, copy.origin.y, copy.origin.z, copy.velocity.x, copy.velocity.y, copy.velocity.z,
+        copy.heading, copy.physics, copy.radius, copy.height);
     else strcpy(pawn, "null");
     const char* statuses[] = {"unavailable", "queued", "hit", "clear", "stale_epoch", "invalid_native_result"};
     if (ray.status == 2) _snprintf(result, sizeof(result),
@@ -253,8 +260,8 @@ void Serve(SOCKET socket, const char* token) {
         ray.hit.normal.x, ray.hit.normal.y, ray.hit.normal.z, ray.hit.time, ray.hit.item, ray.hit.primitive, ray.hit.material);
     else strcpy(result, "null");
     _snprintf(response, sizeof(response),
-        "{\"protocol\":\"c4-agent/2\",\"profile\":\"%s\",\"pid\":%lu,\"sequence\":%lu,\"ageMs\":%s,\"tickThread\":%lu,\"epoch\":%lu,\"engine\":\"%p\",\"viewportActor\":\"%p\",\"level\":\"%p\",\"pawn\":%s,\"session\":%s,\"capabilities\":[\"health\",\"native_tick_sample\",\"surface\",\"session_observe\",\"native_login\",\"native_selection\"],\"surface\":{\"requestId\":%lu,\"epoch\":%lu,\"status\":\"%s\",\"nativeReturn\":%d,\"mask\":%lu,\"extent\":[0,0,0],\"start\":[%.6f,%.6f,%.6f],\"end\":[%.6f,%.6f,%.6f],\"hit\":%s}}\n",
-        c4::Profile, GetCurrentProcessId(), copy.sequence, age, copy.thread, copy.epoch, copy.engine, copy.viewportActor, copy.level, pawn, sessionJson,
+        "{\"protocol\":\"c4-agent/3\",\"profile\":\"%s\",\"pid\":%lu,\"sequence\":%lu,\"ageMs\":%s,\"tickThread\":%lu,\"epoch\":%lu,\"engine\":\"%p\",\"viewportActor\":\"%p\",\"level\":\"%p\",\"pawn\":%s,\"session\":%s,\"movement\":%s,\"capabilities\":[\"health\",\"native_tick_sample\",\"surface\",\"session_observe\",\"native_login\",\"native_selection\",\"native_movement\"],\"surface\":{\"requestId\":%lu,\"epoch\":%lu,\"status\":\"%s\",\"nativeReturn\":%d,\"mask\":%lu,\"extent\":[0,0,0],\"start\":[%.6f,%.6f,%.6f],\"end\":[%.6f,%.6f,%.6f],\"hit\":%s}}\n",
+        c4::Profile, GetCurrentProcessId(), copy.sequence, age, copy.thread, copy.epoch, copy.engine, copy.viewportActor, copy.level, pawn, sessionJson, movementJson,
         ray.id, ray.epoch, statuses[ray.status], ray.nativeReturn, WorldTraceMask,
         ray.start.x, ray.start.y, ray.start.z, ray.end.x, ray.end.y, ray.end.z, result);
     SendAll(socket, response);

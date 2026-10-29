@@ -8,7 +8,7 @@ static_assert(sizeof(void*) == 4, "The C4 profile requires an x86 build");
 
 namespace c4 {
 constexpr const char* Profile = "l2solo-c4-656-0293b3ed-p1";
-constexpr const char* Protocol = "c4-agent/2";
+constexpr const char* Protocol = "c4-agent/3";
 // UNetworkHandler::Init writes this module-relative singleton. Its notify
 // subobject must match UGameEngine +0x38 (verified in this build's constructor).
 constexpr SIZE_T NetworkSingleton = 0x6d5e68;
@@ -19,6 +19,11 @@ constexpr SIZE_T NetworkGameDriver = 0x48;
 constexpr SIZE_T NetworkAuthPending = 0x50;
 constexpr SIZE_T DriverTransport = 0x38;
 constexpr SIZE_T EngineConsole = 0x6c;
+// setPhysics, physWalking and native controller movement/stop disassembly pin
+// these fields/slots. Raw origin and floor contact are deliberately not equated.
+constexpr SIZE_T ActorPhysics = 0x34, ActorYaw = 0x1cc, ActorVelocity = 0x1d4;
+constexpr SIZE_T PawnController = 0x13f0, ControllerPawn = 0x3a8;
+constexpr SIZE_T ControllerStopSlot = 0x318, NetworkMoveSlot = 0xdc;
 // SHA-pinned NWindow console class and its native Start(index) wrapper. The
 // wrapper calls RequestGameStart, then performs the matching UI transition.
 constexpr SIZE_T WindowConsoleTable = 0x1b2428;

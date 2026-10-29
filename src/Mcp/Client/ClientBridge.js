@@ -129,9 +129,10 @@ class ClientBridge {
         const sample = await this.observe();
         return { protocol, profile, pid: sample.pid, sequence: sample.sequence, epoch: sample.epoch, ageMs: sample.ageMs,
             tickThread: sample.tickThread, session: sample.session, pawnAvailable: !!sample.pawn,
-            capabilities: ['client_status', 'client_observe', 'login', 'select_server', 'select_character', 'client_action_status'],
-            unavailable: ['consent_automation', 'security_pad_answers', 'movement', 'stop', 'events', 'wait', 'capture', 'calibrated_geometry'],
-            control: { owned: this.owned, lost: this.lost, disconnect: 'Queued actions are revoked on release/lease expiry; dispatched session actions are not undone. No movement capability.' } };
+            movement: sample.movement,
+            capabilities: ['client_status', 'client_observe', 'login', 'select_server', 'select_character', 'move', 'stop', 'client_action_status'],
+            unavailable: ['consent_automation', 'security_pad_answers', 'events', 'wait', 'capture', 'correction_classification', 'calibrated_geometry'],
+            control: { owned: this.owned, lost: this.lost, disconnect: 'Release/15s lease expiry revokes queued commands and requests native stop for foreground movement. Inspect movement.stop: dispatch is not stationary confirmation. Dispatched session actions are not undone.' } };
     }
 
     async claim() {
@@ -163,10 +164,14 @@ class ClientBridge {
             if (!replay) {
                 const sample = await this.observe();
                 if (sample.epoch !== input.expectedEpoch) throw fail('stale_epoch');
-                if (input.action !== 'login' && sample.session.revision !== input.expectedRevision) throw fail('stale_revision');
+                if (['select_server', 'select_character'].includes(input.action) && sample.session.revision !== input.expectedRevision) throw fail('stale_revision');
             }
             let payload;
-            if (input.action === 'select_server') {
+            if (input.action === 'move') {
+                payload = `move ${id} ${input.expectedEpoch} ${input.destination.x} ${input.destination.y} ${input.destination.z} ${input.timeoutMs}`;
+            } else if (input.action === 'stop') {
+                payload = `stop ${id} ${input.expectedEpoch}`;
+            } else if (input.action === 'select_server') {
                 payload = `server ${id} ${input.expectedEpoch} ${input.expectedRevision} ${input.serverId}`;
             } else {
                 const parsed = credentials.safeParse(await privateJson(input.credentialFile, 4096));
@@ -190,7 +195,7 @@ class ClientBridge {
             this.payloads.set(id, digest);
             const split = payload.indexOf(' ');
             const result = { ...this.normalizeReceipt(await this.rpc(`${payload.slice(0, split)} ${this.owner} ${payload.slice(split + 1)}`, true), input.requestId),
-                guidance: 'Queued/dispatched is not session/world completion. Inspect client_status and the same client_action_status; worldEntered requires native acceptance, matching self identity and a checked pawn. Never retry an uncertain action with a new requestId.' };
+                guidance: 'Queued/dispatched is not completion. Inspect client_observe and the original receipt. Movement outcomes use native progress/stationarity; reached_xy_stopped does not establish floor/contact or vertical arrival. A void native call has nativeReturn=null. Never retry an uncertain action with a new requestId.' };
             if (result.error) this.rejections.set(id, result);
             return result;
         } finally {
@@ -204,9 +209,11 @@ class ClientBridge {
     normalizeReceipt(result, requestId) {
         if (result.error) return result;
         if (result.requestId !== requestId.replaceAll('-', '').toLowerCase() || !Number.isInteger(result.epoch)
-            || !['login', 'select_server', 'select_character'].includes(result.action)
+            || !['login', 'select_server', 'select_character', 'move', 'stop'].includes(result.action)
             || !['queued', 'dispatched', 'stale_epoch', 'owner_lost', 'native_unavailable', 'native_rejected', 'queue_expired', 'stale_revision'].includes(result.status)
-            || !Number.isInteger(result.nativeReturn)) throw fail('invalid_receipt');
+            || (['move', 'stop'].includes(result.action) ? result.nativeReturn !== null : !Number.isInteger(result.nativeReturn))
+            || !['not_observed', 'pending', 'moving', 'reached_xy_stopped', 'stopped', 'stalled', 'timed_out', 'interrupted', 'world_lost', 'manual_override', 'unknown'].includes(result.outcome)
+            || !['not_requested', 'pending', 'dispatched', 'observed_stopped', 'unconfirmed'].includes(result.stop)) throw fail('invalid_receipt');
         return { ...result, requestId: requestId.toLowerCase() };
     }
 

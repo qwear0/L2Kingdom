@@ -1,7 +1,7 @@
 'use strict';
 
 const { z } = require('zod');
-const protocol = 'c4-agent/2';
+const protocol = 'c4-agent/3';
 const profile = 'l2solo-c4-656-0293b3ed-p1';
 const requestId = z.uuid();
 const epoch = z.number().int().min(1).max(0xffffffff);
@@ -14,7 +14,12 @@ const schemas = {
         z.strictObject({ requestId, expectedEpoch: epoch, expectedRevision: revision,
             action: z.literal('select_server'), serverId: z.number().int().min(1).max(255) }),
         z.strictObject({ requestId, expectedEpoch: epoch, expectedRevision: revision,
-            action: z.literal('select_character'), credentialFile })
+            action: z.literal('select_character'), credentialFile }),
+        z.strictObject({ requestId, expectedEpoch: epoch, action: z.literal('move'),
+            destination: z.strictObject({ x: z.number().min(-1000000).max(1000000),
+                y: z.number().min(-1000000).max(1000000), z: z.number().min(-1000000).max(1000000) }),
+            timeoutMs: z.number().int().min(1000).max(15000) }),
+        z.strictObject({ requestId, expectedEpoch: epoch, action: z.literal('stop') })
     ]),
     receipt: z.strictObject({ requestId })
 };

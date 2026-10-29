@@ -237,12 +237,16 @@ void* Handler(void* engine) {
 
 constexpr unsigned ReceiptLimit = 32;
 constexpr DWORD OwnerTTL = 15000;
-enum Action { LoginAction, ServerAction, CharacterAction };
+enum Action { LoginAction, ServerAction, CharacterAction, MoveAction, StopAction };
 struct Receipt {
     char id[33];
     BYTE digest[32];
     DWORD epoch, revision;
     int status, nativeReturn, action, selection;
+    Vector target, origin, last;
+    DWORD timeout, began, stopBegan, stableSince, observedSequence;
+    int outcome, stopState;
+    bool progressed;
 };
 Receipt receipts[ReceiptLimit];
 unsigned receiptCount;
@@ -252,19 +256,24 @@ DWORD queuedAt, ownerTime;
 char owner[33];
 wchar_t account[15], password[17];
 const char* statuses[] = {"queued", "dispatched", "stale_epoch", "owner_lost", "native_unavailable", "native_rejected", "queue_expired", "stale_revision"};
-const char* actions[] = {"login", "select_server", "select_character"};
+const char* actions[] = {"login", "select_server", "select_character", "move", "stop"};
+
+#include "movement.h"
 
 void ClearCredentials() {
     SecureZeroMemory(account, sizeof(account));
     SecureZeroMemory(password, sizeof(password));
 }
 void EndOwner() {
+    RevokeMovement();
     if (queued >= 0) { receipts[queued].status = 3; queued = -1; }
     ClearCredentials();
     SecureZeroMemory(owner, sizeof(owner));
 }
 void ExpireOwner() { if (*owner && GetTickCount() - ownerTime >= OwnerTTL) EndOwner(); }
-void Tick(void* engine, DWORD epoch, bool pawn) {
+void Tick(void* engine, const Sample& next) {
+    DWORD epoch = next.epoch;
+    bool pawn = next.pawn != nullptr;
     void* handler = Handler(engine);
     nativeState.handlerValid = handler != nullptr;
     void* auth = PointerAt(handler, c4::NetworkAuthDriver);
@@ -290,13 +299,16 @@ void Tick(void* engine, DWORD epoch, bool pawn) {
         && nativeState.characterListValid && nativeState.characterCount > 0
         && nativeState.characterCount == static_cast<unsigned>(nativeState.characterExpected);
     ExpireOwner();
+    TickMovement(engine, next);
     if (queued >= 0) {
         Receipt& receipt = receipts[queued];
         bool ready = receipt.action == LoginAction ? nativeState.loginReady
-            : receipt.action == ServerAction ? nativeState.serverReady : nativeState.characterReady;
+            : receipt.action == ServerAction ? nativeState.serverReady
+            : receipt.action == CharacterAction ? nativeState.characterReady
+            : nativeState.worldEntered && (receipt.action == StopAction ? next.pawn != nullptr : MovementReady(next));
         if (GetTickCount() - queuedAt >= 10000) receipt.status = 6;
         else if (receipt.epoch != epoch) receipt.status = 2;
-        else if (receipt.action != LoginAction && receipt.revision != nativeState.revision) receipt.status = 7;
+        else if ((receipt.action == ServerAction || receipt.action == CharacterAction) && receipt.revision != nativeState.revision) receipt.status = 7;
         else if (!ready) receipt.status = 4;
         else {
             // A native return is dispatch only. Network callbacks, matching
@@ -315,7 +327,7 @@ void Tick(void* engine, DWORD epoch, bool pawn) {
                 Phase(ServerDispatch);
                 receipt.nativeReturn = serverLogin(handler, &stack);
                 nativeState.serverReady = false;
-            } else {
+            } else if (receipt.action == CharacterAction) {
                 wcscpy(nativeState.selectedCharacter, nativeState.characters[receipt.selection]);
                 nativeState.selfMatches = false;
                 nativeState.gameAccepted = 0;
@@ -326,7 +338,8 @@ void Tick(void* engine, DWORD epoch, bool pawn) {
                 receipt.nativeReturn = start(console, receipt.selection);
                 nativeState.characterReady = false;
             }
-            receipt.status = receipt.nativeReturn == 1 ? 1 : 5;
+            if (receipt.action >= MoveAction) DispatchMovement(queued, next);
+            else receipt.status = receipt.nativeReturn == 1 ? 1 : 5;
         }
         queued = -1;
         ClearCredentials();
@@ -405,8 +418,12 @@ void Render(char* output, unsigned size) {
     if (n < 0 || static_cast<unsigned>(n) >= size) strcpy(output, "{\"error\":\"session_overflow\"}");
 }
 void RenderReceipt(const Receipt& receipt, char* output, unsigned size) {
-    _snprintf(output, size, "{\"requestId\":\"%s\",\"epoch\":%lu,\"action\":\"%s\",\"status\":\"%s\",\"nativeReturn\":%d}",
-        receipt.id, receipt.epoch, actions[receipt.action], statuses[receipt.status], receipt.nativeReturn);
+    char nativeReturn[16];
+    if (receipt.action >= MoveAction) strcpy(nativeReturn, "null");
+    else _snprintf(nativeReturn, sizeof(nativeReturn), "%d", receipt.nativeReturn);
+    _snprintf(output, size, "{\"requestId\":\"%s\",\"epoch\":%lu,\"action\":\"%s\",\"status\":\"%s\",\"nativeReturn\":%s,\"outcome\":\"%s\",\"stop\":\"%s\",\"observedSequence\":%lu,\"progressObserved\":%s}",
+        receipt.id, receipt.epoch, actions[receipt.action], statuses[receipt.status], nativeReturn,
+        outcomes[receipt.outcome], stopStates[receipt.stopState], receipt.observedSequence, receipt.progressed ? "true" : "false");
 }
 
 // Called with sampleLock held. Parsing/digests/disk-free transport stay on the
@@ -424,6 +441,7 @@ void Rpc(const char* command, DWORD epoch, bool fresh, char* output, unsigned si
         }
         if (!strcmp(verb, "claim")) {
             if (*owner && strcmp(owner, suppliedOwner)) { strcpy(output, "{\"error\":\"owner_busy\"}"); return; }
+            if (StopOutstanding()) { strcpy(output, "{\"error\":\"stop_pending\"}"); return; }
             strcpy(owner, suppliedOwner); ownerTime = GetTickCount();
             strcpy(output, "{\"status\":\"owned\",\"ttlMs\":15000}"); return;
         }
@@ -435,6 +453,8 @@ void Rpc(const char* command, DWORD epoch, bool fresh, char* output, unsigned si
         }
     }
     int action = -1, selection = -1;
+    Vector destination = {};
+    unsigned long timeout = 0;
     if (!strcmp(verb, "login")) {
         if (sscanf(command, "%8s %32s %32s %lu %56s %64s %c", verb, suppliedOwner, id, &expected, user, secret, &extra) == 6) action = LoginAction;
     } else if (!strcmp(verb, "server")) {
@@ -442,6 +462,12 @@ void Rpc(const char* command, DWORD epoch, bool fresh, char* output, unsigned si
             && server > 0 && server <= 255) action = ServerAction;
     } else if (!strcmp(verb, "char")) {
         if (sscanf(command, "%8s %32s %32s %lu %lu %256s %c", verb, suppliedOwner, id, &expected, &revision, user, &extra) == 6) action = CharacterAction;
+    } else if (!strcmp(verb, "move")) {
+        if (sscanf(command, "%8s %32s %32s %lu %f %f %f %lu %c", verb, suppliedOwner, id, &expected,
+            &destination.x, &destination.y, &destination.z, &timeout, &extra) == 8
+            && Finite(destination) && timeout >= 1000 && timeout <= 15000) action = MoveAction;
+    } else if (!strcmp(verb, "stop")) {
+        if (sscanf(command, "%8s %32s %32s %lu %c", verb, suppliedOwner, id, &expected, &extra) == 4) action = StopAction;
     }
     if (action < 0 || !Hex(suppliedOwner, 32) || !Hex(id, 32) || !expected) {
         SecureZeroMemory(secret, sizeof(secret)); strcpy(output, "{\"error\":\"invalid_command\"}"); return;
@@ -454,11 +480,15 @@ void Rpc(const char* command, DWORD epoch, bool fresh, char* output, unsigned si
         else RenderReceipt(receipts[i], output, size);
         SecureZeroMemory(secret, sizeof(secret)); return;
     }
-    bool ready = action == LoginAction ? published.loginReady : action == ServerAction ? published.serverReady : published.characterReady;
+    bool ready = action == LoginAction ? published.loginReady : action == ServerAction ? published.serverReady
+        : action == CharacterAction ? published.characterReady
+        : published.worldEntered && (action == StopAction ? sample.pawn != nullptr : MovementReady(sample));
     const char* error = !*owner || strcmp(owner, suppliedOwner) ? "owner_lost"
         : !fresh ? "sample_stale" : expected != epoch ? "stale_epoch"
-        : queued >= 0 ? "action_busy" : action != LoginAction && revision != published.revision ? "stale_revision"
+        : queued >= 0 || (action == MoveAction && foreground >= 0) ? "action_busy"
+        : (action == ServerAction || action == CharacterAction) && revision != published.revision ? "stale_revision"
         : !ready ? "action_unavailable" : receiptCount >= ReceiptLimit ? "receipt_capacity" : nullptr;
+    if (!error && action == MoveAction && !LocalDestination(sample.origin, destination)) error = "destination_out_of_range";
     if (!error && action == LoginAction && (!Decode(user, account, 15) || !Decode(secret, password, 17))) error = "invalid_credentials_shape";
     if (!error && action == ServerAction) {
         for (unsigned i = 0; i < published.serverCount; ++i) if (published.servers[i].id == server) selection = static_cast<int>(i);
@@ -484,6 +514,7 @@ void Rpc(const char* command, DWORD epoch, bool fresh, char* output, unsigned si
     Receipt& receipt = receipts[queued];
     strcpy(receipt.id, id); memcpy(receipt.digest, digest, 32); receipt.epoch = expected;
     receipt.revision = revision; receipt.action = action; receipt.selection = selection;
+    receipt.target = destination; receipt.timeout = action == StopAction ? 5000 : timeout;
     queuedAt = ownerTime = GetTickCount();
     RenderReceipt(receipt, output, size);
 }

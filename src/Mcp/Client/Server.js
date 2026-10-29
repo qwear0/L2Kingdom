@@ -14,7 +14,7 @@ async function run() {
         if (closing) return;
         closing = true;
         try { await bridge.close(); }
-        catch { console.error('C4 client MCP :: release unconfirmed; queued actions expire with the 15s owner lease; dispatched session actions are not undone'); process.exitCode = 1; }
+        catch { console.error('C4 client MCP :: release unconfirmed; the 15s owner lease revokes queued actions and requests native movement stop; stationary confirmation requires fresh native samples; dispatched session actions are not undone'); process.exitCode = 1; }
         await server.close();
     };
     server.server.onclose = () => { void shutdown(); };
