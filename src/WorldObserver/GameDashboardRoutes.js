@@ -24,7 +24,7 @@ async function gameDashboardRoute(request, response, url, context, service) {
             else result = await service.link(context.principal, context.clientAddress, await readJson(request));
         } else if (url.pathname === DASHBOARD) result = await service.read(context.principal, query.length === 1);
         else result = await service.command(context.principal, await readJson(request));
-        sendJson(response, result);
+        sendJson(response, result, result.outcome === 'rejected' ? C.REASONS[result.code] || 409 : 200);
     } catch (error) {
         const code = Object.hasOwn(C.REASONS, error.code) ? error.code
             : Object.hasOwn(C.REASONS, error.message) ? error.message : 'request_failed';

@@ -2,6 +2,7 @@ const Html = invoke('GameServer/World/Generics/HtmlKit');
 const Response = invoke('GameServer/Network/Response');
 const Controller = invoke('GameServer/Actor/PlayerAutoFight');
 const Settings = require('../../../Actor/PlayerAutoFightSettings');
+const Control = require('../../../Actor/PlayerAutoFightControl');
 const PAGE_SIZE = 6;
 const TABS = [['main', 'Hunt'], ['skills', 'Skills'], ['settings', 'Settings']];
 
@@ -94,6 +95,8 @@ function render(session, message = '') {
         body += 'Edits save automatically per character. Defaults: radius 1200, basic only ON, pickup OFF, no allowed skills, HP 35/95%, MP 20/95%.<br>';
     }
     body += '<br>' + command('Refresh', 'refresh');
+    session.nativeAutoFightControlVersion = Control.version(controller);
+    session.nativeAutoFightRunId = Control.runId(controller);
     session.dataSendToMe(Response.npcHtml(0, Html.page(body, {
         title: 'Auto-fight', tabs: Html.tabs(TABS, tab, `${prefix} view`)
     })));
@@ -104,12 +107,14 @@ function renderWithCompletion(session, controller, message = '') {
     if (controller.settingsStatus !== 'loading' && controller.settingsSave !== 'saving') return;
     const epoch = session.nativeAutoFightEpoch, revision = session.nativeAutoFightRevision;
     const htmlGeneration = session.npcHtmlGeneration;
+    const commandEpoch = controller.controlCommandEpoch || 0;
     // Auto-fight revisions cannot detect another dialog replacing the shared HTML
     // window. Require both page identity and lifecycle ownership before redrawing.
     controller.settingsTask?.then(() => {
         if (session.actor === controller.actor && session.nativeAutoFightActor === controller.actor && session.nativeAutoFightOpen
             && session.nativeAutoFightEpoch === epoch && session.nativeAutoFightRevision === revision
-            && session.npcHtmlGeneration === htmlGeneration) render(session);
+            && session.npcHtmlGeneration === htmlGeneration
+            && (controller.controlCommandEpoch || 0) === commandEpoch) render(session);
     }).catch(error => utils.infoWarn('PlayerAutoFight', 'settings page redraw failed: %s', error?.message));
 }
 
@@ -137,35 +142,34 @@ function handler(session, parts) {
         if (parts.length !== 5 || !TABS.some(([id]) => id === parts[4])) return;
     } else if (!['thresholds', 'radius'].includes(action)) return;
     const controller = Controller.forActor(session.actor);
-    // Consume before dispatch so repeated New Session/Start/edits cannot apply twice.
     ++session.nativeAutoFightRevision;
-    let accepted = true;
-    if (action === 'stop') controller.stop();
-    else if (action === 'new') {
-        if (controller.run) accepted = false;
-        else controller.newSession();
-    } else if (action === 'start') accepted = controller.start();
-    else if (action === 'center') accepted = controller.rememberPoint('center');
-    else if (action === 'point') accepted = controller.rememberPoint();
-    else if (action === 'allow') accepted = controller.allowSkill(Number(parts[4]));
-    else if (action === 'radius') accepted = parts.length === 5 && /^\d{1,4}$/.test(parts[4])
-        && controller.setRadius(Number(parts[4]));
-    else if (action === 'pickup') accepted = controller.setPickup(!controller.pickup);
-    else if (action === 'basic') accepted = controller.setBasicAttackOnly(!controller.basicAttackOnly);
-    else if (action === 'load') controller.loadSettings(true);
-    else if (action === 'save') accepted = controller.retrySettingsSave();
-    else if (action === 'defaults') accepted = controller.resetSettings();
-    else if (action === 'view') session.nativeAutoFightTab = parts[4];
-    else if (action === 'page') session.nativeAutoFightPage = Number(parts[4]);
-    else if (action === 'thresholds') {
-        accepted = parts.length === 8 && parts.slice(4).every(value => /^\d{1,3}$/.test(value))
-            && controller.setThresholds(...parts.slice(4).map(Number));
+    if (['view', 'page', 'refresh'].includes(action)) {
+        if (action === 'view') session.nativeAutoFightTab = parts[4];
+        if (action === 'page') session.nativeAutoFightPage = Number(parts[4]);
+        renderWithCompletion(session, controller);
+        return;
     }
-    renderWithCompletion(session, controller, accepted ? '' : action === 'thresholds'
-        ? 'Not applied: enter all four integer percentages; each must satisfy 1 <= enter < resume <= 100. Stop before editing.'
-        : action === 'radius'
-            ? `Not applied: enter an integer radius from ${Settings.MIN_RADIUS} to ${Settings.MAX_RADIUS}. Stop before editing.`
-            : 'Not applied. Check status/reason and Stop before changing structural settings.');
+    const names = { stop: 'stop', new: 'newSession', start: 'start', center: 'setCenter', point: 'setRestPoint',
+        allow: 'setSkillAllowed', radius: 'setRadius', pickup: 'setPickup', basic: 'setBasicAttackOnly',
+        load: 'retryLoad', save: 'retrySave', defaults: 'resetDefaults', thresholds: 'setThresholds' };
+    const command = { action: `autoFight.${names[action]}`, expectedVersion: session.nativeAutoFightControlVersion };
+    if (action === 'stop') command.expectedRunId = session.nativeAutoFightRunId;
+    if (action === 'allow') Object.assign(command, { skillId: Number(parts[4]), value: !controller.allowedSkillIds.has(Number(parts[4])) });
+    if (action === 'radius') {
+        if (parts.length !== 5 || !/^\d{1,4}$/.test(parts[4])) { render(session, 'Not applied: enter an integer radius from 1 to 6000.'); return; }
+        command.value = Number(parts[4]);
+    }
+    if (action === 'pickup') command.value = !controller.pickup;
+    if (action === 'basic') command.value = !controller.basicAttackOnly;
+    if (action === 'thresholds') {
+        if (parts.length !== 8 || !parts.slice(4).every(value => /^\d{1,3}$/.test(value))) { render(session, 'Not applied: enter all four integer percentages.'); return; }
+        ['hpEnter', 'hpResume', 'mpEnter', 'mpResume'].forEach((key, index) => { command[key] = Number(parts[4 + index]); });
+    }
+    const result = Control.execute(controller, command);
+    renderWithCompletion(session, controller, result.outcome !== 'rejected' ? ''
+        : result.code === 'stale_version' || result.code === 'stale_run'
+            ? 'Controls changed elsewhere. Refreshed; review the current state before retrying.'
+            : `Not applied: ${result.reason || result.code}. Stop before changing structural settings.`);
 }
 
 handler.open = open;

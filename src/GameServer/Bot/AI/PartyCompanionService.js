@@ -118,6 +118,10 @@ function getSettings(leaderSession) {
 
 function updateSettings(leaderSession, patch = {}) {
     const settings = settingsForLeader(leaderSession);
+    if (leaderSession && Object.keys(patch).some(key => ['distribution', 'movementMode', 'combatMode', 'pullMode', 'pullerId', 'lootPickupEnabled'].includes(key)
+        && patch[key] !== undefined && (patch[key] !== null || key === 'pullerId') && !Object.is(settings[key], patch[key]))) {
+        leaderSession.partyControlPolicyEpoch = (leaderSession.partyControlPolicyEpoch || 0) + 1;
+    }
     Object.keys(patch).forEach((key) => {
         if (patch[key] !== undefined && (patch[key] !== null || key === 'pullerId')) {
             settings[key] = patch[key];
@@ -151,6 +155,7 @@ function setDistribution(leaderSession, distribution) {
     const next = normalizeDistribution(distribution);
     if (settings.distribution !== next) {
         settings.distribution = next;
+        if (leaderSession) leaderSession.partyControlPolicyEpoch = (leaderSession.partyControlPolicyEpoch || 0) + 1;
         // Turn order is meaningful only for the currently selected rule.
         settings.itemLastLootIndex = -1;
         membersForLeader(leaderSession).forEach((companionSession) => {
@@ -1011,6 +1016,8 @@ function detachState(companionSession, plan = 'hunting', preserveTakeover = fals
     invoke('GameServer/Bot/AI/HotBotPolicyOverlay').clearForPartyDetach(companionSession);
     cancelCompanionAction(companionSession);
     companionSession.plan = plan;
+    const leader = companionSession.followPlayerSession;
+    if (leader) leader.partyControlMembershipEpoch = (leader.partyControlMembershipEpoch || 0) + 1;
     companionSession.followPlayerSession = null;
     companionSession.partyCompanion = false;
     delete companionSession.partyJoinApproach;
@@ -1282,6 +1289,7 @@ const PartyCompanionService = {
         });
         invoke('GameServer/Bot/AI/BotPvpIndex').invalidate();
         refreshPartyMemberships(roster, invoke);
+        leaderSession.partyControlMembershipEpoch = (leaderSession.partyControlMembershipEpoch || 0) + 1;
 
         leaderSession.dataSendToMe?.(ServerResponse.joinParty(1));
         roster.forEach((companionSession) => {
@@ -1373,6 +1381,10 @@ const PartyCompanionService = {
         companionSession.plan = 'following';
         companionSession.followPlayerSession = leaderSession;
         companionSession.partyCompanion = true;
+        leaderSession.partyControlMembershipEpoch = (leaderSession.partyControlMembershipEpoch || 0) + 1;
+        if (previousLeader && previousLeader !== leaderSession) {
+            previousLeader.partyControlMembershipEpoch = (previousLeader.partyControlMembershipEpoch || 0) + 1;
+        }
         invoke('GameServer/Bot/AI/BotPvpIndex').invalidate();
         refreshPartyMemberships([companionSession], invoke);
         companionSession.botStay = false;

@@ -11,7 +11,7 @@ const REASONS = Object.freeze({
     account_already_linked: 409, stale_link: 409, stale_actor: 409, stale_version: 409,
     stale_run: 409, ambiguous_session: 409, busy: 409, unlinked: 409, offline: 409,
     settings_loading: 409, settings_failed: 409, stop_required: 409, action_unavailable: 409,
-    invalid_member: 409, invalid_skill: 409, rate_limited: 429,
+    invalid_member: 409, invalid_skill: 409, settling: 409, rate_limited: 429,
     runtime_unavailable: 503, runtime_timeout: 503, dashboard_not_ready: 503
 });
 function failure(code) { return Object.assign(error(code, REASONS[code] || 503), { code }); }

@@ -26,6 +26,11 @@ module.exports = function nativeParty(session, parts) {
         CompanionControl.render(session);
         return;
     }
+    if (session.nativePartyControlActor !== session.actor) {
+        CompanionControl.render(session);
+        return;
+    }
+    const expectedVersion = session.nativePartyControlVersion;
     if (operation === 'action') {
         const command = parts[2];
         const value = parts[3];
@@ -36,14 +41,14 @@ module.exports = function nativeParty(session, parts) {
             loot: ['on', 'off']
         };
         if (command === 'regroup' || (Object.hasOwn(allowed, command) && allowed[command].includes(value))) {
-            CompanionControl(session, ['companion-control', command, value]);
+            CompanionControl(session, ['companion-control', command, value], { expectedVersion });
         }
         return;
     }
     if (operation === 'member') {
         if (!/^\d{1,10}$/.test(parts[2] || '')) return;
-        const Party = invoke('GameServer/Bot/AI/PartyCompanionService');
-        const member = Party.membersForLeader(session).find((candidate) => (
+        const Control = require('../../../Bot/AI/PartyControl');
+        const member = Control.members(session).find((candidate) => (
             candidate.actor?.fetchId() === Number(parts[2])
         ));
         if (!member) {
@@ -53,9 +58,9 @@ module.exports = function nativeParty(session, parts) {
         const name = member.actor.fetchName();
         const action = parts[3];
         if (['follow', 'stay', 'summon'].includes(action)) {
-            CompanionControl(session, ['companion-control', action, name]);
+            CompanionControl(session, ['companion-control', action, name], { expectedVersion });
         } else if (action === 'pull-on' || action === 'pull-off') {
-            CompanionControl(session, ['companion-control', 'member-pull', action === 'pull-on' ? 'on' : 'off', name]);
+            CompanionControl(session, ['companion-control', 'member-pull', action === 'pull-on' ? 'on' : 'off', name], { expectedVersion });
         }
     }
 };

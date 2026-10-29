@@ -1,14 +1,14 @@
 const BotManager = invoke('GameServer/Bot/BotManager');
 const ServerResponse = invoke('GameServer/Network/Response');
-const TeleportTo = invoke('GameServer/Actor/Generics/TeleportTo');
+const Control = require('../../../Bot/AI/PartyControl');
 const BotRoles = invoke('GameServer/Bot/AI/BotRoles');
 const BotStatus = invoke('GameServer/Bot/AI/BotStatus');
 const Html = invoke('GameServer/World/Generics/HtmlKit');
 const PartyCompanionService = invoke('GameServer/Bot/AI/PartyCompanionService');
 
-// C4 limits NpcHtmlMessage to 8192 characters. Five compact party cards fit
-// safely; a full eight-member party therefore uses a second page.
-const COMPANIONS_PER_PAGE = 5;
+// C4 limits NpcHtmlMessage to 8192 characters. Version-stamped action links
+// need room too; four compact cards keep a full eight-member party on two pages.
+const COMPANIONS_PER_PAGE = 4;
 const PARTY_ROLE_PRIORITY = {
     tank: 0,
     buffer: 1,
@@ -16,7 +16,7 @@ const PARTY_ROLE_PRIORITY = {
 };
 
 function companionSessions(session) {
-    return PartyCompanionService.membersForLeader(session);
+    return Control.members(session);
 }
 
 function orderedCompanionSessions(session) {
@@ -36,171 +36,7 @@ function findCompanion(session, botName) {
     )) || null;
 }
 
-// Returns false when the companion is not held: one on a hidden supply errand
-// keeps its errand (a Hold would store the hidden town position as the anchor
-// and the errand's return would never clear it), as at summonNear.
-function stayHere(targetSession) {
-    const SupplyErrand = invoke('GameServer/Bot/AI/BotSupplyErrand');
-    if (SupplyErrand.ownsCompanion(targetSession)) return false;
-    const bot = targetSession.actor;
-    targetSession.botStay = true;
-    targetSession.stayLocation = {
-        locX: bot.fetchLocX(),
-        locY: bot.fetchLocY(),
-        locZ: bot.fetchLocZ()
-    };
-    return true;
-}
-
-function followLeader(targetSession) {
-    targetSession.botStay = false;
-    targetSession.stayLocation = null;
-}
-
-function isAssignedPuller(targetSession, settings = PartyCompanionService.getSettings(targetSession?.followPlayerSession)) {
-    return settings?.pullMode === 'bot' &&
-        Number(settings.pullerId || 0) === Number(targetSession?.actor?.fetchId?.());
-}
-
-function stopPullAction(targetSession) {
-    const bot = targetSession?.actor;
-    if (!bot) return;
-    bot.attack?.abortCast?.(targetSession, bot);
-    bot.attack?.clearTimers?.();
-    bot.state?.setHits?.(false);
-    bot.state?.setCasts?.(false);
-    bot.automation?.abortAll?.(bot);
-    targetSession.currentTargetId = undefined;
-    bot.unselect?.();
-}
-
-function assignedPullerSession(session) {
-    const settings = PartyCompanionService.getSettings(session);
-    return companionSessions(session).find((memberSession) => isAssignedPuller(memberSession, settings)) || null;
-}
-
-function clearAssignedPuller(session, { nextPullMode = 'auto' } = {}) {
-    const settings = PartyCompanionService.getSettings(session);
-    if (settings.pullMode !== 'bot') return false;
-
-    stopPullAction(assignedPullerSession(session));
-    PartyCompanionService.updateSettings(session, { pullMode: nextPullMode, pullerId: null });
-    session.partyPullState = {};
-    companionSessions(session).forEach((memberSession) => {
-        memberSession.partyPuller = false;
-        memberSession.autoTaunt = nextPullMode !== 'off';
-    });
-    return true;
-}
-
-// Returns false when the companion is not moved: one on a hidden supply
-// errand stays on it (the errand's return places it beside the leader), as at
-// the leader's teleport (TeleportTo.syncPartyCompanions).
-function summonNear(session, targetSession, offset = 60) {
-    const SupplyErrand = invoke('GameServer/Bot/AI/BotSupplyErrand');
-    if (SupplyErrand.ownsCompanion(targetSession)) return false;
-    const actor = session.actor;
-    const bot = targetSession.actor;
-    const loc = {
-        locX: actor.fetchLocX() + offset,
-        locY: actor.fetchLocY() + offset,
-        locZ: actor.fetchLocZ()
-    };
-    TeleportTo(targetSession, bot, loc);
-    if (targetSession.botStay) {
-        targetSession.stayLocation = loc;
-    }
-    return true;
-}
-
-function setMovementMode(session, mode) {
-    const members = companionSessions(session);
-    if (mode === 'hold') clearAssignedPuller(session);
-    PartyCompanionService.updateSettings(session, { movementMode: mode });
-    members.forEach((memberSession) => {
-        if (mode === 'hold') {
-            stayHere(memberSession);
-        } else {
-            followLeader(memberSession);
-        }
-    });
-}
-
-function setCombatMode(session, mode) {
-    const allowed = ['assist', 'protect', 'passive'];
-    if (!allowed.includes(mode)) return;
-    PartyCompanionService.updateSettings(session, { combatMode: mode });
-    companionSessions(session).forEach((memberSession) => {
-        memberSession.currentTargetId = undefined;
-        memberSession.actor?.unselect?.();
-    });
-}
-
-function setPullMode(session, mode) {
-    const allowed = ['auto', 'leader', 'off'];
-    const pullMode = allowed.includes(mode) ? mode : 'auto';
-    stopPullAction(assignedPullerSession(session));
-    PartyCompanionService.updateSettings(session, { pullMode, pullerId: null });
-    session.partyPullState = {};
-    companionSessions(session).forEach((memberSession) => {
-        memberSession.autoTaunt = pullMode !== 'off';
-        memberSession.partyPuller = false;
-        memberSession.currentTargetId = undefined;
-        memberSession.actor?.unselect?.();
-    });
-}
-
-function setMemberPuller(session, targetSession) {
-    const role = BotRoles.inferRole(targetSession?.actor);
-    if (!['tank', 'dagger', 'dps'].includes(role)) return false;
-
-    const previousPuller = assignedPullerSession(session);
-    if (previousPuller && previousPuller !== targetSession) stopPullAction(previousPuller);
-    PartyCompanionService.updateSettings(session, {
-        pullMode: 'bot',
-        pullerId: targetSession.actor.fetchId()
-    });
-    session.partyPullState = {};
-    companionSessions(session).forEach((memberSession) => {
-        memberSession.partyPuller = memberSession === targetSession;
-        memberSession.autoTaunt = true;
-        if (memberSession === targetSession) followLeader(memberSession);
-    });
-    BotManager.botSay(targetSession, "I'll pull the next mobs to the party.");
-    return true;
-}
-
-function regroup(session) {
-    let slot = 0;
-    companionSessions(session).forEach((memberSession) => {
-        if (summonNear(session, memberSession, 60 + (slot * 20))) slot += 1;
-    });
-}
-
-function handleMemberCommand(session, subCommand, botName) {
-    const targetSession = findCompanion(session, botName);
-    if (!targetSession) return;
-
-    if (subCommand === 'follow') {
-        if (isAssignedPuller(targetSession)) clearAssignedPuller(session);
-        followLeader(targetSession);
-        BotManager.botSay(targetSession, "Following you again!");
-    } else if (subCommand === 'stay') {
-        if (invoke('GameServer/Bot/AI/BotSupplyErrand').ownsCompanion(targetSession)) return;
-        if (isAssignedPuller(targetSession)) clearAssignedPuller(session);
-        if (stayHere(targetSession)) BotManager.botSay(targetSession, "Holding this position.");
-    } else if (subCommand === 'summon') {
-        if (summonNear(session, targetSession)) {
-            BotManager.botSay(targetSession, "Summoned to your side!");
-        }
-    } else if (subCommand === 'dismiss') {
-        PartyCompanionService.detach(session, targetSession, {
-            event: 'party_kicked',
-            source: 'panel',
-            message: 'Leaving the party. Good luck out there!'
-        });
-    }
-}
+const isAssignedPuller = Control.isAssignedPuller;
 
 function compactText(value, fallback = 'idle') {
     return String(value || fallback)
@@ -219,7 +55,9 @@ function actionRow(items, options = {}) {
             cells.push(Html.cell('', { width, align: 'center' }));
             continue;
         }
-        cells.push(Html.cell(Html.link(item.label, item.command, {
+        const command = options.controlVersion && item.command.startsWith('companion-control ')
+            ? item.command.replace('companion-control ', `companion-control ${options.controlVersion} `) : item.command;
+        cells.push(Html.cell(Html.link(item.label, command, {
             color: item.active ? Html.COLOR.title : (item.color || Html.COLOR.link)
         }), { width, align: 'center' }));
     }
@@ -242,7 +80,8 @@ function pageNavigation(command, page, totalPages, label) {
     ]) + '<br1>';
 }
 
-function renderModePanel(settings, count) {
+function renderModePanel(settings, count, controlVersion) {
+    const row = (items, options) => actionRow(items, { ...options, controlVersion });
     const title = `${Html.font('Party Control', Html.COLOR.title)} ${Html.font(`${count} active`, Html.COLOR.ok)}`;
     const summary = [
         `Combat ${settings.combatMode}`,
@@ -259,29 +98,29 @@ function renderModePanel(settings, count) {
                 Html.cell(Html.font(summary, Html.COLOR.muted), { width: Html.WIDTH, align: 'center' })
             ])
         ]),
-        actionRow([
+        row([
             { label: 'Refresh', command: 'companion-control refresh', color: Html.COLOR.muted }
         ], { columns: 1 }),
         Html.font('Combat', Html.COLOR.muted),
-        actionRow([
+        row([
             { label: 'Assist', active: settings.combatMode === 'assist', command: 'companion-control combat assist' },
             { label: 'Protect', active: settings.combatMode === 'protect', command: 'companion-control combat protect' },
             { label: 'Passive', active: settings.combatMode === 'passive', command: 'companion-control combat passive' }
         ]),
         Html.font('Move', Html.COLOR.muted),
-        actionRow([
+        row([
             { label: 'Follow', active: settings.movementMode !== 'hold', command: 'companion-control movement follow' },
             { label: 'Hold', active: settings.movementMode === 'hold', command: 'companion-control movement hold' },
             { label: 'Regroup', command: 'companion-control regroup', color: Html.COLOR.ok }
         ]),
         Html.font('Pull', Html.COLOR.muted),
-        actionRow([
+        row([
             { label: 'Auto', active: settings.pullMode === 'auto', command: 'companion-control pull auto' },
             { label: 'Player', active: settings.pullMode === 'leader', command: 'companion-control pull leader' },
             { label: 'Off', active: settings.pullMode === 'off', command: 'companion-control pull off' }
         ], { columns: 3 }),
         Html.font('Loot', Html.COLOR.muted),
-        actionRow([
+        row([
             { label: 'On', active: settings.lootPickupEnabled !== false, command: 'companion-control loot on' },
             { label: 'Off', active: settings.lootPickupEnabled === false, command: 'companion-control loot off' }
         ]),
@@ -327,7 +166,7 @@ function companionView(companionSession, settings) {
     };
 }
 
-function renderCompanionCard(companionSession, settings) {
+function renderCompanionCard(companionSession, settings, controlVersion) {
     const bot = companionSession.actor;
     const view = companionView(companionSession, settings);
     const { isPuller, stayActive, role, stance, note, noteColor, canPull } = view;
@@ -360,53 +199,41 @@ function renderCompanionCard(companionSession, settings) {
                 : { label: 'Pull', command: `companion-control member-pull on ${bot.fetchName()}`, color: Html.COLOR.ok })
             : null,
         { label: 'Call', command: `companion-control summon ${bot.fetchName()}` }
-    ].filter(Boolean));
+    ].filter(Boolean), { controlVersion });
 
     return `${Html.line(Html.TEXTURE.line, Html.WIDTH, 1)}${summary}${actions}<br1>`;
 }
 
-function companionControl(session, parts) {
+function companionControl(session, parts, options = {}) {
     const actor = session.actor;
     if (!actor || actor.isDead()) return;
-
-    const subCommand = parts[1];
-    const value = parts[2];
-    const requestedPage = subCommand === 'page' ? Number(value) : 0;
-    if (['movement', 'combat', 'pull', 'loot', 'member-pull', 'regroup', 'follow', 'stay', 'summon', 'dismiss'].includes(subCommand)) {
-        const named = ['member-pull', 'follow', 'stay', 'summon', 'dismiss'].includes(subCommand);
-        const target = named ? findCompanion(session, subCommand === 'member-pull' ? parts[3] : value) : null;
-        const members = named ? (target ? [target] : []) : companionSessions(session);
-        if (members.some(member => member.mcpControl && !member.mcpControl.preempt('owner_party_command'))) {
-            session.dataSendToMe(ServerResponse.speak(actor, { kind: 0, text: 'A companion is settling a native operation. Retry the command after it finishes.' }));
-            return;
+    let expectedVersion = options.expectedVersion;
+    if (/^[0-9a-f-]{36}$/.test(parts[1] || '')) {
+        expectedVersion = parts[1];
+        parts = [parts[0], ...parts.slice(2)];
+    }
+    const subCommand = parts[1], value = parts[2];
+    const names = { movement: 'setMovement', combat: 'setCombat', pull: 'setPull', loot: 'setLoot',
+        'member-pull': 'setMemberPull', regroup: 'regroup', follow: 'follow', stay: 'stay', summon: 'call', dismiss: 'dismiss' };
+    if (Object.hasOwn(names, subCommand)) {
+        const command = { action: `party.${names[subCommand]}`, expectedVersion };
+        if (['movement', 'combat', 'pull'].includes(subCommand)) command.value = value;
+        if (['loot', 'member-pull'].includes(subCommand)) {
+            if (!['on', 'off'].includes(value)) return;
+            command.value = value === 'on';
+        }
+        if (['member-pull', 'follow', 'stay', 'summon', 'dismiss'].includes(subCommand)) {
+            const target = findCompanion(session, subCommand === 'member-pull' ? parts[3] : value);
+            command.memberId = target?.actor.fetchId();
+        }
+        const result = Control.execute(session, command);
+        if (result.outcome !== 'applied' || result.preemptedMemberIds.length) {
+            const text = result.code === 'stale_version' ? 'Party controls changed elsewhere. Refreshed; review before retrying.'
+                : `Party command: ${result.outcome}${result.code ? ` (${result.code})` : ''}; applied ${result.affectedMemberIds.length}, skipped ${result.skippedMembers.length}, MCP released ${result.preemptedMemberIds.length}.`;
+            session.dataSendToMe(ServerResponse.speak(actor, { kind: 0, text }));
         }
     }
-
-    if (subCommand === 'movement') {
-        setMovementMode(session, value === 'hold' ? 'hold' : 'follow');
-    } else if (subCommand === 'combat') {
-        setCombatMode(session, value);
-    } else if (subCommand === 'pull') {
-        setPullMode(session, value);
-    } else if (subCommand === 'loot' && ['on', 'off'].includes(value)) {
-        PartyCompanionService.updateSettings(session, { lootPickupEnabled: value === 'on' });
-    } else if (subCommand === 'member-pull') {
-        const targetSession = findCompanion(session, parts[3]);
-        if (value === 'on' && targetSession) {
-            setMemberPuller(session, targetSession);
-        } else if (value === 'off' && targetSession && isAssignedPuller(targetSession)) {
-            // "Stop Pull" must disable autonomous pulling rather than
-            // silently falling back to the automatic tank puller.
-            clearAssignedPuller(session, { nextPullMode: 'off' });
-            BotManager.botSay(targetSession, 'Stopping pull duty and staying with the party.');
-        }
-    } else if (subCommand === 'regroup') {
-        regroup(session);
-    } else if (subCommand && subCommand !== 'refresh') {
-        handleMemberCommand(session, subCommand, value);
-    }
-
-    renderCompanionPanel(session, requestedPage);
+    renderCompanionPanel(session, subCommand === 'page' ? Number(value) : 0);
 }
 
 function renderCompanionPanel(session, requestedPage = 0, options = {}) {
@@ -415,6 +242,9 @@ function renderCompanionPanel(session, requestedPage = 0, options = {}) {
 
     const myCompanions = orderedCompanionSessions(session);
     const settings = PartyCompanionService.getSettings(session);
+    const controlVersion = Control.version(session, myCompanions);
+    session.nativePartyControlVersion = controlVersion;
+    session.nativePartyControlActor = actor;
 
     if ([1, 2, 3].includes(session.nativePartyUiVersion)) {
         if (options.open === true) session.nativePartyUiOpen = true;
@@ -444,11 +274,11 @@ function renderCompanionPanel(session, requestedPage = 0, options = {}) {
     const first = page * COMPANIONS_PER_PAGE;
     const visibleCompanions = myCompanions.slice(first, first + COMPANIONS_PER_PAGE);
 
-    let body = renderModePanel(settings, myCompanions.length);
+    let body = renderModePanel(settings, myCompanions.length, controlVersion);
     body += Html.spacer(5);
 
     visibleCompanions.forEach((companionSession) => {
-        body += renderCompanionCard(companionSession, settings);
+        body += renderCompanionCard(companionSession, settings, controlVersion);
         body += Html.spacer(4);
     });
 

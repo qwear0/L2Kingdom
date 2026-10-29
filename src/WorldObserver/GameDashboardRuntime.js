@@ -17,9 +17,8 @@ async function dispatch(type, payload, current) {
         if (submitted.length !== stored.length || !timingSafeEqual(submitted, stored)) throw C.failure('invalid_credentials');
         return { accountName: account.username };
     }
-    // P1 establishes the authenticated transport only. P2 supplies authoritative
-    // actor/card/run fences and gameplay dispatch; never invent an offline state.
-    throw C.failure('dashboard_not_ready');
+    const dashboard = require('./GameDashboardService');
+    return type === 'gameDashboard.read' ? dashboard.read(payload, current) : dashboard.action(payload, current);
 }
 
 function install(isUnavailable) {

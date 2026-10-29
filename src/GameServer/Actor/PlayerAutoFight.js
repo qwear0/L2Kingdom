@@ -82,7 +82,7 @@ class PlayerAutoFight {
         this.settingsError = '';
         this.settingsTask = Promise.resolve().then(() => invoke('Database').fetchAutoFightSettings(characterId, accountId))
             .then(row => {
-                if (!this.settingsCurrent(epoch) || revision !== this.settingsRevision) return;
+                if (!this.settingsCurrent(epoch) || this.session.accountId !== accountId || revision !== this.settingsRevision) return;
                 let settings;
                 try { settings = row ? Settings.decode(row.settingsJson) : Settings.defaults(); }
                 catch (_) {
@@ -95,7 +95,7 @@ class PlayerAutoFight {
                 this.settingsStatus = 'ready';
                 this.settingsSave = 'clean';
             }, () => {
-                if (!this.settingsCurrent(epoch) || revision !== this.settingsRevision) return;
+                if (!this.settingsCurrent(epoch) || this.session.accountId !== accountId || revision !== this.settingsRevision) return;
                 this.settingsStatus = 'load_failed';
                 this.settingsError = 'Could not load preferences. Start is blocked; retry loading or explicitly replace them with defaults.';
             });
@@ -111,9 +111,9 @@ class PlayerAutoFight {
         // change the visible save state; earlier failures cannot mask later edits.
         this.settingsTask = Promise.resolve().then(() => invoke('Database').saveAutoFightSettings(characterId, accountId, settings,
             () => this.settingsCurrent(epoch) && this.session.accountId === accountId)).then(() => {
-            if (this.settingsCurrent(epoch) && revision === this.settingsRevision) this.settingsSave = 'saved';
+            if (this.settingsCurrent(epoch) && this.session.accountId === accountId && revision === this.settingsRevision) this.settingsSave = 'saved';
         }, () => {
-            if (!this.settingsCurrent(epoch) || revision !== this.settingsRevision) return;
+            if (!this.settingsCurrent(epoch) || this.session.accountId !== accountId || revision !== this.settingsRevision) return;
             this.settingsSave = 'failed';
             this.settingsError = 'Preferences changed in memory but were NOT saved. Retry saving before Start or logout.';
         });
@@ -137,7 +137,9 @@ class PlayerAutoFight {
 
     available() {
         const { session, actor } = this;
-        return session.actor === actor && World.user.sessions.includes(session) && session.socket?.destroyed !== true
+        const record = World.registeredActorById(actor.fetchId());
+        return record?.session === session && record.actor === actor && !record.retired
+            && session.actor === actor && session.socket?.destroyed !== true
             && actor.fetchIsOnline() && !actor.state.fetchDead()
             && session.constructor?.name !== 'BotSession' && !session.accountId?.startsWith('bot_')
             && !session.pendingActorTeleport && !session.activeTrade && !actor.fetchPrivateStoreType?.()
