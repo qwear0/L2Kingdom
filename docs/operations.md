@@ -39,6 +39,14 @@ Observer keys and sessions are isolated per runtime in `observer-auth/auth.sqlit
 
 Other scripts can migrate, generate, benchmark or mutate data. Inspect the specific owner and side effects before invoking them; a file's presence is not an operating schedule.
 
+## Frontend unavailable after a game restart
+
+- Settings **Stop → Start** replaces only the gameplay wrapper/child. It neither reloads management's HTTP code nor builds/starts the Nginx frontend. Inspect the actual parent PID/binding and `docker ps --filter name=l2kingdom_frontend` rather than repeating game restarts.
+- Management is API-only; a document 404 at its loopback address is expected, not a fallback UI. A 404 from `/observer/api/auth/session` instead indicates an older management process or wrong endpoint. A new unauthenticated auth endpoint returns JSON 401.
+- Initial separation requires an authorized clean game stop, backup of affected private configuration, loopback management/publicOrigin configuration, management replacement and independent frontend deployment. Verify clean shutdown before replacement; never infer it from a disconnected UI. Use the owner's existing management launch environment, including any MCP secret; do not install a new supervisor or change ports unnecessarily.
+- For Compose, provide the selected local environment file explicitly when values are not exported: `docker compose --env-file <local-env-file> -f src/frontend/compose.yaml config --quiet`, then use that same option for the independently authorized `build frontend` and `up ... frontend` commands above. Listener, client CIDR and backend port must agree with the actual deployment. Do not commit private inputs or credentials.
+- Once deployed, later UI-only replacements operate on service `frontend` only. Check the same session and continued backend/game uptime; do not restart management/game merely to refresh pages.
+
 ## Offline territory profiling
 
 Use only when profiling is requested; this executes the real preparation algorithm, not an automated test suite. It does not start or stop the game, download geodata, or touch SQLite. Prefer running without competing startup work when comparing timings.

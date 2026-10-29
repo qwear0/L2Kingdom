@@ -47,7 +47,7 @@ docker compose -f src/frontend/compose.yaml up -d --no-deps --no-build --pull ne
 docker compose -f src/frontend/compose.yaml -f src/frontend/compose.dev.yaml up -d --no-deps --no-build --pull never --force-recreate frontend
 ```
 
-Production reads assets from the image. Development overlays only `src/frontend/public/` read-only; edit browser files and manually reload, with no watcher/HMR/bundler or backend restart. Template/Dockerfile changes still require an authorized frontend image rebuild/recreate. Do not use broad Compose shutdown or restart management/game for a frontend-only replacement. Initial builds, `nginx -t`/module availability, actual listeners, session continuity and unchanged game/management PID or generation still need separately authorized operational acceptance.
+Production reads assets from the image. Development overlays only `src/frontend/public/` read-only; edit browser files and manually reload, with no watcher/HMR/bundler or backend restart. Template/Dockerfile changes still require an authorized frontend image rebuild/recreate. Do not use broad Compose shutdown or restart management/game for a frontend-only replacement. Build/configuration checks and runtime acceptance are separate operations: validate `nginx -t`/auth-request module availability, actual listeners and login/resources, then verify session/preferences and unchanged game/management PID or generation across a frontend-only replacement. A successful image build alone is not browser/runtime acceptance.
 
 ### Frontend routes and response handling
 
@@ -56,7 +56,7 @@ Production reads assets from the image. Development overlays only `src/frontend/
 - Document redirects carry the original path/query in the login URL fragment, avoiding unescaped query interpolation. `auth.js` accepts that fragment and legacy `?next=` links, validates a local `/observer/` destination and excludes login destinations. The login page probes the session and redirects already signed-in users; 401 leaves the form available, other failures show an inline availability error.
 - `/observer/api/*` and `/observer/item-icons/*` proxy directly to management without a second static-session check. Backend auth, icon validation and existing method semantics remain authoritative; no static icon fallback. The bot-control prefix is rejected by Nginx; local MCP stays direct.
 - Proxying preserves original Host including port, Origin, cookies, methods/bodies, queries, validators, content encoding and upstream statuses/bodies. It overwrites `X-Real-IP`, clears client forwarding-chain/protocol headers and disables caching, request/response buffering and retries. Nginx-generated API failures are JSON/non-success; backend errors are not intercepted. A timeout/disconnect is not proof that a mutation failed.
-- Frontend responses set `Cache-Control: no-store`, `Referrer-Policy: no-referrer` and `X-Content-Type-Options: nosniff` themselves, including errors. Static HEAD/conditional handling comes from Nginx, not an auth-subrequest header copy. Unhashed assets have no long-lived cache policy.
+- Frontend responses set `Cache-Control: no-store`, `Referrer-Policy: no-referrer` and `X-Content-Type-Options: nosniff` themselves, including errors. JSON error handlers clear inherited MIME mappings: an original `.css`/`.js` extension must not turn a JSON denial/upstream failure into CSS/JavaScript. Static HEAD/conditional handling comes from Nginx, not an auth-subrequest header copy. Unhashed assets have no long-lived cache policy.
 
 ### LAN and peer-sensitive boundary
 

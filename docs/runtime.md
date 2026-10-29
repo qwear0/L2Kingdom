@@ -7,6 +7,7 @@ Read this when changing startup, effective configuration or shutdown behavior. S
 | Entrypoint | Responsibility |
 | --- | --- |
 | `package.json` → `scripts/start.js` (`npm start`) | Persistent API-only WorldObserver management parent. Owns auth/Settings APIs, configuration/preset writes and lifecycle/data operations; does not serve browser pages/assets. Does not start gameplay on launch. |
+| `src/frontend/compose.yaml` → service `frontend` | Independent Nginx browser frontend (`l2kingdom_frontend`), built/recreated separately. Proxies to the fixed loopback management binding, never the private game endpoint; does not start Node or gameplay. |
 | `scripts/run-server.js` (`npm run NodeL2`) | Geodata/runtime wrapper. Spawns `src/NodeL2.js` with `--openssl-legacy-provider`, repository working directory and shutdown IPC; not another management frontend. |
 | `src/NodeL2.js` | Owns SQLite, world, TCP listeners, bots and optional game observer API. Direct invocation bypasses geodata preparation. |
 | `src/ConfigLoader.js`, `src/Global.js` | Shared INI loading; only the runtime installs `invoke`, utilities and global options. The parent does not import game singletons or open the world DB to serve auth/Settings APIs. |

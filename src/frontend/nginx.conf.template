@@ -55,6 +55,8 @@ server {
 
     # Only Nginx-generated failures use these handlers. Backend error bodies,
     # statuses, cookies and validators pass through without interception.
+    # Named redirects retain the original extension: clear MIME mappings in
+    # JSON handlers so a .css/.js request cannot override default_type.
     error_page 400 = @error_400;
     error_page 403 = @error_403;
     error_page 404 = @error_404;
@@ -79,6 +81,7 @@ server {
         return 404 '{"error":"Not found."}';
     }
     location ^~ /observer/api/bot-control {
+        types { }
         default_type application/json;
         return 403 '{"error":"Direct loopback bot-control access only."}';
     }
@@ -120,6 +123,7 @@ server {
         try_files $l2kingdom_file =404;
     }
     location @sign_in {
+        types { }
         # The fragment carries the original path/query without unsafe query
         # interpolation. auth.js validates it as a local destination.
         if ($l2kingdom_document = 1) { return 302 "/observer/login#$request_uri"; }
@@ -128,19 +132,19 @@ server {
     }
     location / { return 404; }
 
-    location @error_400 { default_type application/json; return 400 '{"error":"Bad frontend request."}'; }
-    location @error_403 { default_type application/json; return 403 '{"error":"Frontend access denied."}'; }
-    location @error_404 { default_type application/json; return 404 '{"error":"Not found."}'; }
-    location @error_405 { default_type application/json; return 405 '{"error":"Method not allowed."}'; }
-    location @error_408 { default_type application/json; return 408 '{"error":"Frontend request timed out."}'; }
-    location @error_411 { default_type application/json; return 411 '{"error":"Content length required."}'; }
-    location @error_413 { default_type application/json; return 413 '{"error":"Request body too large."}'; }
-    location @error_414 { default_type application/json; return 414 '{"error":"Request URI too long."}'; }
-    location @error_429 { default_type application/json; return 429 '{"error":"Too many requests."}'; }
-    location @error_500 { default_type application/json; return 500 '{"error":"Frontend authorization or processing unavailable."}'; }
-    location @error_501 { default_type application/json; return 501 '{"error":"Request method not implemented."}'; }
-    location @error_502 { default_type application/json; return 502 '{"error":"Management upstream unavailable."}'; }
-    location @error_503 { default_type application/json; return 503 '{"error":"Frontend unavailable."}'; }
-    location @error_504 { default_type application/json; return 504 '{"error":"Management upstream timed out; action outcome may be uncertain."}'; }
-    location @error_505 { default_type application/json; return 505 '{"error":"HTTP version not supported."}'; }
+    location @error_400 { types { } default_type application/json; return 400 '{"error":"Bad frontend request."}'; }
+    location @error_403 { types { } default_type application/json; return 403 '{"error":"Frontend access denied."}'; }
+    location @error_404 { types { } default_type application/json; return 404 '{"error":"Not found."}'; }
+    location @error_405 { types { } default_type application/json; return 405 '{"error":"Method not allowed."}'; }
+    location @error_408 { types { } default_type application/json; return 408 '{"error":"Frontend request timed out."}'; }
+    location @error_411 { types { } default_type application/json; return 411 '{"error":"Content length required."}'; }
+    location @error_413 { types { } default_type application/json; return 413 '{"error":"Request body too large."}'; }
+    location @error_414 { types { } default_type application/json; return 414 '{"error":"Request URI too long."}'; }
+    location @error_429 { types { } default_type application/json; return 429 '{"error":"Too many requests."}'; }
+    location @error_500 { types { } default_type application/json; return 500 '{"error":"Frontend authorization or processing unavailable."}'; }
+    location @error_501 { types { } default_type application/json; return 501 '{"error":"Request method not implemented."}'; }
+    location @error_502 { types { } default_type application/json; return 502 '{"error":"Management upstream unavailable."}'; }
+    location @error_503 { types { } default_type application/json; return 503 '{"error":"Frontend unavailable."}'; }
+    location @error_504 { types { } default_type application/json; return 504 '{"error":"Management upstream timed out; action outcome may be uncertain."}'; }
+    location @error_505 { types { } default_type application/json; return 505 '{"error":"HTTP version not supported."}'; }
 }

@@ -212,7 +212,7 @@
         $('wipeScope').disabled = !stopped(); $('wipeConfirmation').disabled = !stopped();
         $('wipePrompt').textContent = `Type WIPE ${$('wipeScope').value.toUpperCase()}`;
         $('wipeWorld').disabled = !stopped() || $('wipeConfirmation').value !== `WIPE ${$('wipeScope').value.toUpperCase()}`;
-        $('serviceInfo').textContent = `Version ${server.version} · config layers: ${server.configSources.join(' → ')}. Frontend ${location.origin}; backend listener states ${JSON.stringify(server.listeners)}; private game observer ${server.observer}.`;
+        $('serviceInfo').textContent = `Version ${server.version} · config layers: ${server.configSources.join(' → ')}. L2Kingdom frontend ${location.origin}; backend listener states ${JSON.stringify(server.listeners)}; private game observer ${server.observer}.`;
         window.WorldObserverShell?.connection(server.phase === 'running' && server.observer === 'ready', server.phase === 'running' ? `Game ${server.observer}` : `Game ${server.phase}`);
     }
     async function readServerStatus() {
