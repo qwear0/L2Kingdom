@@ -74,45 +74,47 @@ function checksumOf(record) {
 }
 async function canonicalDigest(value, omitRootChecksum = false, checkpoint = null) {
     const hash = createHash('sha256');
-    let bytes = 0, visited = 0;
-    const yieldBatch = () => new Promise(resolve => setImmediate(resolve));
-    async function emit(text) {
-        hash.update(text);
-        bytes += Buffer.byteLength(text);
-        if ((++visited % LIMITS.maxBatchRecords) === 0) {
+    let bytes = 0, count = 0;
+    const batch = [];
+    const emit = text => { batch.push(text); bytes += Buffer.byteLength(text); };
+    const scalar = node => {
+        if (typeof node === 'number' && !Number.isFinite(node)) throw new TypeError('canonical_json_non_finite_number');
+        if (typeof node === 'undefined' || typeof node === 'function' || typeof node === 'symbol' || typeof node === 'bigint') {
+            throw new TypeError('canonical_json_unsupported_value');
+        }
+        emit(JSON.stringify(node));
+    };
+    // Only ancestor containers need traversal frames. A promise/generator per
+    // scalar token needlessly expands the heap while hashing the same bytes.
+    const enter = (node, root = false) => {
+        const array = Array.isArray(node);
+        const keys = array ? null : Object.keys(node).filter(key => !(root && omitRootChecksum && key === 'checksum')).sort();
+        emit(array ? '[' : '{');
+        return { node, keys, index: 0, length: array ? node.length : keys.length };
+    };
+    const stack = [];
+    if (value !== null && typeof value === 'object') stack.push(enter(value, true));
+    else scalar(value);
+    while (stack.length) {
+        const frame = stack[stack.length - 1];
+        if (frame.index === frame.length) {
+            emit(frame.keys ? '}' : ']'); stack.pop();
+        } else {
+            if (frame.index) emit(',');
+            const key = frame.keys ? frame.keys[frame.index] : frame.index;
+            if (frame.keys) emit(`${JSON.stringify(key)}:`);
+            frame.index++;
+            const node = frame.node[key];
+            if (node !== null && typeof node === 'object') stack.push(enter(node));
+            else scalar(node);
+        }
+        if (++count === LIMITS.maxBatchRecords) {
+            hash.update(batch.join('')); batch.length = 0; count = 0;
             if (checkpoint) await checkpoint(LIMITS.maxBatchRecords);
-            else await yieldBatch();
+            else await new Promise(resolve => setImmediate(resolve));
         }
     }
-    async function visit(node, root = false) {
-        if (node === null || typeof node !== 'object') {
-            if (typeof node === 'number' && !Number.isFinite(node)) throw new TypeError('canonical_json_non_finite_number');
-            if (typeof node === 'undefined' || typeof node === 'function' || typeof node === 'symbol' || typeof node === 'bigint') {
-                throw new TypeError('canonical_json_unsupported_value');
-            }
-            await emit(JSON.stringify(node));
-            return;
-        }
-        if (Array.isArray(node)) {
-            await emit('[');
-            for (let index = 0; index < node.length; index++) {
-                if (index) await emit(',');
-                await visit(node[index]);
-            }
-            await emit(']');
-            return;
-        }
-        const keys = Object.keys(node).filter(key => !(root && omitRootChecksum && key === 'checksum')).sort();
-        await emit('{');
-        for (let index = 0; index < keys.length; index++) {
-            if (index) await emit(',');
-            const key = keys[index];
-            await emit(`${JSON.stringify(key)}:`);
-            await visit(node[key]);
-        }
-        await emit('}');
-    }
-    await visit(value, true);
+    if (batch.length) hash.update(batch.join(''));
     return { sha256: hash.digest('hex'), bytes };
 }
 async function checksumOfAsync(record) {
@@ -125,13 +127,21 @@ async function checksumOfAsync(record) {
 function parseStrictJson(text, label = 'json') {
     let index = 0;
     const fail = reason => { throw new Error(`${label}:${reason}@${index}`); };
-    const whitespace = () => { while (index < text.length && /[\u0009\u000a\u000d\u0020]/.test(text[index])) index++; };
-    const string = () => {
+    const numberPattern = /-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?/y;
+    const whitespace = () => {
+        while (index < text.length) {
+            const code = text.charCodeAt(index);
+            if (code !== 9 && code !== 10 && code !== 13 && code !== 32) break;
+            index++;
+        }
+    };
+    const string = (decode = true) => {
         if (text[index] !== '"') fail('expected_string');
         const start = index++;
         while (index < text.length) {
             const char = text[index++];
             if (char === '"') {
+                if (!decode) return;
                 try { return JSON.parse(text.slice(start, index)); }
                 catch (_) { fail('invalid_string'); }
             }
@@ -146,13 +156,12 @@ function parseStrictJson(text, label = 'json') {
         if (depth > 128) fail('nesting_limit');
         whitespace();
         const char = text[index];
-        if (char === '"') return string();
+        if (char === '"') return string(false);
         if (char === '{') {
             index++;
             whitespace();
-            const out = Object.create(null);
             const keys = new Set();
-            if (text[index] === '}') { index++; return out; }
+            if (text[index] === '}') { index++; return; }
             for (;;) {
                 whitespace();
                 const key = string();
@@ -161,40 +170,44 @@ function parseStrictJson(text, label = 'json') {
                 keys.add(key);
                 whitespace();
                 if (text[index++] !== ':') fail('expected_colon');
-                out[key] = value(depth + 1);
+                value(depth + 1);
                 whitespace();
                 const separator = text[index++];
-                if (separator === '}') return out;
+                if (separator === '}') return;
                 if (separator !== ',') fail('expected_object_separator');
             }
         }
         if (char === '[') {
             index++;
             whitespace();
-            const out = [];
-            if (text[index] === ']') { index++; return out; }
+            if (text[index] === ']') { index++; return; }
             for (;;) {
-                out.push(value(depth + 1));
+                value(depth + 1);
                 whitespace();
                 const separator = text[index++];
-                if (separator === ']') return out;
+                if (separator === ']') return;
                 if (separator !== ',') fail('expected_array_separator');
             }
         }
         if (char === 't' && text.slice(index, index + 4) === 'true') { index += 4; return true; }
         if (char === 'f' && text.slice(index, index + 5) === 'false') { index += 5; return false; }
         if (char === 'n' && text.slice(index, index + 4) === 'null') { index += 4; return null; }
-        const match = /^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?/.exec(text.slice(index));
+        numberPattern.lastIndex = index;
+        const match = numberPattern.exec(text);
         if (!match) fail('invalid_value');
         index += match[0].length;
         const number = Number(match[0]);
         if (!Number.isFinite(number)) fail('non_finite_number');
         return number;
     };
-    const result = value(0);
+    value(0);
     whitespace();
     if (index !== text.length) fail('trailing_data');
-    return result;
+    // The scanner retains only ancestor key sets. Native JSON.parse builds one
+    // compact tree after duplicate/forbidden-key checks, not a parallel set of
+    // dictionary objects and growable coordinate arrays.
+    try { return JSON.parse(text); }
+    catch (_) { fail('invalid_json'); }
 }
 
 function isRecord(value) {
@@ -475,8 +488,8 @@ async function validateRecord(record, expectedIdentity = null, loadContext = {})
             throw new Error('input_scope_mismatch');
         }
     }
-    const expectedChecksum = (await canonicalDigest(record, true, checkpoint)).sha256;
-    if (typeof record.checksum !== 'string' || record.checksum !== expectedChecksum) throw new Error('generated_checksum_mismatch');
+    const recordDigest = await canonicalDigest(record, true, checkpoint);
+    if (typeof record.checksum !== 'string' || record.checksum !== recordDigest.sha256) throw new Error('generated_checksum_mismatch');
     if (!isRecord(record.requirements)) throw new Error('generated_inventory_incomplete');
     await validateAuthoredBatched(record.requirements, checkpoint);
     if (!Array.isArray(record.requirements.serviceInventory)) throw new Error('generated_service_inventory_missing');
@@ -634,11 +647,9 @@ async function validateRecord(record, expectedIdentity = null, loadContext = {})
         }
     }
     if (vertices > LIMITS.vertices) throw new Error('generated_vertex_limit_exceeded');
-    const coverageCertificateIds = new Set();
     for (const entry of allCoverage) for (const id of entry.certificateIds) {
         await checkpoint();
         if (!certificateIds.has(id) && !componentIds.has(id)) throw new Error(`generated_coverage_certificate_missing:${id}`);
-        coverageCertificateIds.add(`${entry.kind}\0${entry.requirementId}\0${id}`);
     }
     const expectedUnresolved = allCoverage.filter(entry => entry.status !== 'supported')
         .map(entry => `${entry.kind}\0${entry.requirementId}\0${entry.status}`).sort();
@@ -647,11 +658,11 @@ async function validateRecord(record, expectedIdentity = null, loadContext = {})
         || expectedUnresolved.some((value, index) => value !== actualUnresolved[index])) throw new Error('generated_unresolved_inventory_mismatch');
     if (!isRecord(record.buildStats) || Object.values(record.buildStats).some(value => typeof value === 'number'
         && (!Number.isFinite(value) || value < 0))) throw new Error('generated_build_stats_invalid');
-    const checksum = await canonicalDigest(record, false, checkpoint);
-    if (checksum.bytes > LIMITS.generatedBytes) throw new Error('generated_size_limit_exceeded');
+    const bytes = recordDigest.bytes + Buffer.byteLength(`"checksum":${JSON.stringify(record.checksum)},`);
+    if (bytes > LIMITS.generatedBytes) throw new Error('generated_size_limit_exceeded');
     if (Date.now() - startedAtWallMs > LIMITS.maxLoaderMs) throw new Error('loader_wall_limit');
     if (process.memoryUsage.rss() - baselineRss > LIMITS.maxLoaderRss) throw new Error('loader_additional_rss_limit');
-    return { bytes: checksum.bytes, checksum: record.checksum, inputFingerprint: record.inputFingerprint };
+    return { bytes, checksum: record.checksum, inputFingerprint: record.inputFingerprint };
 }
 
 function deepFreeze(value) {

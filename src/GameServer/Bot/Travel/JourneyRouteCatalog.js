@@ -82,14 +82,25 @@ async function makeTopology(record, checkpoint) {
     for (const rows of adjacency) rows.sort((a, b) => edges[a].id.localeCompare(edges[b].id));
     return { waypointIds, waypointIndex, count, distance, firstEdge, edges, adjacency };
 }
-async function freezeDeep(value, checkpoint, seen = new WeakSet()) {
-    if (!value || typeof value !== 'object' || Object.isFrozen(value) || seen.has(value)) return value;
-    seen.add(value);
-    for (const child of Object.values(value)) {
-        await freezeDeep(child, checkpoint, seen);
-        await checkpoint();
+async function freezeDeep(value, checkpoint) {
+    const pending = [value];
+    let visited = 0;
+    while (pending.length) {
+        const node = pending.pop();
+        if (!node || typeof node !== 'object' || Object.isFrozen(node)) continue;
+        // Freeze before enqueueing children so aliases/cycles cannot expand the
+        // work list. Nothing is published until every descendant is frozen.
+        Object.freeze(node);
+        for (const key of Object.keys(node)) {
+            const child = node[key];
+            if (child && typeof child === 'object' && !Object.isFrozen(child)) pending.push(child);
+            if (++visited === Format.LIMITS.maxBatchRecords) {
+                await checkpoint(visited); visited = 0;
+            }
+        }
     }
-    return Object.freeze(value);
+    if (visited) await checkpoint(visited);
+    return value;
 }
 async function makeIndexes(record, revision, checkpoint) {
     const spansByRow = new Map();

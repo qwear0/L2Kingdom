@@ -1,5 +1,7 @@
+require('../Geodata/JourneyGeometryIdentity.js').define(module, require, function (module, exports, require, __filename, __dirname) {
 const DiamondCatalog = require('../Items/DimensionalDiamondCatalog');
-const destinationIndex = require('../Knowledge/NativeServiceIndex').currentIndex(['0'], rows =>
+const ServiceIndex = require('../Knowledge/NativeServiceIndex');
+const destinationIndex = ServiceIndex.currentIndex(['0'], rows =>
     new Set(rows.map(([id]) => id)));
 const { destinations: DESTINATIONS, lists: LISTS } = loadCatalogue();
 
@@ -87,3 +89,5 @@ function menu(npcId, hasQuest) {
 }
 
 module.exports = { destination, html, menu, lists: LISTS };
+return [[require.resolve('../Knowledge/NativeServiceIndex'), ServiceIndex]];
+});

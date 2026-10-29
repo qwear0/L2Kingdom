@@ -35,16 +35,7 @@ function usage() {
         + '[--output FILE] --artifact-root DIR';
 }
 function teleporterAdapter(root) {
-    const fsSync = require('node:fs');
-    const jsonSchema = require('jsonschema');
-    const dataPath = path.join(root, 'data/Teleports/gatekeepers.json');
-    const schemaPath = path.join(root, 'data/Teleports/.schema.json');
-    const data = JSON.parse(fsSync.readFileSync(dataPath, 'utf8'));
-    const schema = JSON.parse(fsSync.readFileSync(schemaPath, 'utf8'));
-    jsonSchema.validate(data, schema, { throwFirst: true });
-    const lists = Object.create(null);
-    for (const row of data.gatekeepers) lists[row.npcId] = row.routes.map(route => [route.destinationId, route.label]);
-    return { lists };
+    return require(path.join(root, 'src/GameServer/World/C4GatekeeperTeleports'));
 }
 function installOfflineInvoke(root, dataCache, gatekeepers) {
     const resolveGameModule = name => path.join(root, 'src', `${name}.js`);
@@ -54,6 +45,7 @@ function installOfflineInvoke(root, dataCache, gatekeepers) {
         case 'GameServer/World/C4GatekeeperTeleports': return gatekeepers;
         case 'GameServer/Geodata/GeodataEngine':
         case 'GameServer/World/TownRespawn':
+        case 'GameServer/World/C4CrumaTowerTeleports':
         case 'GameServer/World/C4SevenSignsDungeonTeleports':
             return require(resolveGameModule(name));
         case 'GameServer/World/Generics/NpcShopBuyLists':
@@ -67,7 +59,8 @@ function installOfflineInvoke(root, dataCache, gatekeepers) {
 }
 async function loadNative(root, geodataDir, regionKeys, registered, budget) {
     const gatekeepers = teleporterAdapter(root);
-    const dataCache = { npcs: registered.templates, npcSpawns: registered.spawnDefinitions, items: [] };
+    const dataCache = { npcs: registered.templates, npcSpawns: registered.spawnDefinitions, items: [],
+        newbieSpawns: require(path.join(root, 'data/Templates/Spawns/spawns.json')) };
     installOfflineInvoke(root, dataCache, gatekeepers);
     const Geo = require(path.join(root, 'src/GameServer/Geodata/GeodataEngine'));
     const VirtualObstacles = require(path.join(root, 'src/GameServer/Geodata/VirtualObstacles'));

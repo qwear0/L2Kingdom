@@ -997,7 +997,23 @@ function journeyAdmission(definition) {
     };
 }
 
-module.exports = { init, randomCoords, nearLeader, identity, journeyAdmission };
+// Collect the complete native initial-root inventory without running random
+// preparation or reading/writing its cache. Retained samples are not a domain.
+function journeyAdmissionSources(definitions) {
+    const roots = [];
+    Proofs.prototype.collect.call({ root: (point, source) => roots.push({ source, authored: point }) }, definitions);
+    const monsters = new Set(invoke('GameServer/DataCache').npcs
+        .filter(npc => npc.template?.kind === 'Monster').map(npc => Number(npc.selfId)));
+    const fixed = [];
+    for (const [definitionId, territory] of definitions.entries()) for (const [row, spawn] of territory.spawns.entries()) {
+        if (spawn.total <= 0 || !monsters.has(Number(spawn.selfId))) continue;
+        for (const [coordinate, point] of spawn.coords.entries()) fixed.push({
+            source: `fixed:${definitionId}:${row}:${coordinate}`, territoryId: territory.selfId, authored: point });
+    }
+    return { roots, fixed };
+}
+
+module.exports = { init, randomCoords, nearLeader, identity, journeyAdmission, journeyAdmissionSources };
 return [[require.resolve('./GeodataEngine'), Geo], [require.resolve('./SpawnSurface'), Surface],
     [require.resolve('./SpawnPlacementCache'), DiskCache]];
 });

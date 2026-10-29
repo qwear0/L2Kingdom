@@ -18,7 +18,8 @@ const ALGORITHM_INPUTS = Object.freeze([
     'src/GameServer/Geodata/SpawnPlacement.js', 'src/GameServer/Geodata/SpawnPlacementCache.js',
     'src/GameServer/Geodata/VirtualObstacles/index.js', 'src/GameServer/Lord/GatherAreas.js',
     'src/GameServer/World/WorldAreaCatalog.js', 'src/GameServer/RaidBoss/RaidBossBalance.js',
-    'src/GameServer/World/C4SevenSignsDungeonTeleports.js',
+    'src/GameServer/World/C4SevenSignsDungeonTeleports.js', 'src/GameServer/World/C4CrumaTowerTeleports.js',
+    'src/GameServer/World/C4GatekeeperTeleports.js', 'src/GameServer/Knowledge/NativeServiceIndex.js',
     'src/GameServer/Bot/Travel/JourneyRouteInputs.js', 'src/GameServer/Bot/Travel/JourneyRouteFormat.js',
     'src/GameServer/Bot/Travel/JourneyRouteBuilder.js', 'src/GameServer/Bot/Travel/JourneyRouteComponents.js',
     'src/GameServer/Bot/Travel/JourneyRouteCatalog.js', 'scripts/generate-journey-routes.js'
@@ -50,6 +51,7 @@ const CORE_INPUTS = Object.freeze([
     'src/GameServer/Bot/Travel/JourneyRouteComponents.js', 'src/GameServer/Bot/Travel/JourneyRouteBuilder.js',
     'src/GameServer/Bot/Travel/JourneyRouteCatalog.js', 'scripts/generate-journey-routes.js',
     'data/Teleports/gatekeepers.json', 'data/Teleports/.schema.json',
+    'data/Templates/Spawns/spawns.json', 'src/GameServer/World/C4CrumaTowerTeleports.js',
     'data/Npcs/Minions/c4_raid_bosses.json', 'data/Npcs/Spawns/spawns.json',
     'src/GameServer/World/C4LateTownGatekeepers.js', 'src/GameServer/World/GiranMammon.js',
     'src/GameServer/World/GiranCrystallizationStation.js', 'src/GameServer/World/GludioCastellan.js',
@@ -313,18 +315,27 @@ function selectedGeometry(input, scope, registered) {
     if (regions.size > IDENTITY_LIMITS.maxRegions) throw new Error(`journey_region_limit_exceeded:${regions.size}`);
     return { regions: [...regions].sort((a, b) => a.localeCompare(b)), polygonIds: [...polygonIds].sort(), townIds: [...townIds].sort() };
 }
-async function hashFile(file, startedAt, recordIndex, baselineRss, displayPath = file) {
+async function hashFile(file, startedAt, recordIndex, baselineRss, buffer, displayPath = file) {
     let before;
     try { before = await fsp.lstat(file, { bigint: true }); }
     catch (error) { if (error.code === 'ENOENT') return { missing: true, size: 0, sha256: null }; throw error; }
     if (!before.isFile() || before.isSymbolicLink()) throw new Error(`journey_input_not_regular_file:${displayPath}`);
     const digest = createHash('sha256');
     let size = 0;
-    for await (const chunk of fs.createReadStream(file, { highWaterMark: 1024 * 1024 })) {
-        digest.update(chunk);
-        size += chunk.length;
-        checkDeadline(startedAt, recordIndex + Math.ceil(size / (1024 * 1024)), baselineRss);
-    }
+    const handle = await fsp.open(file, 'r');
+    try {
+        const opened = await handle.stat({ bigint: true });
+        if (opened.dev !== before.dev || opened.ino !== before.ino || opened.size !== before.size) {
+            throw new Error(`journey_input_changed_while_opening:${displayPath}`);
+        }
+        for (;;) {
+            const { bytesRead } = await handle.read(buffer, 0, buffer.length, size);
+            if (!bytesRead) break;
+            digest.update(buffer.subarray(0, bytesRead));
+            size += bytesRead;
+            checkDeadline(startedAt, recordIndex + Math.ceil(size / buffer.length), baselineRss);
+        }
+    } finally { await handle.close(); }
     const after = await fsp.lstat(file, { bigint: true });
     if (before.dev !== after.dev || before.ino !== after.ino || before.size !== after.size
         || before.mtimeNs !== after.mtimeNs || before.ctimeNs !== after.ctimeNs || size !== Number(before.size)) {
@@ -338,6 +349,7 @@ function moduleExportDigest(value, seen = new Set()) {
     seen.add(value);
     if (typeof value === 'function') return `function:${value.toString()}`;
     if (Array.isArray(value)) return `[${value.map(item => moduleExportDigest(item, seen)).join(',')}]`;
+    if (value instanceof Map) return `map:${moduleExportDigest([...value.entries()], seen)}`;
     return `{${Object.keys(value).sort().map(key => `${JSON.stringify(key)}:${moduleExportDigest(value[key], seen)}`).join(',')}}`;
 }
 async function verifyCachedJsonExport(file) {
@@ -379,6 +391,9 @@ async function inputIdentity({ sourceFile = DEFAULT_SOURCE, catalogueFile = DEFA
                     throw new Error('journey_authored_requirements_stale');
                 }
                 selectedScope = expectedRecord.scope;
+                // Only the small identity envelope is needed during sequential
+                // source hashing; do not retain a second full geometry/index tree.
+                expectedRecord = { inputs: expectedRecord.inputs, scope: expectedRecord.scope };
             } catch (error) {
                 if (error.code === 'ENOENT') return { status: 'disabled', reason: 'journey_catalogue_missing',
                     fingerprint: null, inputs: [], scope: null, sourceFile: authored.file };
@@ -442,10 +457,11 @@ async function inputIdentity({ sourceFile = DEFAULT_SOURCE, catalogueFile = DEFA
         }
         const admissionJsonDigests = new Map(), diskDigests = new Map();
         const inputs = [];
+        const hashBuffer = Buffer.allocUnsafe(1024 * 1024);
         let index = 0;
         for (const [id, { file, displayPath }] of [...fileMap.entries()].sort(([a], [b]) => a.localeCompare(b))) {
             checkDeadline(startedAt, index, baselineRss);
-            const result = await hashFile(file, startedAt, index++, baselineRss);
+            const result = await hashFile(file, startedAt, index++, baselineRss, hashBuffer, displayPath || file);
             if (result.missing && !id.startsWith('geodata:')) throw new Error(`journey_required_input_missing:${id}`);
             diskDigests.set(file, result.sha256);
             if (admissionJsonFiles.has(file)) {
@@ -455,7 +471,8 @@ async function inputIdentity({ sourceFile = DEFAULT_SOURCE, catalogueFile = DEFA
             }
             const entry = { id, path: displayPath, size: result.size, missing: result.missing };
             if (!result.missing) entry.sha256 = result.sha256;
-            if (id.startsWith('registered:src/')) {
+            if (id.startsWith('registered:src/') || id === 'source:src/GameServer/World/C4CrumaTowerTeleports.js'
+                || id === 'source:src/GameServer/World/C4GatekeeperTeleports.js') {
                 const exports = cachedModule(file);
                 entry.loadedSha256 = Format.sha256(moduleExportDigest(exports));
             } else if (id.startsWith('obstacle:')) {
@@ -463,6 +480,18 @@ async function inputIdentity({ sourceFile = DEFAULT_SOURCE, catalogueFile = DEFA
                 entry.loadedSha256 = Format.sha256(moduleExportDigest(exports));
             } else if (!id.startsWith('geodata:') && file.endsWith('.json')) {
                 await verifyCachedJsonExport(file);
+                if (file === path.join(ROOT, 'data/Templates/Spawns/spawns.json')) {
+                    // DataCache uses validateModel, not require's JSON cache.
+                    // Attest the actual loaded root array before borrowing disk identity.
+                    const loaded = invoke('GameServer/DataCache').newbieSpawns;
+                    if (!Array.isArray(loaded)) throw new Error('journey_loaded_player_roots_missing');
+                    entry.loadedSha256 = Format.sha256(JSON.stringify(loaded));
+                    const { bytes } = await readRegular(file, 1024 * 1024, 'journey_player_roots');
+                    if (Format.sha256(bytes) !== result.sha256
+                        || Format.sha256(JSON.stringify(JSON.parse(bytes.toString('utf8')))) !== entry.loadedSha256) {
+                        throw new Error('journey_loaded_player_roots_mismatch');
+                    }
+                }
             }
             if (id.startsWith('geodata:') && !result.missing) {
                 totalGeoBytes += result.size;

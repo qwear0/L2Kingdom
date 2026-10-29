@@ -221,10 +221,13 @@ function makePermission(input, activeIds, context = {}) {
     const scoped = region => (region.role !== 'farm_access'
         || region.areaId === context.areaId && region.spawnId === context.spawnId)
         && (!region.townKey || !context.townKey || region.townKey === context.townKey);
-    return point => {
-        if (rejected.some(region => insideRegion(point, region))) return false;
-        return accepted.some(region => scoped(region) && insideRegion(point, region));
-    };
+    const bounded = region => ({ region,
+        minX: Math.min(...region.polygon.map(p => p.locX)), maxX: Math.max(...region.polygon.map(p => p.locX)),
+        minY: Math.min(...region.polygon.map(p => p.locY)), maxY: Math.max(...region.polygon.map(p => p.locY)) });
+    const allowed = accepted.filter(scoped).map(bounded), denied = rejected.map(bounded);
+    const contains = (point, box) => point.locX >= box.minX && point.locX <= box.maxX
+        && point.locY >= box.minY && point.locY <= box.maxY && insideRegion(point, box.region);
+    return point => !denied.some(box => contains(point, box)) && allowed.some(box => contains(point, box));
 }
 function pointKey(point) {
     return `${point.locX}:${point.locY}:${point.locZ}`;
@@ -237,7 +240,7 @@ function normalizePoint(point, Geo, Surface, budget) {
     return Surface.supported(point, budget);
 }
 function withPointSafety(Geo, Surface, budget, permitted, safety) {
-    const exactLayerCache = new Map();
+    const exactLayerCache = new Map(), centreAdmissionCache = new Map();
     const realLayer = point => {
         const key = `${point.locX >> 4}:${point.locY >> 4}:${point.locZ}`;
         if (exactLayerCache.has(key)) return exactLayerCache.get(key);
@@ -246,8 +249,14 @@ function withPointSafety(Geo, Surface, budget, permitted, safety) {
         return valid;
     };
     const admit = point => {
-        if (!permitted(point) || safety.point(point)) return false;
-        return realLayer(point);
+        // Permission is constant for this proof, but polygon boundaries need
+        // exact XY: only cell centres may share a cell/layer permission result.
+        const centre = (point.locX - 8) % 16 === 0 && (point.locY - 8) % 16 === 0;
+        const key = centre ? pointKey(point) : null;
+        if (centre && centreAdmissionCache.has(key)) return centreAdmissionCache.get(key);
+        const valid = permitted(point) && !safety.point(point) && realLayer(point);
+        if (centre) centreAdmissionCache.set(key, valid);
+        return valid;
     };
     return { admitNode: admit, admitSegment: admit,
         checkBudget: () => budget.searchCheckpoint(),
@@ -544,14 +553,58 @@ function certifyTrunk({ connection, waypoints, input, world, budget, safety, cer
         points: result.points, length: result.length2d, transitRegionIds: regionIds,
         regionIds, certificateId: certId, componentIds: [] };
 }
+function accountAdmissionRoots(areaResult, registered, world, budget) {
+    const sources = require('../../Geodata/SpawnPlacement').journeyAdmissionSources(registered.spawnDefinitions);
+    const rows = new Map();
+    for (const span of areaResult.spans) {
+        if (!rows.has(span.rowY)) rows.set(span.rowY, []);
+        rows.get(span.rowY).push(span);
+    }
+    const rootsByComponent = new Map(), fixedByComponent = new Map();
+    const classify = (entry, memberships) => {
+        budget.poll();
+        const point = entry.authored;
+        if (!point || !['locX', 'locY', 'locZ'].every(axis => Number.isInteger(point[axis]))) {
+            return { ...entry, status: 'invalid_coordinate' };
+        }
+        const spans = (rows.get(point.locY >> 4) || []).filter(span => span.xStart <= (point.locX >> 4)
+            && span.xEnd >= (point.locX >> 4));
+        if (!spans.length) return { ...entry, status: 'outside_component_cells' };
+        const normalized = world.Surface.supported(point, budget);
+        const componentIds = [...new Set(spans.filter(span => span.layerZ === normalized?.locZ).map(span => span.componentId))];
+        for (const id of componentIds) {
+            if (!memberships.has(id)) memberships.set(id, []);
+            memberships.get(id).push(entry.source);
+        }
+        return { ...entry, normalized, componentIds, status: componentIds.length ? 'component_cell_root' : 'no_matching_component_layer' };
+    };
+    const roots = sources.roots.map(entry => classify(entry, rootsByComponent));
+    const fixed = sources.fixed.map(entry => classify(entry, fixedByComponent));
+    for (const component of areaResult.components) {
+        const initialRoots = rootsByComponent.get(component.id) || [], fixedCoordinates = fixedByComponent.get(component.id) || [];
+        component.nativeBoundary.initialRootSources = initialRoots;
+        component.nativeBoundary.fixedCoordinateSources = fixedCoordinates;
+        // Fixed monster coordinates are not initial trusted roots: auditFixed
+        // shares them only after a proof from the existing trusted closure.
+        // Keep coverage unresolved until the root/transition contract is settled.
+        component.nativeBoundary.rootAdmission = initialRoots.length ? 'initial_root_present'
+            : component.nativeBoundary.status === 'closed' && !fixedCoordinates.length
+                ? 'no_initial_root_in_closed_native_component' : 'not_proven';
+    }
+    return { scope: 'complete_native_collect_and_positive_fixed_monster_inventory',
+        randomAdmission: 'root_or_previously_proven_witness_then_Surface.walk_or_Surface.reachable',
+        fixedAdmission: 'authored_fixed_coordinates_are_not_random_roots; global_proof_is_diagnostic',
+        roots, fixed, initialRootCount: roots.length, fixedCoordinateCount: fixed.length };
+}
 function attachComponentEntries(polygon, areaResult, entryWaypoints, input, world, budget, safety, certificates, attachments) {
-    const entryComponents = new Map();
+    const memberSpan = point => areaResult.spans.find(row => row.layerZ === point.locZ && row.rowY === (point.locY >> 4)
+        && row.xStart <= (point.locX >> 4) && row.xEnd >= (point.locX >> 4));
+    const entrySpans = new Map();
     for (const waypoint of entryWaypoints) {
         const point = world.Surface.supported(waypoint.point, budget);
         if (!point) continue;
-        const span = areaResult.spans.find(row => row.layerZ === point.locZ && row.rowY === (point.locY >> 4)
-            && row.xStart <= (point.locX >> 4) && row.xEnd >= (point.locX >> 4));
-        if (span) entryComponents.set(waypoint.id, span.componentId);
+        const span = memberSpan(point);
+        if (span) entrySpans.set(waypoint.id, span);
     }
     for (const component of areaResult.components) {
         const patches = areaResult.patches.filter(patch => patch.componentId === component.id);
@@ -564,7 +617,7 @@ function attachComponentEntries(polygon, areaResult, entryWaypoints, input, worl
         const candidates = entryWaypoints.filter(row => row.areaId === polygon.areaId && row.spawnId === polygon.spawnId)
             .sort((a, b) => distance2d(a.point, localAnchor) - distance2d(b.point, localAnchor) || a.id.localeCompare(b.id));
         if (component.nativeBoundary?.status === 'closed'
-            && !candidates.some(row => entryComponents.get(row.id) === component.id)) {
+            && !candidates.some(row => entrySpans.get(row.id)?.componentId === component.id)) {
             // A closed transition boundary does not settle native root/fixed
             // admission inside it. Retain the layer and unresolved coverage.
             component.status = 'unresolved'; component.reason = 'trunk_unproved';
@@ -580,8 +633,15 @@ function attachComponentEntries(polygon, areaResult, entryWaypoints, input, worl
         const sharedRegions = input.acceptedTransitRegions.filter(region => ['land_road', 'town_approach'].includes(region.role))
             .map(region => region.id);
         const regionIds = [...new Set([...sharedRegions, ...farmRegions])].sort();
-        let attached = false;
+        let attached = false, attachedPatch = null;
         for (const waypoint of boundedCandidates) {
+            const span = entrySpans.get(waypoint.id);
+            const entryPatch = span?.componentId === component.id
+                ? patches.find(patch => span.patchIds.includes(patch.id))
+                : [...patches].sort((a, b) => distance2d(a.anchor, waypoint.point) - distance2d(b.anchor, waypoint.point)
+                    || a.id.localeCompare(b.id))[0];
+            if (!entryPatch) continue;
+            const localAnchor = entryPatch.anchor;
             const outward = provePath({ from: waypoint.point, to: localAnchor, regionIds,
                 context: { areaId: polygon.areaId, spawnId: polygon.spawnId }, world, budget, safety,
                 constraints: { maxDistance: Format.LIMITS.localDistance, maxRadius: Format.LIMITS.localRadius } });
@@ -602,23 +662,73 @@ function attachComponentEntries(polygon, areaResult, entryWaypoints, input, worl
             }
             const certIds = [];
             for (const [direction, proof, fromId, toId] of [
-                ['to_component', outward, waypoint.id, patches[0].id],
-                ['from_component', returning, patches[0].id, waypoint.id]]) {
+                ['to_component', outward, waypoint.id, entryPatch.id],
+                ['from_component', returning, entryPatch.id, waypoint.id]]) {
                 const id = `entry:${component.id}:${waypoint.id}:${direction}`;
                 certificates.push({ id, kind: 'entry_access', requirementId: polygon.spawnId,
                     areaId: polygon.areaId, spawnId: polygon.spawnId,
-                    componentId: component.id, direction, anchorId: waypoint.id, patchId: patches[0].id,
+                    componentId: component.id, direction, anchorId: waypoint.id, patchId: entryPatch.id,
                     fromAnchorId: fromId, toAnchorId: toId, provedNodeCount: proof.nodeCount,
-                    pathDistance: proof.length, maxPathDistance: proof.length, coveredLayerCellCount: component.nodeCount,
+                    pathDistance: proof.length, maxPathDistance: proof.length, coveredLayerCellCount: entryPatch.nodeCount,
                     membershipSpanIndices: [], regionIds, geometry: proof.points });
                 certIds.push(id);
             }
             component.entryAnchorIds.push(waypoint.id);
             component.certificateIds = [...(component.certificateIds || []), ...certIds];
-            attachments.push({ anchorId: waypoint.id, componentId: component.id, patchId: patches[0].id,
+            attachments.push({ anchorId: waypoint.id, componentId: component.id, patchId: entryPatch.id,
                 direction: 'both', point: waypoint.point });
-            attached = true;
+            attached = true; attachedPatch = entryPatch;
             break;
+        }
+        if (attached) {
+            const internal = input.waypoints.filter(row => row.kind === 'farm_internal'
+                && row.areaId === polygon.areaId && row.spawnId === polygon.spawnId)
+                .map(row => ({ ...row, point: world.Surface.supported(row.point, budget) }))
+                .filter(row => row.point && memberSpan(row.point)?.componentId === component.id);
+            const anchors = [...patches.map(patch => ({ id: patch.id, point: patch.anchor, patch })),
+                ...internal.map(row => ({ ...row, patch: patches.find(patch => memberSpan(row.point).patchIds.includes(patch.id)) }))];
+            const reached = new Set([attachedPatch.id]);
+            const attempted = new Set();
+            // Entry proves only its own patch. Every other patch needs its own
+            // bounded native connectors; authored internal anchors can bridge
+            // them without enlarging a patch or inventing straight-line links.
+            while (patches.some(patch => !reached.has(patch.id))) {
+                const pairs = [];
+                for (const from of anchors) if (reached.has(from.id)) for (const to of anchors) {
+                    const key = `${from.id}\0${to.id}`, distance = distance2d(from.point, to.point);
+                    if (!reached.has(to.id) && !attempted.has(key) && distance <= Format.LIMITS.localRadius) {
+                        pairs.push({ from, to, key, distance });
+                    }
+                }
+                pairs.sort((a, b) => a.distance - b.distance || a.key.localeCompare(b.key));
+                if (!pairs.length) { attached = false; break; }
+                const { from, to, key } = pairs[0]; attempted.add(key);
+                const proofs = [];
+                for (const [source, target] of [[from, to], [to, from]]) {
+                    const proof = provePath({ from: source.point, to: target.point, regionIds,
+                        context: { areaId: polygon.areaId, spawnId: polygon.spawnId }, world, budget, safety,
+                        constraints: { maxDistance: Format.LIMITS.localDistance, maxRadius: Format.LIMITS.localRadius } });
+                    if (proof.status !== 'supported') {
+                        (component.entryFailures ||= []).push({ anchorId: source.id, toAnchorId: target.id,
+                            direction: 'patch_connector', reason: proof.reason, diagnostic: proof.diagnostic || null,
+                            length: proof.length ?? null, maxXY: proof.maxXY ?? null, evidence: proof.evidence || null });
+                        break;
+                    }
+                    proofs.push({ source, target, proof });
+                }
+                if (proofs.length !== 2) continue;
+                for (const { source, target, proof } of proofs) {
+                    const id = `patch-link:${component.id}:${source.id}:${target.id}`;
+                    certificates.push({ id, kind: 'patch_access', requirementId: polygon.spawnId,
+                        areaId: polygon.areaId, spawnId: polygon.spawnId, componentId: component.id,
+                        direction: 'forward', anchorId: source.id, patchId: target.patch.id,
+                        fromAnchorId: source.id, toAnchorId: target.id, provedNodeCount: proof.nodeCount,
+                        pathDistance: proof.length, maxPathDistance: proof.length, maxXYRadius: proof.maxXY,
+                        coveredLayerCellCount: target.patch.nodeCount, membershipSpanIndices: [], regionIds, geometry: proof.points });
+                    component.certificateIds.push(id);
+                }
+                reached.add(to.id);
+            }
         }
         if (!attached) {
             component.status = 'unresolved';
@@ -773,6 +883,7 @@ async function build({ sourceFile = Inputs.DEFAULT_SOURCE, geodataDir, outputFil
         } finally { budget.endPolygon(); }
         const spanOffset = membershipSpans.length;
         const componentRows = decomposed.components || [];
+        if (componentRows.length) decomposed.rootAdmission = accountAdmissionRoots(decomposed, registered, world, budget);
         const polygonEntryCandidates = selected.rows.filter(row => row.kind === 'farm_entry'
             && row.areaId === area.id && row.spawnId === spawnId);
         try {
@@ -822,7 +933,7 @@ async function build({ sourceFile = Inputs.DEFAULT_SOURCE, geodataDir, outputFil
         const componentCertificates = componentRows.flatMap(row => row.certificateIds || []);
         polygonResults.push({ spawnId, status: polygonStatus, reason: polygonReason, componentIds,
             certificateIds: componentCertificates,
-            stats: decomposed.stats, excluded: decomposed.excluded });
+            stats: decomposed.stats, excluded: decomposed.excluded, rootAdmission: decomposed.rootAdmission || null });
         const unresolvedReason = polygonStatus === 'unresolved' && decomposed.stats?.unresolvedBoundaryFragments
             ? 'boundary_fragment_unresolved' : polygonReason;
         if (polygonResults.at(-1).reason !== unresolvedReason) polygonResults.at(-1).reason = unresolvedReason;
