@@ -65,7 +65,7 @@ function resume(state) {
     if (state.lease || hasHolds(state)) return;
     const reasons = busy(state.session);
     state.resumeBlocked = reasons;
-    if (reasons.length && state.matches()) return;
+    if (!closed && reasons.length && state.matches()) return;
     if (!closed && state.matches() && state.session.mcpTrainingDeferred) {
         state.session.mcpTrainingDeferred = false;
         state.resumingTraining = true;
@@ -165,5 +165,14 @@ function shutdown() {
     if (timer) clearInterval(timer);
     timer = null;
 }
+async function drainShutdown() {
+    if (!closed) throw Error('control_shutdown_admission_open');
+    while (states.size) {
+        sweep();
+        const blocked = [...states.values()].find(state => state.blocked || state.foreground?.publicationBlocked);
+        if (blocked) throw Error(`control_shutdown_settlement_failed:${blocked.blocked || 'publication_blocked'}`);
+        if (states.size) await new Promise(resolve => setTimeout(resolve, 25));
+    }
+}
 function usage() { return { manualLeases: [...states.values()].filter(state => state.lease).length, handoffStates: states.size }; }
-module.exports = { usage, acquire, requireLease, grant, current, revoke, heartbeat, closeAttachment, view, busy, resume, shutdown };
+module.exports = { usage, acquire, requireLease, grant, current, revoke, heartbeat, closeAttachment, view, busy, resume, shutdown, drainShutdown };

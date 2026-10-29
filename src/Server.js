@@ -27,9 +27,12 @@ function packetReceiver(onPacket, onInvalidPacket = () => {}) {
 
 class Server {
     constructor(name, optn, callback) {
-        const parameters = { name: name, callback: callback };
+        this.name = name;
+        this.callback = callback;
+        this.accepting = true;
+        this.sockets = new Set();
 
-        this.listener = require('net').createServer(this.onSocket.bind(parameters));
+        this.listener = require('net').createServer(this.onSocket.bind(this));
         this.ready = new Promise((resolve, reject) => {
             this.listener.once('error', reject);
             this.listener.listen(optn.port, optn.hostname, () => {
@@ -43,7 +46,17 @@ class Server {
         });
     }
 
+    closeAdmission() {
+        this.accepting = false;
+        this.listener.close();
+        // Keep current actors registered until their final snapshot. Destroying
+        // sockets here would run logout cleanup concurrently with that snapshot.
+        for (const socket of this.sockets) socket.pause();
+    }
+
     onSocket(socket) {
+        if (!this.accepting) { socket.destroy(); return; }
+        this.sockets.add(socket);
         utils.infoSuccess(
             this.name, 'new connection received from %s:%d', socket.remoteAddress, socket.remotePort
         );
@@ -54,7 +67,7 @@ class Server {
             // One TCP chunk can carry several packets. Once a handler error
             // has closed the connection, the rest of that chunk belongs to a
             // client we already dropped.
-            if (socket.destroyed) return undefined;
+            if (!this.accepting || socket.destroyed) return undefined;
 
             // A throwing handler used to take the whole process with it, so a
             // malformed packet only ever costs the connection that sent it.
@@ -66,7 +79,9 @@ class Server {
             };
             try {
                 const result = session.dataReceive(packet);
-                if (result && typeof result.then === 'function') result.then(null, drop);
+                if (result && typeof result.then === 'function') {
+                    invoke('GameServer/GameplayLifecycle').track(Promise.resolve(result)).then(null, drop);
+                }
                 return result;
             } catch (err) {
                 drop(err);
@@ -75,8 +90,11 @@ class Server {
             utils.infoWarn(this.name, 'invalid packet size %d from %s:%d', packetSize, socket.remoteAddress, socket.remotePort);
             socket.destroy();
         }));
-        socket.on('error', session.error.bind(session));
-        socket.on('close', () => session.error());
+        socket.on('error', error => { if (this.accepting) session.error(error); });
+        socket.on('close', () => {
+            this.sockets.delete(socket);
+            if (this.accepting) session.error();
+        });
     }
 }
 

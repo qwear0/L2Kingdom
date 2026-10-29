@@ -17,7 +17,7 @@ This is the current gameplay ownership boundary, not the historical ambient-bot 
 2. `StarterKits.js` owns legal level-20 skills, class-compatible gear and supplies. Lord/vassal starting Adena are 1,000,000 / 100,000; created vassals receive level 20 and equipped mid-D gear.
 3. Creation requires leadership of an eligible active level-1-or-higher clan. Service entry and queued grant fences recheck contact, inventory/progression and clan state.
 4. Confirmation receipts are valid for ten minutes. A successfully committed receipt replays before later expiry/capacity checks; retry must not duplicate a character or grant.
-5. A committed result can report publication pending if live restoration fails. Durable success and successful live publication are separate outcomes.
+5. A committed result can report publication pending if live restoration fails. Durable success and successful live publication are separate outcomes. During shutdown, a live-publication exception instead rejects the tracked bypass drain: final snapshots must not overwrite a committed grant with stale runtime state. The durable receipt still remains committed; no grant is replayed automatically.
 
 New vassals keep the selected race and sex and receive a random face, hairstyle and hair color from the existing bot appearance ranges (3 faces × 5 hairstyles × 4 colors). Creation prefers combinations not already used by the same owner's vassals of that race and sex; only an exhausted 60-combination pool permits repeats. The choice is committed with the character, so receipt replay, live restoration and restart preserve it. Existing characters are not rerolled.
 

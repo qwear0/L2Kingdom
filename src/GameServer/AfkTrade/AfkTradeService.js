@@ -1187,7 +1187,7 @@ function startTimers() {
     settleTimer = setInterval(() => {
         if (settling) return;
         settling = true;
-        settlePending()
+        require('../GameplayLifecycle').track(settlePending())
             .catch((error) => utils.infoWarn('AfkTrade', 'board settlement failed: %s', error.message))
             .finally(() => { settling = false; });
     }, SETTLE_TICK_MS);
@@ -1242,6 +1242,7 @@ module.exports = {
     settleOwners,
     syncOnlineInventory,
     settlePending,
+    shutdown: stopTimers,
     stop,
     _resetForTests() {
         require('./TradeMeetingService').reset();

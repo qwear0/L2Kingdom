@@ -171,7 +171,7 @@ module.exports = {
         });
         require('./Doors').start(invoke('GameServer/World/World'));
         timer = setInterval(
-            () => tick().catch((e) => utils.infoWarn('ClanHall', 'finance tick: %s', e.message)),
+            () => require('../GameplayLifecycle').track(tick()).catch((e) => utils.infoWarn('ClanHall', 'finance tick: %s', e.message)),
             10000
         );
         timer.unref?.();

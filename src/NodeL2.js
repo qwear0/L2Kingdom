@@ -24,6 +24,8 @@ const ProgressionRates = invoke('GameServer/ProgressionRates');
 const ClanService = invoke('GameServer/Clan/ClanService');
 const CharacterWriteQueue = invoke('GameServer/Persistence/CharacterWriteQueue');
 const PathfindingWorkerPool = invoke('GameServer/Geodata/PathfindingWorkerPool');
+const GameplayLifecycle = invoke('GameServer/GameplayLifecycle');
+const GameplayShutdown = invoke('GameServer/GameplayShutdown');
 
 const generation = process.env.L2NODE_MANAGED_GENERATION;
 const managed = Boolean(generation && process.send);
@@ -46,6 +48,7 @@ require('./WorldObserver/GameDashboardRuntime').install(() => shuttingDown || !r
 function shutdown(signal) {
     if (shuttingDown) return;
     shuttingDown = true;
+    GameplayLifecycle.begin();
     utils.infoWarn('DB', 'flushing buffered character state before %s', signal);
     const forceExit = setTimeout(() => exitWithOutcome('timed_out'), 15000);
     let failed = startupFailed;
@@ -53,18 +56,19 @@ function shutdown(signal) {
         failed = true;
         utils.infoWarn('Shutdown', '%s cleanup reported failure', step);
     };
-    for (const listener of listeners) listener.listener.close();
+    for (const listener of listeners) listener.closeAdmission();
     require('./WorldObserver/BotControlRoutes').shutdown();
     WorldObserver.server?.close();
     forceExit.unref?.();
-    // Each step logs its own failure and the next steps still run, so the
-    // database is always closed.
+    // Never snapshot or close persistence beneath live gameplay producers.
+    // If admission/quiescence fails, exit non-clean under the same deadline.
     (async () => {
         // Do not close persistence underneath an awaited bootstrap step. The
         // same shutdown deadline bounds bootstrap and subsequent cleanup.
         await initialization;
-        try { await invoke('GameServer/Bot/Population/PopulationService').stop(); }
-        catch (error) { failed = true; utils.infoWarn('ColdWorker', 'cold simulation drain failed: %s', error.message); }
+        await invoke('GameServer/Bot/Population/PopulationService').stop({ quiesce: GameplayShutdown.quiesce });
+        try { await GameplayShutdown.persistPlayers(); }
+        catch (error) { failed = true; utils.infoWarn('DB', 'final player status persistence failed: %s', error.message); }
         try { await CharacterWriteQueue.flushAll(); }
         catch (error) { failed = true; utils.infoWarn('DB', 'final buffered flush failed: %s', error.message); }
         try { await PathfindingWorkerPool.shutdown({ onCleanupFailure: cleanupFailure('pathfinding') }); }
@@ -79,7 +83,10 @@ function shutdown(signal) {
         } catch (error) { failed = true; utils.infoWarn('InteractionMemory', 'shutdown drain failed: %s', error.message); }
         try { await Database.close({ onCleanupFailure: cleanupFailure('database/history/checkpoint') }); }
         catch (error) { failed = true; utils.infoWarn('DB', 'graceful SQLite close failed: %s', error.message); }
-    })().catch(() => { failed = true; }).finally(() => { clearTimeout(forceExit); exitWithOutcome(failed || startupFailed ? 'failed' : 'clean'); });
+    })().catch(error => {
+        failed = true;
+        utils.infoWarn('Shutdown', 'shutdown could not reach durable quiescence: %s', error.stack || error.message);
+    }).finally(() => { clearTimeout(forceExit); exitWithOutcome(failed || startupFailed ? 'failed' : 'clean'); });
 }
 
 process.on('SIGINT', () => shutdown('SIGINT'));

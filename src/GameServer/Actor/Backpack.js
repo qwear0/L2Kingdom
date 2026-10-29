@@ -688,8 +688,7 @@ class Backpack extends BackpackModel {
             }
         };
         if (castTime > 0) {
-            if (actionOwner) actor.attack.queueTimer(apply, castTime);
-            else setTimeout(apply, castTime);
+            actor.attack.queueTimer(apply, castTime);
         } else apply();
         return true;
     }
@@ -877,7 +876,7 @@ class Backpack extends BackpackModel {
         };
 
         if (castTime > 0) {
-            setTimeout(apply, castTime);
+            session.actor.attack.queueTimer(apply, castTime);
         } else {
             apply();
         }
@@ -1092,7 +1091,7 @@ class Backpack extends BackpackModel {
         };
 
         if (castTime > 0) {
-            setTimeout(finish, castTime);
+            session.actor.attack.queueTimer(finish, castTime);
         } else {
             finish();
         }
@@ -1334,7 +1333,7 @@ class Backpack extends BackpackModel {
             };
 
             if (castTime > 0) {
-                setTimeout(apply, castTime);
+                session.actor.attack.queueTimer(apply, castTime);
             } else {
                 apply();
             }

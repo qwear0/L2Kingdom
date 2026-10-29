@@ -53,12 +53,14 @@ async function publishClan(session, actor, result) {
     return result;
 }
 
-// A committed result stays successful even if packet/cache publication fails.
-// Reopening/retrying reloads that receipt; it never creates replacement rewards.
+// A committed result normally stays successful if packet/cache publication
+// fails: reopening reloads its receipt, never replacement rewards. Shutdown
+// must instead reject publication failure before capturing stale live state.
 async function afterCommit(result, publish) {
     try { return await publish(); }
     catch (error) {
         utils.infoWarn('Lord', 'committed operation requires publication reload: %s', error.message);
+        if (require('../GameplayLifecycle').stopping) throw error;
         return { ...result, publicationPending: true, publicationError: error.message };
     }
 }

@@ -4,6 +4,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const BotControlRoutes = require('./BotControlRoutes');
+const GameplayLifecycle = require('../GameServer/GameplayLifecycle');
 
 const PUBLIC_DIR = path.join(__dirname, '..', 'frontend', 'public');
 const ITEM_ICON_CATALOG_DIR = path.join(PUBLIC_DIR, 'item-icons');
@@ -2414,6 +2415,15 @@ function sendSnapshotJson(request, response, json) {
     response.end(json);
 }
 
+function admitMutation(work) {
+    if (GameplayLifecycle.stopping) {
+        const error = new Error('Game server is stopping.');
+        error.statusCode = 503;
+        return Promise.reject(error);
+    }
+    return GameplayLifecycle.track(Promise.resolve().then(work));
+}
+
 function readJsonBody(request, maxBytes = 16384) {
     return new Promise((resolve, reject) => {
         const chunks = [];
@@ -2606,7 +2616,7 @@ function handleTeleportControl(request, response, url) {
             return true;
         }
         readJsonBody(request)
-            .then((payload) => teleportPlayerToRaid(payload.playerName, payload.bossTemplateId))
+            .then((payload) => admitMutation(() => teleportPlayerToRaid(payload.playerName, payload.bossTemplateId)))
             .then((result) => sendJson(response, result, result.ok ? 200 : 400))
             .catch((err) => sendJson(response, { ok: false, error: err.message }, err.statusCode || 500));
         return true;
@@ -2777,7 +2787,7 @@ function handleClanOrderRoutes(request, response, url) {
             return true;
         }
         readJsonBody(request, 32768)
-            .then((payload) => createPlayerManagedClanOrder(clanOrderCreateMatch[1], payload))
+            .then((payload) => admitMutation(() => createPlayerManagedClanOrder(clanOrderCreateMatch[1], payload)))
             .then((result) => sendJson(response, result, clanOrderMutationStatus(result)))
             .catch((err) => sendJson(response, { ok: false, error: err.message }, err.statusCode || 500));
         return true;
@@ -2791,11 +2801,11 @@ function handleClanOrderRoutes(request, response, url) {
             return true;
         }
         readJsonBody(request, 32768)
-            .then(async (payload) => {
+            .then(payload => admitMutation(async () => {
                 const clan = await ClanGoalService.clanProjectionById(Number(clanOrderEditMatch[1]));
                 const result = await ClanOrderService.edit(clan, Number(clanOrderEditMatch[2]), payload);
                 return result.ok ? { ...result, order: compactClanOrder(result.order), goal: compactClanGoal(result.goal) } : result;
-            })
+            }))
             .then((result) => sendJson(response, result, clanOrderMutationStatus(result)))
             .catch((err) => sendJson(response, { ok: false, error: err.message }, err.statusCode || 500));
         return true;
@@ -2809,12 +2819,12 @@ function handleClanOrderRoutes(request, response, url) {
             return true;
         }
         readJsonBody(request)
-            .then((payload) => transitionPlayerManagedClanOrder(
+            .then((payload) => admitMutation(() => transitionPlayerManagedClanOrder(
                 clanOrderTransitionMatch[1],
                 clanOrderTransitionMatch[2],
                 clanOrderTransitionMatch[3],
                 payload
-            ))
+            )))
             .then((result) => sendJson(response, result, clanOrderMutationStatus(result)))
             .catch((err) => sendJson(response, { ok: false, error: err.message }, err.statusCode || 500));
         return true;
@@ -2828,15 +2838,15 @@ function handleClanCrest(request, response, url) {
     if (clanCrestMatch) {
         if (request.method === 'POST') {
             readJsonBody(request)
-                .then((payload) => updatePlayerManagedClanCrest(clanCrestMatch[1], payload))
+                .then((payload) => admitMutation(() => updatePlayerManagedClanCrest(clanCrestMatch[1], payload)))
                 .then((result) => sendJson(response, result, clanCrestMutationStatus(result)))
                 .catch((err) => sendJson(response, { ok: false, error: err.message }, err.statusCode || 500));
             return true;
         }
         if (request.method === 'DELETE') {
-            deletePlayerManagedClanCrest(clanCrestMatch[1])
+            admitMutation(() => deletePlayerManagedClanCrest(clanCrestMatch[1]))
                 .then((result) => sendJson(response, result, clanCrestMutationStatus(result)))
-                .catch((err) => sendJson(response, { ok: false, error: err.message }, 500));
+                .catch((err) => sendJson(response, { ok: false, error: err.message }, err.statusCode || 500));
             return true;
         }
         if (request.method !== 'GET') {
@@ -2963,6 +2973,9 @@ function serveStatic(request, response, url) {
 
 // Checks run in this exact order; each group answers or passes the request on.
 function route(request, response) {
+    if (GameplayLifecycle.stopping) {
+        sendJson(response, { error: 'Game server is stopping.' }, 503); return;
+    }
     const url = new URL(request.url, 'http://localhost');
     if (BotControlRoutes.gameRoute(request, response, url)) return;
     if (redirectObserverRoot(response, url)) return;
@@ -3060,6 +3073,9 @@ const WorldObserverServer = {
         if (internal && hostname !== '127.0.0.1') throw new Error('Private observer must bind loopback.');
         const auth = internal ? null : new ObserverAuth(port);
         this.server = http.createServer((request, response) => {
+            if (GameplayLifecycle.stopping) {
+                sendAuthError(response, { error: 'Game server is stopping.' }, 503); return;
+            }
             (async () => {
                 if (internal) {
                     // The parent authenticates sessions before proxying. Reject direct

@@ -181,6 +181,8 @@ function trySweep(session, bot, npc, Generics) {
     return true;
 }
 
+const GameplayLifecycle = require('../GameplayLifecycle');
+
 const BotAI = {
     clearTacticalState,
 
@@ -193,6 +195,7 @@ const BotAI = {
     },
 
     scheduleTick(session, delayMs, { urgent = false } = {}) {
+        if (GameplayLifecycle.stopping) return false;
         if (!session?.actor || !session.aiActive || session.mcpControl) return false;
         this.cancelScheduledTick(session);
         const generation = Number(session.aiScheduleGeneration || 0);
@@ -220,7 +223,7 @@ const BotAI = {
     },
 
     init(session) {
-        if (session.mcpControl) return;
+        if (GameplayLifecycle.stopping || session.mcpControl) return;
         this.cancelScheduledTick(session);
         session.aiActive = true;
         // Once per activation: a later re-init must not bring back a servitor
@@ -406,6 +409,7 @@ const BotAI = {
     },
 
     tick(session) {
+        if (GameplayLifecycle.stopping) return;
         if (session.mcpControl) return;
         const bot = session.actor;
         if (!bot) return;

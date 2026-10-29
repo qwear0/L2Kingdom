@@ -1,6 +1,8 @@
 const ServerResponse = invoke('GameServer/Network/Response');
+const GameplayLifecycle = require('../../GameplayLifecycle');
 
 function npcTalkResponse(session, data) {
+    if (GameplayLifecycle.stopping) return;
     if (session.mcpObservation) {
         session.mcpObservation.dialogue = null;
         require('../../Bot/Control/Offers').clear(session);
@@ -12,7 +14,7 @@ function npcTalkResponse(session, data) {
 
     if (parts[0] === 'quest') {
         const QuestService = invoke('GameServer/Quest/QuestService');
-        QuestService.onEvent(session, { questId: parts[1], name: parts[2] }).catch((error) => {
+        GameplayLifecycle.track(QuestService.onEvent(session, { questId: parts[1], name: parts[2] })).catch((error) => {
             utils.infoWarn('Quest', 'failed to process quest event: %s', error.message);
             session.dataSendToMe(ServerResponse.actionFailed());
         });
@@ -28,7 +30,7 @@ function npcTalkResponse(session, data) {
                 fetchSelfId: () => activeNpc.selfId,
                 fetchId: () => activeNpc.objectId
             };
-            QuestService.onTalk(session, npc).then((handled) => {
+            GameplayLifecycle.track(QuestService.onTalk(session, npc)).then((handled) => {
                 if (handled) return;
                 session.dataSendToMe(ServerResponse.npcHtml(
                     activeNpc.objectId,
@@ -65,7 +67,7 @@ function npcTalkResponse(session, data) {
         const result = handler(session, parts);
         // Async bypasses (BotFriends) fail the same way as sync ones, not as an unhandled rejection.
         if (result && typeof result.catch === 'function') {
-            result.catch((err) => utils.infoWarn('GameServer', 'Unhandled bypass command: %s, error: %s', parts[0], err?.message));
+            GameplayLifecycle.track(result).catch((err) => utils.infoWarn('GameServer', 'Unhandled bypass command: %s, error: %s', parts[0], err?.message));
         }
     } catch (err) {
         utils.infoWarn('GameServer', 'Unhandled bypass command: %s, error: %s', parts[0], err.message);

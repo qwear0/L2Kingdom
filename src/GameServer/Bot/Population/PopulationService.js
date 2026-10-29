@@ -1296,28 +1296,27 @@ const PopulationService = {
         return pass;
     },
 
-    stop() {
+    stop({ quiesce = null } = {}) {
         if (this.stopPromise) return this.stopPromise;
         const saveFinalOwnedActors = this.ownedSnapshotAdmissionOpen;
         this.ownedSnapshotAdmissionOpen = false;
         if (this.ownedSnapshotTimer) clearInterval(this.ownedSnapshotTimer);
         this.ownedSnapshotTimer = null;
         const pendingSnapshot = this.ownedSnapshotPromise;
-        // The periodic pass may predate the latest position/posture. Wait for it
-        // before a fresh final pass; a rejected pass remains a shutdown failure.
-        const finalSnapshot = saveFinalOwnedActors
-            ? Promise.allSettled([pendingSnapshot]).then(() => this.persistOwnedActors({ final: true }))
-            : null;
-        // An admitted snapshot may be suspended in setImmediate. Wait for every
-        // drain even after failure, before NodeL2 can flush/close its database.
+        // A periodic pass may be suspended in setImmediate. Drain every owner,
+        // including native gameplay, before capturing a fresh final snapshot.
+        // A failed quiescence must never be presented as a durable clean stop.
         const drain = Promise.allSettled([
             pendingSnapshot,
-            finalSnapshot,
             Promise.resolve().then(() => ColdSimulationCoordinator.stop()),
             Promise.resolve().then(() => this.stopLocalServices())
-        ]).then(results => {
+        ]).then(async results => {
             const errors = results.filter(result => result.status === 'rejected').map(result => result.reason);
+            // A cold/local drain can still publish actors. Freeze gameplay only
+            // after those owners settle, including when one reported failure.
+            try { await quiesce?.(); } catch (error) { errors.push(error); }
             if (errors.length) throw new AggregateError(errors, `population drain failed: ${errors.map(error => error?.message || error).join('; ')}`);
+            if (saveFinalOwnedActors) await this.persistOwnedActors({ final: true });
         }).finally(() => {
             if (this.stopPromise === drain) this.stopPromise = null;
         });

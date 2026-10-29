@@ -158,12 +158,12 @@ function dispatchLocalCommand(session, data) {
     }
     if (data.text === '.afksell' || data.text === '.afkbuy') {
         const AfkTrade = invoke('GameServer/AfkTrade/AfkTradeService');
-        AfkTrade.begin(session, data.text === '.afksell' ? AfkTrade.SELL : AfkTrade.BUY)
+        invoke('GameServer/GameplayLifecycle').track(AfkTrade.begin(session, data.text === '.afksell' ? AfkTrade.SELL : AfkTrade.BUY))
             .catch((error) => utils.infoWarn('AfkTrade', 'command failed: %s', error.message));
         return true;
     }
     if (data.text === '.afkstop') {
-        invoke('GameServer/AfkTrade/AfkTradeService').stop(session)
+        invoke('GameServer/GameplayLifecycle').track(invoke('GameServer/AfkTrade/AfkTradeService').stop(session))
             .catch((error) => utils.infoWarn('AfkTrade', 'stop command failed: %s', error.message));
         return true;
     }

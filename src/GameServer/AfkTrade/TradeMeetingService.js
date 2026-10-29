@@ -1,6 +1,7 @@
 'use strict';
 const { randomUUID } = require('node:crypto');
 const { MAX_COMMITMENTS } = require('./TradeMeeting');
+const GameplayLifecycle = require('../GameplayLifecycle');
 const { partyTradeAllowed } = require('../Bot/Population/PartyAdmission');
 const staged = new Map();
 const preparedActors = new Map(); // actor -> staged token; one preparation per actor.
@@ -444,9 +445,9 @@ function reset() {
     staged.clear(); preparedActors.clear(); refusedAds.clear(); pages = 0; transportPages = 0; transportBytes = 0; enrolled.clear(); playerWaiters.clear(); travelNotices.clear(); queue.clear();
 }
 function wake(id) {
-    if (!enrolled.has(Number(id))) return;
+    if (GameplayLifecycle.stopping || !enrolled.has(Number(id))) return;
     queue.add(Number(id));
-    if (!draining) { draining = true; setImmediate(drain); }
+    if (!draining) { draining = true; setImmediate(() => GameplayLifecycle.track(drain())); }
 }
 async function processOwner(id) {
     for (const meetingId of [...(enrolled.get(id) || [])].slice(0, MAX_COMMITMENTS)) await processMeeting(id, meetingId);
@@ -551,11 +552,24 @@ async function continueColdTravel(row, side, state) {
 async function drain() {
     const started = performance.now(); let count = 0;
     try {
-        while (queue.size && count++ < 32 && performance.now() - started < 4) {
+        while (!GameplayLifecycle.stopping && queue.size && count++ < 32 && performance.now() - started < 4) {
             const id = queue.values().next().value; queue.delete(id);
-            try { await processOwner(id); } catch (error) { utils.infoWarn('AfkTrade', 'meeting owner %d: %s', id, error.message); }
+            try { await processOwner(id); } catch (error) {
+                if (GameplayLifecycle.stopping) throw error;
+                utils.infoWarn('AfkTrade', 'meeting owner %d: %s', id, error.message);
+            }
         }
-    } finally { draining = false; if (queue.size) { draining = true; setImmediate(drain); } }
+    } finally {
+        draining = false;
+        if (queue.size && !GameplayLifecycle.stopping) {
+            draining = true;
+            setImmediate(() => GameplayLifecycle.track(drain()));
+        }
+    }
+}
+async function shutdown() {
+    while (draining) await new Promise(resolve => setTimeout(resolve, 25));
+    reset();
 }
 async function init() {
     unsubscribeLife?.(); unsubscribeMarketLife?.(); unsubscribePlayer?.(); unsubscribeBoard?.(); enrolled.clear(); playerWaiters.clear(); travelNotices.clear(); queue.clear();
@@ -597,7 +611,7 @@ async function init() {
         await new Promise(resolve => setImmediate(resolve));
     }
 }
-module.exports = { stage, discard, hasPreparation, canJoinParty, accept, cancel, receipt, waitForResult, prepareTrade, trade, wake, init, reset, presenceChanged,
+module.exports = { stage, discard, hasPreparation, canJoinParty, accept, cancel, receipt, waitForResult, prepareTrade, trade, wake, init, reset, shutdown, presenceChanged,
     isPlayerWaiting: id => !!playerWaiters.get(Number(id))?.size,
     adjustTransportPages,
     counters: () => ({ preparations: staged.size, pages: pages + transportPages, bytes: transportBytes + [...staged.values()].reduce((total, row) => total + row.bytes, 0), queued: queue.size, participants: enrolled.size }) };

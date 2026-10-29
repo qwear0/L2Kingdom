@@ -1,5 +1,6 @@
 const ServerResponse = invoke('GameServer/Network/Response');
 const GeodataEngine  = invoke('GameServer/Geodata/GeodataEngine');
+const GameplayLifecycle = require('../../GameplayLifecycle');
 
 const COMPANION_TELEPORT_OFFSETS = [
     { locX: 80, locY: 0 },
@@ -18,7 +19,7 @@ function isBotSession(session) {
 }
 
 function syncPartyCompanions(leaderSession, destination, Generics, companions = null) {
-    if (isBotSession(leaderSession)) {
+    if (GameplayLifecycle.stopping || isBotSession(leaderSession)) {
         return 0;
     }
 
@@ -132,7 +133,7 @@ function teleportTo(session, actor, coords, options = {}) {
         }
 
         if (typeof options.onArrival === 'function') {
-            Promise.resolve().then(() => options.onArrival(coords)).catch(error => {
+            GameplayLifecycle.track(Promise.resolve().then(() => options.onArrival(coords))).catch(error => {
                 utils.infoWarn('TeleportTo', 'arrival delivery failed for %d: %s', actor.fetchId(), error.message);
             });
         }
@@ -143,14 +144,19 @@ function teleportTo(session, actor, coords, options = {}) {
             BotAI.wakeup(session, { urgent: options.urgentWakeup === true });
         }
     };
-    setTimeout(() => {
-        try { arrive(); }
-        catch (error) {
-            if (!options.actionOwner) throw error;
-            options.onInterrupted?.('native_teleport_publication_failed');
-            utils.infoWarn('TeleportTo', 'controlled arrival failed actor=%s error=%s', actor.fetchId(), error.message);
-        }
-    }, 1000);
+    // An accepted paid hop still lands during shutdown. Its arrival and async
+    // publication must settle before the final position/status snapshot.
+    GameplayLifecycle.track(new Promise((resolve, reject) => {
+        setTimeout(() => {
+            try { arrive(); resolve(); }
+            catch (error) {
+                reject(error);
+                if (!options.actionOwner) throw error;
+                options.onInterrupted?.('native_teleport_publication_failed');
+                utils.infoWarn('TeleportTo', 'controlled arrival failed actor=%s error=%s', actor.fetchId(), error.message);
+            }
+        }, 1000);
+    }));
     return true;
 }
 

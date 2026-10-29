@@ -5,6 +5,7 @@ const Social = invoke('GameServer/Bot/AI/BotSocialMemory');
 const Effects = invoke('GameServer/Skills/C4SkillEffects');
 const Town = invoke('GameServer/Bot/AI/TownPathfinder');
 const ServerResponse = invoke('GameServer/Network/Response');
+const GameplayLifecycle = require('../../GameplayLifecycle');
 
 const QUOTE_MS = 2 * 60 * 1000;
 const MAX_DISTANCE = 900;
@@ -122,7 +123,7 @@ function waitForCast(milliseconds) {
 }
 
 function castInterrupted(playerSession, providerSession, player, provider, skill) {
-    return playerSession.actor !== player || providerSession.actor !== provider
+    return GameplayLifecycle.stopping || playerSession.actor !== player || providerSession.actor !== provider
         || !ownedProviderAllowed(playerSession, providerSession)
         || player.isDead?.() || provider.isDead?.()
         || player.state?.fetchCombats?.() || provider.state?.fetchCombats?.()
@@ -131,6 +132,7 @@ function castInterrupted(playerSession, providerSession, player, provider, skill
 }
 
 async function castPaidBuff(playerSession, providerSession, skill, wait = waitForCast) {
+    if (GameplayLifecycle.stopping) return { effect: null, interrupted: true };
     const player = playerSession.actor, provider = providerSession.actor;
     const vassalEpoch = providerSession.vassalEpoch;
     const calculated = provider.attack?.calculatedSkillHitTime?.(provider, skill, skill.fetchSpell?.());

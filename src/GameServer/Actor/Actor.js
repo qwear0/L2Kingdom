@@ -31,8 +31,7 @@ class Actor extends ActorModel {
     }
 
     destructor() {
-        this.playerAutoFight?.dispose('actor_disposed');
-        invoke('GameServer/Skills/ChargeLifecycle').dispose(this);
+        this.quiesce();
         // A player-owned summon retains follow/feed/lifetime timers. Dispose it
         // while the owner and session are still valid; otherwise a timer can
         // fire after Session.error() clears session.actor.
@@ -44,11 +43,14 @@ class Actor extends ActorModel {
         invoke(path.actor).unselect(
             this.session, this
         );
+    }
 
-        invoke(path.actor).clearStoredActions(
-            this.session, this
-        );
-
+    // Stop native producers without retiring the actor or unsummoning its pet:
+    // shutdown still needs their original identities for final persistence.
+    quiesce() {
+        this.playerAutoFight?.dispose('actor_disposed');
+        invoke('GameServer/Skills/ChargeLifecycle').dispose(this);
+        invoke(path.actor).clearStoredActions(this.session, this);
         this.attack.destructor();
         this.automation.destructor(this);
     }

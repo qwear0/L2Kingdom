@@ -1,4 +1,5 @@
 const ServerResponse = invoke('GameServer/Network/Response');
+const GameplayLifecycle = require('../../GameplayLifecycle');
 
 function finishRevive(session, actor, helper) {
     const wasDead = actor.state.fetchDead?.() === true;
@@ -62,10 +63,17 @@ function revive(session, actor, {
 
     session.dataSendToMeAndOthers(ServerResponse.revive(actor.fetchId()), actor);
 
-    setTimeout(() => {
-        finishRevive(session, actor, helper);
-        session.dataSendToMeAndOthers(ServerResponse.socialAction(actor.fetchId(), 9), actor); // SWAG stand-up
-    }, delayMs);
+    GameplayLifecycle.track(new Promise((resolve, reject) => {
+        setTimeout(() => {
+            try {
+                if (session.actor === actor) {
+                    finishRevive(session, actor, helper);
+                    session.dataSendToMeAndOthers(ServerResponse.socialAction(actor.fetchId(), 9), actor);
+                }
+                resolve();
+            } catch (error) { reject(error); throw error; }
+        }, delayMs);
+    }));
     return experience;
 }
 
