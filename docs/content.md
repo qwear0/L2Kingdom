@@ -82,6 +82,8 @@ Some optional exported relations need a supplied native catalogue. Preserve thos
 4. `NpcTalk.js` prioritizes service menus and preserves merchant/gatekeeper quest branches before falling back to static `data/Html/<selfId>.html`.
 5. `NpcTalkResponse.js` routes quest events, links and dynamic bypasses. NPC interaction sends `ActionFailed` where needed to release client interaction state.
 
+**Legacy scripted hand-ins:** guarded paths in selected JS quests, including Q151, require successful `QuestService.takeItem` calls or preflight their required item set before grants or progression. Known shortages return a refusal naming the required items. Multi-item consumption and subsequent grants/state writes remain sequential, not `QuestStep.apply` transactions; these guards do not provide rollback for persistence failures or protection against unrelated inventory races.
+
 **Secret Meeting pilot (Q11/Q12):** both quests are active in `QuestRegistry.js`, adapted from Mobius C4 snapshot `a4c31517cd0c428783650e008e199f2ac42a8434`. New acceptance requires level 74 or above; existing started states retain their meaning. Each quest delivers one distinct Munitions Box (`7231` / `7232`) and completes once for a base 79,761 EXP / 0 SP, scaled by the existing quest reward policy. `QuestStep.apply` couples supply issuance and final item consumption/reward with their state transitions; missing items or stale conditions cannot pay a reward.
 
 - Cadmon (`8296`), Helmut (`8258`) and programmatically supplied Leon (`8256`, `World/C4LateTownGatekeepers.js`) keep their existing native definitions/placements. `data/Html/8256.html` preserves Leon's shop and exposes his quest branch; Helmut's existing page is unchanged.
