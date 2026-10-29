@@ -68,8 +68,11 @@ function sample(session) {
     }
     const path = session.lastPathfinding;
     if (path && path !== journal.path) {
-        journal.emit('route_result', 'native_pathfinding', { strategy: path.strategy, reason: path.reason, error: path.error,
-            routeUsable: path.routeUsable, lowLodWarp: path.lowLodWarp, requestedTo: path.requestedTo }); journal.path = path;
+        // MCP owners publish their settled result synchronously with actionId;
+        // polling must not duplicate it or attach a later route to an old action.
+        if (!path.actionId) journal.emit('route_result', 'native_pathfinding', { strategy: path.strategy, reason: path.reason, error: path.error,
+            routeUsable: path.routeUsable, lowLodWarp: path.lowLodWarp, requestedTo: path.requestedTo });
+        journal.path = path;
     }
     journal.previous = state;
 }

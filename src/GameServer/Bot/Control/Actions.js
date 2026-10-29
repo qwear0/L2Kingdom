@@ -1,7 +1,7 @@
 'use strict';
 
 const { randomUUID } = require('crypto');
-const { limits, fault } = require('../../../Mcp/Contracts');
+const { limits, actionLimits, fault } = require('../../../Mcp/Contracts');
 const Authority = require('./Authority');
 const Results = require('./Results');
 const World = invoke('GameServer/World/World');
@@ -52,15 +52,44 @@ function nativeOwner(run) {
         canInitiate: targets => targets.every(legalTarget), acceptTargets() {},
         rejectCandidate: () => run.fail('target_lookup_failed', 'native'),
         routeFailed: () => run.fail('movement_blocked', 'native') };
-    const owner = { source: 'bot-mcp', run, controller,
+    const owner = { source: 'bot-mcp', run, controller, actionId: run.receipt.actionId, pathEvidence: true,
+        captureRoute(result, points) {
+            if (!owner.isCurrent()) return;
+            const route = Array.isArray(points) ? points : [];
+            const count = Math.min(route.length, actionLimits.routeSamplePoints);
+            const sample = Array.from({ length: count }, (_, i) => {
+                const index = count > 1 ? Math.floor(i * (route.length - 1) / (count - 1)) : 0;
+                const point = route[index];
+                return { index, locX: Number.isFinite(point.locX) ? point.locX : null,
+                    locY: Number.isFinite(point.locY) ? point.locY : null, locZ: Number.isFinite(point.locZ) ? point.locZ : null };
+            });
+            // Keep the action's own result, not a later session.lastPathfinding.
+            // Only the latest route per action is retained; sampling is not a trace.
+            run.receipt.evidence.route = { ...result.pathEvidence, actionId: owner.actionId,
+                routeGeneration: result.routeGeneration, ordinal: run.routeOrdinal, status: 'resolved', sampledAt: result.at,
+                requestedTo: { ...result.requestedTo }, routedTo: { ...result.routedTo }, strategy: result.strategy,
+                pathLength: result.pathLength, routeUsable: result.routeUsable, lowLodWarp: result.lowLodWarp,
+                reason: result.reason || null, error: result.error || null,
+                executionNavigation: result.executionNavigation, returnedPoints: route.length, sample,
+                sampleTruncated: count < route.length, previousRoutesRetained: false };
+            run.retainedRoute = run.receipt.evidence.route;
+            session.mcpObservation?.emit('route_result', 'native_pathfinding', {
+                routeGeneration: result.routeGeneration, ordinal: run.routeOrdinal, strategy: result.strategy,
+                reason: result.reason || null, error: result.error || null, routeUsable: result.routeUsable,
+                search: result.pathEvidence?.search || null }, owner.actionId);
+        },
+        reuseRoute(result) {
+            if (owner.isCurrent() && result.pathEvidence && run.retainedRoute?.routeGeneration === result.routeGeneration) run.receipt.evidence.route = {
+                ...run.retainedRoute, ordinal: run.routeOrdinal, reused: true };
+        },
         isCurrent: () => !run.done && !run.cancelReason && Authority.current(lease) && state.foreground === run,
         nativeEvent: (event, details) => run.event(event, details),
-        acceptRoute: route => route.length <= 512 && route.every(point => Object.values(point).every(Number.isFinite)),
+        acceptRoute: route => route.length <= actionLimits.routePoints && route.every(point => Object.values(point).every(Number.isFinite)),
         approach(value, range, execute) {
             if (!owner.isCurrent()) return false;
             run.approach = { target: value, range, execute };
             run.receipt.phase = 'approaching';
-            run.navigate(position(value), Math.min(32, range));
+            run.navigate(position(value), Math.min(actionLimits.arrivalXYDefault, range));
             return true;
         } };
     return owner;
@@ -90,6 +119,12 @@ function createRun(input, lease, key, fingerprint) {
             if (actor.storedAttack?.actionOwner === run.owner) actor.storedAttack = null;
             if (actor.storedSpell?.actionOwner === run.owner) actor.storedSpell = null;
             receipt.evidence.finalPosition = position(actor);
+            if (receipt.evidence.route) receipt.evidence.finalNavigation = invoke('GameServer/Geodata/GeodataEngine').inputIdentity();
+            if (run.destination) run.measureMovement();
+            if (receipt.evidence.route?.status === 'pending') {
+                receipt.evidence.route = { ...receipt.evidence.route, status: 'unavailable',
+                    reason: reason, search: null, gap: 'No settled route result before action termination.' };
+            }
             if (run.destination && receipt.executionOutcome === 'not_applied'
                 && distance(receipt.evidence.from, receipt.evidence.finalPosition) > 1) {
                 receipt.executionOutcome = 'partial';
@@ -168,11 +203,28 @@ function createRun(input, lease, key, fingerprint) {
             }
         },
         navigate(to, tolerance) {
-            if (distance(position(actor), to) > 6000) throw fault('movement_budget', 409);
+            const measuredDistance = distance(position(actor), to);
+            if (measuredDistance > actionLimits.moveDistanceXY) throw fault('movement_budget', 409,
+                { distanceXY: measuredDistance, maxDistanceXY: actionLimits.moveDistanceXY });
             run.destination = { ...to }; run.tolerance = tolerance;
+            run.routeOrdinal = (run.routeOrdinal || 0) + 1;
+            receipt.evidence.route = { actionId: receipt.actionId, ordinal: run.routeOrdinal, status: 'pending',
+                requestedTo: { ...to }, search: null, previousRoutesRetained: false };
+            receipt.evidence.spawnPreparation = invoke('GameServer/Geodata/SpawnPlacement').identity();
             receipt.status = 'running'; receipt.phase = 'pathfinding';
             invoke(path.actor).moveTo(session, actor, { from: position(actor), to: { ...to }, arrivalRadius: tolerance,
-                pathMaxNodes: 4000, actionOwner: run.owner });
+                pathMaxNodes: actionLimits.pathMaxNodes, actionOwner: run.owner });
+        },
+        measureMovement() {
+            const point = position(actor), goal = run.approach ? position(run.approach.target) : run.destination;
+            const tolerance = run.approach ? run.approach.range : run.tolerance;
+            const route = receipt.evidence.route;
+            const arrived = distance(point, goal) <= tolerance && Math.abs(point.locZ - goal.locZ) <= actionLimits.arrivalZ;
+            receipt.evidence.movement = { from: receipt.evidence.from, requestedTo: run.destination, measured: point,
+                xyTolerance: tolerance, zTolerance: actionLimits.arrivalZ, arrived, lowLodWarp: route?.lowLodWarp === true,
+                path: { strategy: route?.strategy, routeUsable: route?.routeUsable,
+                    error: route?.error || null, reason: route?.reason || null, search: route?.search || null } };
+            return receipt.evidence.movement;
         },
         poll() {
             if (run.done) return;
@@ -192,20 +244,15 @@ function createRun(input, lease, key, fingerprint) {
             if (actor.attack.queue.data?.actionOwner === run.owner) { receipt.phase = 'native_queued'; return; }
             const moving = session.pendingPathRequest || session.moveTimer || actor.state.fetchTowards();
             if (run.destination) {
-                const point = position(actor);
-                const goal = run.approach ? position(run.approach.target) : run.destination;
-                const tolerance = run.approach ? run.approach.range : run.tolerance;
-                const arrived = distance(point, goal) <= tolerance && Math.abs(point.locZ - goal.locZ) <= 64;
-                receipt.evidence.movement = { from: receipt.evidence.from, requestedTo: run.destination,
-                    measured: point, xyTolerance: tolerance, zTolerance: 64, arrived, lowLodWarp: session.lastPathfinding?.lowLodWarp === true,
-                    path: { strategy: session.lastPathfinding?.strategy, routeUsable: session.lastPathfinding?.routeUsable,
-                        error: session.lastPathfinding?.error || null, reason: session.lastPathfinding?.reason || null } };
-                if (arrived && !session.lastPathfinding?.lowLodWarp) {
+                const movement = run.measureMovement(), route = receipt.evidence.route;
+                if (movement.arrived && !movement.lowLodWarp) {
                     actor.automation.abortAll(actor);
                     run.destination = null;
                     if (run.approach) { const next = run.approach.execute; run.approach = null; next(); }
                     else { receipt.executionOutcome = 'applied'; receipt.gameplayOutcome = 'arrived'; run.finish('succeeded', 'physical_arrival'); }
-                } else if (!moving) run.fail(session.lastPathfinding?.error ? 'movement_blocked' : 'partial_or_unreachable_route', 'native');
+                } else if (!moving) run.fail(route?.routeUsable ? 'movement_incomplete'
+                    : route?.reason || route?.error || (route?.search?.goalReached ? 'route_unusable' : route?.search?.stopReason)
+                        || 'path_result_unavailable', 'native');
                 return;
             }
             if (input.command.kind === 'target') {
@@ -247,7 +294,7 @@ function start(run) {
     else if (command.kind === 'approach') {
         const value = target(command.targetId);
         run.approach = { target: value, range: command.range, execute() { receipt.executionOutcome = 'applied'; receipt.gameplayOutcome = 'arrived'; run.finish('succeeded', 'physical_approach'); } };
-        run.navigate(position(value), Math.min(32, command.range));
+        run.navigate(position(value), Math.min(actionLimits.arrivalXYDefault, command.range));
     } else if (command.kind === 'target') {
         if (command.targetId === null) { actor.unselect(); run.poll(); return; }
         const value = target(command.targetId);
@@ -404,7 +451,10 @@ function dispatch(input, attachmentFor) {
             run.publicationBlocked = true;
             Object.assign(run.receipt, { status: 'unknown', phase: 'settlement_blocked', executionOutcome: 'unknown', reasonCode: 'dispatch_uncertain', reasonSource: 'adapter' });
             utils.infoWarn('BotControl', 'dispatch uncertain actor=%s error=%s', run.actor.fetchId(), error.message);
-        } else run.fail(error.code, 'adapter');
+        } else {
+            if (Object.keys(error.details || {}).length) run.receipt.evidence.rejection = require('./Journal').compact(error.details);
+            run.fail(error.code, 'adapter');
+        }
     }
     return run.receipt;
 }

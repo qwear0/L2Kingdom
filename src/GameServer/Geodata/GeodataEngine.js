@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { createHash, randomUUID } = require('crypto');
 const VirtualObstacles = invoke('GameServer/Geodata/VirtualObstacles/index');
 
 const REGION_OFFSET_X = 20;
@@ -86,6 +87,25 @@ function getLocalY(y, regionY) {
 const GeodataEngine = {
     regions: {}, // Loaded region buffers, keyed by "XX_YY"
     missing: {}, // Keys of missing regions, to prevent console spam and repeat disk checks
+    instanceId: randomUUID(),
+    regionIdentities: new Map(),
+    regionIdentity: null,
+
+    recordRegionIdentity(key, buffer) {
+        // Hash bytes at the load boundary, never current disk files on a status
+        // request. Existing actors share this small snapshot; no per-bot hashing.
+        this.regionIdentities.set(key, buffer ? createHash('sha256').update(buffer).digest('hex') : null);
+        const entries = [...this.regionIdentities].sort(([a], [b]) => a.localeCompare(b));
+        this.regionIdentity = Object.freeze({ sha256: createHash('sha256').update(JSON.stringify(entries)).digest('hex'),
+            loaded: entries.filter(([, digest]) => digest !== null).length,
+            missing: entries.filter(([, digest]) => digest === null).length });
+    },
+
+    inputIdentity() {
+        return { instanceId: this.instanceId, navigationRevision: this.navigationRevision || 0,
+            regions: this.regionIdentity, obstacles: VirtualObstacles.identity || null,
+            source: 'loaded_region_bytes_and_obstacle_exports', coverage: 'loaded_set_not_entire_world' };
+    },
 
     init() {
         this.navigationRevision = Number(this.navigationRevision || 0) + 1;
@@ -152,11 +172,11 @@ const GeodataEngine = {
         if (fs.existsSync(filePath)) {
             try {
                 const buffer = fs.readFileSync(filePath);
-                this.regions[key] = buffer;
-                
-                // Build block offset index table
+                // Build block offset index table before publishing the loaded input.
                 const offsetIndex = this.buildOffsetIndex(buffer);
+                this.regions[key] = buffer;
                 this[`index_${key}`] = offsetIndex;
+                this.recordRegionIdentity(key, buffer);
 
                 if (invoke('GameServer/Bot/Population/PopulationConfig').developerDiagnostics === true) utils.infoSuccess("GeodataEngine", "Loaded region geodata: %s (Size: %s MB)", key, (buffer.length / (1024 * 1024)).toFixed(2));
                 return true;
@@ -165,6 +185,7 @@ const GeodataEngine = {
             }
         } else {
             this.missing[key] = true;
+            if (!this.regions[key]) this.recordRegionIdentity(key, null);
             utils.infoWarn("GeodataEngine", "Geodata file not found: %s", filePath);
         }
         return false;
@@ -519,6 +540,9 @@ const GeodataEngine = {
     },
 
     findPath(startX, startY, startZ, endX, endY, endZ, maxNodes = 2000, options = {}) {
+        const evidence = options.evidence;
+        if (evidence) Object.assign(evidence, { stopReason: 'SEARCHING', searchComplete: false,
+            nodesExpanded: 0, maxNodes, goalReached: false, missingGeodata: false });
         const checkBudget = typeof options.checkBudget === 'function' ? options.checkBudget : null;
         checkBudget?.();
         const startCx = startX >> 4;
@@ -534,6 +558,7 @@ const GeodataEngine = {
             let cell = cells.get(key);
             if (!cell) {
                 cell = this.getCellData((cx << 4) + 8, (cy << 4) + 8, z);
+                if (evidence && cell.nswe !== 0 && !this.hasGeo((cx << 4) + 8, (cy << 4) + 8)) evidence.missingGeodata = true;
                 if (cells.size < 65536) cells.set(key, cell);
             }
             return cell;
@@ -570,6 +595,7 @@ const GeodataEngine = {
 
         const immediate = { cx: startCx, cy: startCy, cz: startCell.z };
         if (reachedGoal(immediate)) {
+            if (evidence) Object.assign(evidence, { stopReason: 'GOAL_REACHED', searchComplete: true, goalReached: true });
             if (goalRadius > 0) {
                 return [{ locX: startX, locY: startY, locZ: startZ }];
             }
@@ -609,14 +635,17 @@ const GeodataEngine = {
             nodesExpanded++;
             if ((nodesExpanded & 127) === 0) checkBudget?.();
             if (nodesExpanded > maxNodes) {
+                if (evidence) evidence.stopReason = 'PATH_NODE_LIMIT';
                 // Route estimates must distinguish an unfinished search from
                 // an exhausted open set; only the latter rejects terrain.
                 if (options.requireComplete) throw Object.assign(Error('path node budget exceeded'), { code: 'PATH_NODE_LIMIT' });
                 break;
             }
 
+            if (evidence) evidence.nodesExpanded = nodesExpanded;
             if (reachedGoal(current)) {
                 targetNode = current;
+                if (evidence) Object.assign(evidence, { stopReason: 'GOAL_REACHED', searchComplete: true, goalReached: true });
                 break;
             }
 
@@ -671,6 +700,9 @@ const GeodataEngine = {
 
         let node = targetNode;
         if (!node) {
+            if (evidence && evidence.stopReason !== 'PATH_NODE_LIMIT') {
+                Object.assign(evidence, { stopReason: 'OPEN_SET_EXHAUSTED', searchComplete: true });
+            }
             return null;
         }
 

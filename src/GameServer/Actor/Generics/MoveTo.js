@@ -347,6 +347,7 @@ function moveTo(session, actor, coords) {
     if (!previewOnly && (isBot || serverControlled) && coords.forceRepath !== true) {
         const activeGoal = activeMoveGoal(session, actor);
         if (activeGoal && sameMoveGoal(activeGoal.requestedTo, requestedTo)) {
+            if (owner?.pathEvidence === true && session.lastPathfinding?.actionId === owner.actionId) owner.reuseRoute(session.lastPathfinding);
             return session.lastPathfinding;
         }
     }
@@ -529,7 +530,7 @@ function moveTo(session, actor, coords) {
                 sameLoc(locOf(actor), start) &&
                 sameLoc(coords.to, pathTarget)
             );
-            const finish = (candidatePath, strategy, error = null) => {
+            const finish = (candidatePath, strategy, error = null, pathEvidence = null) => {
                 if (!isCurrent()) {
                     clearPending({ clearGoal: true });
                     return null;
@@ -561,6 +562,14 @@ function moveTo(session, actor, coords) {
                     ...(error ? { error: error.code || error.message || String(error) } : {}),
                     at: Date.now()
                 };
+                if (owner?.pathEvidence === true) {
+                    Object.assign(session.lastPathfinding, { actionId: owner.actionId, routeGeneration,
+                        pathEvidence: pathEvidence || error?.pathEvidence || { search: {
+                            stopReason: error?.code || (strategy === 'short_direct' ? 'DIRECT_SEGMENT' : 'RESULT_UNAVAILABLE'),
+                            searchComplete: null, nodesExpanded: null, maxNodes: pathMaxNodes, goalReached: null }, worker: null },
+                        executionNavigation: GeodataEngine.inputIdentity() });
+                    owner.captureRoute(session.lastPathfinding, candidatePath || movementPath);
+                }
                 if (movementPath.length) {
                     rememberTownNpcEgress(session, requestedTo, pathTarget, movementPath);
                     startPathMovement({ session, actor, path: movementPath, isClose, moveGoal });
@@ -575,6 +584,7 @@ function moveTo(session, actor, coords) {
                 endY: target.locY,
                 endZ: target.locZ,
                 maxNodes: pathMaxNodes,
+                ...(owner?.pathEvidence === true ? { evidence: true } : {}),
                 goalRadius: pathArrivalRadius,
                 ...(townName ? { town: townName } : {}),
                 goalZTolerance: ACTIVE_GOAL_Z_TOLERANCE
@@ -582,12 +592,13 @@ function moveTo(session, actor, coords) {
                 key: requestKey,
                 priority: isCompanion ? 100 : 50,
                 timeoutMs: COMPANION_PATH_TIMEOUT_MS
-            }).then((candidatePath) => {
+            }).then((result) => {
+                const candidatePath = owner?.pathEvidence === true ? result.path : result;
                 if (!isCurrent()) {
                     clearPending({ clearGoal: true });
                     return null;
                 }
-                if (serverControlled) return finish(candidatePath, strategy);
+                if (serverControlled) return finish(candidatePath, strategy, null, owner.pathEvidence === true ? result.evidence : null);
                 if (Array.isArray(candidatePath) && candidatePath.length > 1) {
                     if (sameLoc(target, requestedTo)) session.townRoutePlan = null;
                     return finish(candidatePath, strategy);
@@ -665,6 +676,7 @@ function moveTo(session, actor, coords) {
                 distanceToPlayer,
                 destinationDistanceToPlayer,
                 strategy: 'worker_pending',
+                ...(owner?.pathEvidence === true ? { actionId: owner.actionId, routeGeneration } : {}),
                 worker: true,
                 arrivalRadius: pathArrivalRadius,
                 maxNodes: pathMaxNodes,

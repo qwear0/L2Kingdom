@@ -21,6 +21,7 @@ const poolStates = new Map();
 const cursors = new WeakMap();
 const EMPTY = new Int32Array();
 let revision = -1;
+let preparationIdentity = null;
 let warned = new Set();
 
 const keyFor = (bounds, anchors) => JSON.stringify([bounds, anchors || []]);
@@ -786,6 +787,7 @@ function describe(inv, proofs, budget, fixed, cacheHit) {
 }
 
 function init(definitions, cacheOptions = {}) {
+    preparationIdentity = null;
     const budget = new Budget();
     pools.clear(); poolStates.clear(); warned = new Set();
     revision = Number(Geo.navigationRevision || 0);
@@ -913,7 +915,15 @@ function init(definitions, cacheOptions = {}) {
             globalWorkBudget: false, renewableWorkWindows: true,
             deterministicFallback: true, fixedProofCache: true }
     };
+    preparationIdentity = Object.freeze({ fingerprint: result.fingerprint, cacheHit: result.cacheHit,
+        cacheSaved: result.cacheSaved, navigationRevision: revision, preparedAt: Date.now(),
+        inventoryComplete: result.inventoryComplete, blocker: result.blocker,
+        source: 'retained_preparation_result_not_current_disk' });
     return result;
+}
+
+function identity() {
+    return preparationIdentity && { ...preparationIdentity, current: revision === Number(Geo.navigationRevision || 0) };
 }
 
 function randomCoords(definition) {
@@ -966,4 +976,4 @@ function nearLeader(leader) {
     return origin;
 }
 
-module.exports = { init, randomCoords, nearLeader };
+module.exports = { init, randomCoords, nearLeader, identity };

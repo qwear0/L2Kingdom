@@ -98,7 +98,8 @@ class BoundedPathfindingWorkerPool {
             cancelled: false,
             settled: false,
             timer: null,
-            queuedAt: DiagnosticConfig.developerDiagnostics ? Date.now() : null,
+            queuedAt: DiagnosticConfig.developerDiagnostics || request.evidence === true ? Date.now() : null,
+            startedAt: null,
             cancelFlag: new Int32Array(new SharedArrayBuffer(4)),
             resolve: null,
             reject: null
@@ -172,6 +173,7 @@ class BoundedPathfindingWorkerPool {
             while (task?.cancelled) task = this.queue.shift();
             if (!task) return;
             task.state = 'running';
+            if (task.request.evidence === true) task.startedAt = Date.now();
             slot.task = task;
             DiagnosticConfig.developerDiagnostics && (this.metrics.maxQueueWaitMs = Math.max(this.metrics.maxQueueWaitMs, Date.now() - task.queuedAt));
             slot.worker.postMessage({ type: 'path', id: task.id, request: task.request, cancelBuffer: task.cancelFlag.buffer });
@@ -189,10 +191,16 @@ class BoundedPathfindingWorkerPool {
             if (message.ok) {
                 this.restartAttempts[slot.index] = 0;
                 DiagnosticConfig.developerDiagnostics && (this.metrics.completed += 1);
-                this.finishTask(task, message.path, null);
+                const value = task.request.evidence === true ? { path: message.path,
+                    evidence: { ...message.evidence, workerMs: message.workerMs ?? null,
+                        queueWaitMs: task.startedAt - task.queuedAt } } : message.path;
+                this.finishTask(task, value, null);
             } else {
                 DiagnosticConfig.developerDiagnostics && (this.metrics.errors += 1);
-                this.finishTask(task, null, taskError(message.error || 'path worker failed', message.code || 'PATH_WORKER_ERROR'));
+                const error = taskError(message.error || 'path worker failed', message.code || 'PATH_WORKER_ERROR');
+                if (task.request.evidence === true) error.pathEvidence = { ...message.evidence,
+                    workerMs: message.workerMs ?? null, queueWaitMs: task.startedAt - task.queuedAt };
+                this.finishTask(task, null, error);
             }
         } else {
             this.cleanupTask(task);

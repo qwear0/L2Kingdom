@@ -7,8 +7,14 @@ function bounded(value) {
     const result = Journal.compact(value);
     return Buffer.byteLength(JSON.stringify(result)) <= 2048 ? result : { truncated: true };
 }
-function diagnose(attachment, input) {
+function diagnose(attachment, input, actorRef) {
     const { actor, session } = attachment.record;
+    if ((input.destination || input.checkDirect) && input.kind !== 'movement') throw fault('destination_requires_movement_diagnostic');
+    if (input.checkDirect && !input.destination) throw fault('destination_required');
+    const action = input.actionId ? require('./Actions').read({ sessionId: attachment.sessionId, actionId: input.actionId }) : null;
+    if (action && (action.actorRef.characterId !== actorRef.characterId || action.actorRef.incarnation !== actorRef.incarnation)) {
+        throw fault('action_actor_mismatch', 409);
+    }
     const from = Queries.point(actor), Geo = invoke('GameServer/Geodata/GeodataEngine');
     const entity = input.handle ? Queries.resolve(actor, input.handle) : null;
     const to = entity ? Queries.point(entity) : null;
@@ -23,15 +29,20 @@ function diagnose(attachment, input) {
     }
     const result = { kind: input.kind, view: 'server_diagnostic', sampledAt: Date.now(), source: 'native_state_not_causal_inference',
         control: require('./Authority').view(session), position: from };
+    if (input.destination) result.destination = require('./DestinationPreflight').inspect(from, input.destination, input.checkDirect);
     if (input.checkLos && to) result.geometry = { checkedAt: Date.now(),
         hasGeodata: Geo.hasGeo(to.locX, to.locY) && Geo.hasGeo(from.locX, from.locY),
         los: Geo.hasLineOfSight(from.locX, from.locY, from.locZ, to.locX, to.locY, to.locZ),
         source: 'current_native_LOS_not_past_cause' };
     if (input.kind === 'movement' || input.kind === 'evidence') result.movement = {
         lastPathfinding: bounded(session.lastPathfinding || null), pending: Boolean(session.pendingPathRequest),
+        currentRoute: session.lastPathfinding ? { actionId: session.lastPathfinding.actionId || null,
+            routeGeneration: session.lastPathfinding.routeGeneration ?? null, evidence: session.lastPathfinding.pathEvidence || null } : null,
+        actionRoute: action?.evidence.route || null, currentNavigation: Geo.inputIdentity(),
         towards: bounded(actor.state.fetchTowards() || null), grid,
         geodata: Geo.hasGeo(from.locX, from.locY), relocationIsNotArrival: session.lastPathfinding?.lowLodWarp === true,
-        gaps: ['No new route job or nearest-blocker inference; current grid/LOS cannot prove a past failure cause.'] };
+        gaps: ['lastPathfinding/currentRoute/grid/LOS describe current state, not the selected historical action. Only actionRoute is action-correlated.',
+            'No new route job or nearest-blocker inference; absent route evidence stays unknown.'] };
     if (input.kind === 'combat' || input.kind === 'evidence') result.combat = {
         target: entity ? Queries.row(entity, input.handle.kind, from, 'diagnostic') : null,
         selectedTargetId: actor.fetchDestId() || null,
@@ -52,9 +63,10 @@ function diagnose(attachment, input) {
             destination: bounded(session.journey.request?.to || null), paymentUncertain: session.journey.paymentUncertain === true } : null,
         source: 'existing_native_policy_evidence; missing reasons stay unknown' };
     if (input.kind === 'evidence') {
-        result.action = input.actionId ? require('./Actions').read({ sessionId: attachment.sessionId, actionId: input.actionId }) : null;
+        result.action = action;
         result.events = Journal.recent(session.mcpObservation, input.actionId || null);
-        result.gaps = ['Only selected before/after action self fields are retained, not full snapshots; no build SHA or raw packets. Runtime epoch identifies the process.'];
+        result.gaps = ['Only selected before/after fields and the latest bounded route sample per action are retained, not full snapshots or raw packets.',
+            'Loaded navigation identities do not certify a build SHA or independent native-client collision.'];
     }
     return result;
 }

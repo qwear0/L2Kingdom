@@ -1,7 +1,7 @@
 'use strict';
 
 const { randomUUID } = require('crypto');
-const { limits, fault, parse } = require('../../../Mcp/Contracts');
+const { limits, actionLimits, diagnosticLimits, fault, parse } = require('../../../Mcp/Contracts');
 const World = invoke('GameServer/World/World');
 const Registry = require('../../Lord/VassalService');
 const Observation = require('./Observation');
@@ -12,6 +12,8 @@ const Journal = require('./Journal');
 const Queries = require('./Queries');
 const Waiters = require('./Waiters');
 const runtimeEpoch = randomUUID();
+const processIdentity = Object.freeze({ pid: process.pid, startedAt: Math.round(Date.now() - process.uptime() * 1000),
+    nodeVersion: process.versions.node, build: null, buildSource: 'not_recorded_no_disk_inference' });
 const sessions = new Map(), attachments = new Map(), observed = new Map(), receipts = Results.entries;
 const incarnations = new WeakMap();
 let cleanupTimer = null, unsubscribe = null, closed = false;
@@ -129,9 +131,13 @@ function publicReceipt(entry) {
     return value;
 }
 function status() {
-    return { runtimeEpoch, phase: 'running', capabilities: { phase: 'P4', readOnlyAttachment: true,
+    return { runtimeEpoch, phase: 'running', identity: { process: processIdentity,
+        navigation: invoke('GameServer/Geodata/GeodataEngine').inputIdentity(),
+        spawnPreparation: invoke('GameServer/Geodata/SpawnPlacement').identity() },
+        capabilities: { phase: 'P4', readOnlyAttachment: true,
         discovery: true, selfObservation: true, localScene: true, semanticEvents: true,
-        detailPages: true, boundedWait: true, diagnostics: true,
+        detailPages: true, boundedWait: true, diagnostics: true, destinationPreflight: true,
+        evidence: { source: 'server_geodata_and_native_state', actionCorrelatedRoutes: true, independentClientCollision: false },
         manualControl: true, gameplayActions: true,
         supported: ['move', 'approach', 'stop', 'target', 'attack:first_swing/target_dead/bounded', 'cast:learned_native',
             'state:seated/walking', 'item:shots/native_self/timed_self/native_skill_coords', 'equip', 'pickup:in_native_range', 'drop:at_self',
@@ -141,7 +147,7 @@ function status() {
         notImplemented: ['selected_trainer_purchase', 'owner_only_castellan', 'unregistered_npc_services', 'private_store/trade',
             'item_handlers/non_self_items', 'destroy_item', 'ground/corpse_offensive_skills', 'summon_corpse_skill', 'pvp_attack'],
         unavailableReasons: { selected_trainer_purchase: 'Only autonomous reconciliation exists; no selected native trainer/cost/rank ingress.',
-            unregistered_npc_services: 'Only issued allowlisted native menu families are adapted; never raw bypass dispatch.' } }, limits,
+            unregistered_npc_services: 'Only issued allowlisted native menu families are adapted; never raw bypass dispatch.' } }, limits, actionLimits, diagnosticLimits,
         usage: { sessions: sessions.size, attachments: attachments.size, observedBots: observed.size, ...Authority.usage(), pendingActions: Actions.pendingCount(), ...Journal.usage(), ...Queries.usage(), ...Waiters.usage() } };
 }
 function dispatch(action, raw) {
@@ -198,7 +204,7 @@ function dispatch(action, raw) {
         if (action === 'wait') return Waiters.wait(input, () => lookup(input.sessionId, input.attachmentId)).then(bounded);
         if (action === 'events') return bounded(Journal.read(attachment.record.session.mcpObservation, input));
         if (action === 'inspect') return bounded(input.section === 'self' ? Observation.snapshot(attachment.record, identity) : Queries.inspect(attachment, input));
-        if (action === 'diagnose') return bounded(require('./Diagnostics').diagnose(attachment, input));
+        if (action === 'diagnose') return bounded(require('./Diagnostics').diagnose(attachment, input, identity.actorRef));
         const snapshot = Observation.snapshot(attachment.record, identity);
         if (input.view === 'perception') { snapshot.view = 'perception'; snapshot.control = { mode: Authority.view(attachment.record.session).mode }; }
         snapshot.scene = Queries.page(attachment, input);

@@ -1,6 +1,9 @@
 require('../../Global');
 
-const { parentPort, workerData } = require('worker_threads');
+const { parentPort, workerData, threadId } = require('worker_threads');
+const { randomUUID } = require('crypto');
+const workerIdentity = Object.freeze({ instanceId: randomUUID(), threadId, startedAt: Date.now(),
+    nodeVersion: process.versions.node, build: null, buildSource: 'not_recorded_no_disk_inference' });
 invoke('GameServer/Bot/Population/PopulationConfig').developerDiagnostics = workerData?.developerDiagnostics === true;
 const GeodataEngine = invoke('GameServer/Geodata/GeodataEngine');
 const TownPathCorridor = invoke('GameServer/Geodata/TownPathCorridor');
@@ -67,7 +70,9 @@ parentPort.on('message', (message) => {
         if (navigationRevision !== null && navigationRevision !== request.navigationRevision) GeodataEngine.init();
         navigationRevision = request.navigationRevision;
     }
-    const timed = request.townCorridor || request.journeyEstimate || workerData?.developerDiagnostics === true;
+    const search = request.evidence === true ? { stopReason: 'NOT_STARTED', searchComplete: null,
+        nodesExpanded: null, maxNodes: request.maxNodes, goalReached: null, missingGeodata: null } : null;
+    const timed = !!search || request.townCorridor || request.journeyEstimate || workerData?.developerDiagnostics === true;
     const startedAt = timed ? performance.now() : null;
     const cancelFlag = message.cancelBuffer ? new Int32Array(message.cancelBuffer) : null;
     const checkBudget = () => {
@@ -93,18 +98,22 @@ parentPort.on('message', (message) => {
                 goalRadius: request.goalRadius,
                 goalZTolerance: request.goalZTolerance,
                 heuristicWeight: request.heuristicWeight,
+                evidence: search,
                 checkBudget
             }
         );
         const result = request.townCorridor ? TownPathCorridor.build(path, checkBudget) : path;
-        parentPort.postMessage({ id, ok: true, path: result, workerMs: timed ? performance.now() - startedAt : null });
+        parentPort.postMessage({ id, ok: true, path: result, workerMs: timed ? performance.now() - startedAt : null,
+            ...(search ? { evidence: { search, worker: workerIdentity, navigation: GeodataEngine.inputIdentity() } } : {}) });
     } catch (error) {
         parentPort.postMessage({
             id,
             ok: false,
             code: error?.code,
             workerMs: timed ? performance.now() - startedAt : null,
-            error: error?.message || String(error)
+            error: error?.message || String(error),
+            ...(search ? { evidence: { search: { ...search, stopReason: error?.code || 'PATH_WORKER_ERROR' },
+                worker: workerIdentity, navigation: GeodataEngine.inputIdentity() } } : {})
         });
     }
 });

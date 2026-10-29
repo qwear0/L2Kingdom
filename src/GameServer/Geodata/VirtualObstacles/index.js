@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { createHash } = require('crypto');
 
 function pointInPolygon(x, y, points) {
     let inside = false;
@@ -20,7 +21,8 @@ const VirtualObstacles = {
 
     init() {
         this.obstaclesByRegion = {};
-        const files = fs.readdirSync(__dirname);
+        let failedFiles = 0;
+        const files = fs.readdirSync(__dirname).sort();
         
         for (const file of files) {
             if (file === 'index.js' || !file.endsWith('.js')) {
@@ -36,9 +38,14 @@ const VirtualObstacles = {
                     if (invoke('GameServer/Bot/Population/PopulationConfig').developerDiagnostics === true) utils.infoSuccess("GeodataEngine", "Loaded virtual obstacles for %s (Region: %s)", loc.name || file, loc.region);
                 }
             } catch (err) {
+                failedFiles++;
                 console.error(`VirtualObstacles :: Failed to load ${file}:`, err);
             }
         }
+        // require() may retain older exports after disk changes. Identify the
+        // actual obstacle data used by this instance, not the files on disk.
+        this.identity = Object.freeze({ sha256: createHash('sha256').update(JSON.stringify(this.obstaclesByRegion)).digest('hex'),
+            complete: failedFiles === 0, failedFiles });
     },
 
     checkObstacle(x, y, regionKey) {

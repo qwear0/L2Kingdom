@@ -1,6 +1,12 @@
 'use strict';
 
 const { z } = require('zod');
+const actionLimits = Object.freeze({ moveDistanceXY: 6000, pathMaxNodes: 4000, routePoints: 512,
+    arrivalXYDefault: 32, arrivalXYMax: 64, arrivalZ: 64, approachRangeDefault: 80, approachRangeMax: 512,
+    timeoutDefaultMs: 30000, timeoutMaxMs: 120000, waitDefaultMs: 5000, waitMaxMs: 9000,
+    routeSamplePoints: 16 });
+const diagnosticLimits = Object.freeze({ destinationDistanceXY: 6000, directDistanceXY: 512,
+    layerCells: 160, transitions: 128, displayedLayers: 16 });
 const ID = z.number().int().positive().max(Number.MAX_SAFE_INTEGER);
 const epoch = z.string().min(1).max(100);
 const uuid = z.uuid();
@@ -13,7 +19,7 @@ const entityHandle = z.strictObject({ objectId: ID, incarnation: uuid, kind: z.e
 const eventCursor = z.strictObject({ journalId: uuid, sequence: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER) });
 const predicate = z.discriminatedUnion('kind', [
     z.strictObject({ kind: z.literal('action_terminal'), actionId: uuid }),
-    z.strictObject({ kind: z.literal('arrived'), to: point, tolerance: ID.max(64).default(32) }),
+    z.strictObject({ kind: z.literal('arrived'), to: point, tolerance: ID.max(actionLimits.arrivalXYMax).default(actionLimits.arrivalXYDefault) }),
     z.strictObject({ kind: z.literal('target_dead'), handle: entityHandle }),
     z.strictObject({ kind: z.literal('effect_present'), skillId: ID }),
     z.strictObject({ kind: z.literal('dialogue_available') }),
@@ -22,8 +28,8 @@ const predicate = z.discriminatedUnion('kind', [
     z.strictObject({ kind: z.literal('inventory_revision'), revision: ID })
 ]);
 const command = z.discriminatedUnion('kind', [
-    z.strictObject({ kind: z.literal('move'), to: point, tolerance: ID.max(64).default(32) }),
-    z.strictObject({ kind: z.literal('approach'), targetId: ID, range: ID.max(512).default(80) }),
+    z.strictObject({ kind: z.literal('move'), to: point, tolerance: ID.max(actionLimits.arrivalXYMax).default(actionLimits.arrivalXYDefault) }),
+    z.strictObject({ kind: z.literal('approach'), targetId: ID, range: ID.max(actionLimits.approachRangeMax).default(actionLimits.approachRangeDefault) }),
     z.strictObject({ kind: z.literal('stop') }),
     z.strictObject({ kind: z.literal('target'), targetId: ID.nullable() }),
     z.strictObject({ kind: z.literal('attack'), targetId: ID, until: z.enum(['first_swing', 'target_dead', 'bounded']).default('first_swing'), durationMs: ID.max(60000).default(10000) }),
@@ -53,12 +59,13 @@ const schemas = Object.freeze({
         limit: ID.max(50).default(20), cursor: uuid.optional(), handle: entityHandle.optional() }),
     events: z.strictObject({ ...namespace, attachmentId: uuid, cursor: eventCursor.optional(), limit: ID.max(100).default(20) }),
     diagnose: z.strictObject({ ...namespace, attachmentId: uuid, kind: z.enum(['movement', 'combat', 'ai', 'evidence']),
-        handle: entityHandle.optional(), actionId: uuid.optional(), checkLos: z.boolean().default(false), gridRadius: z.number().int().min(0).max(4).default(1) }),
-    wait: z.strictObject({ ...namespace, attachmentId: uuid, predicate, timeoutMs: ID.max(9000).default(5000) }),
+        handle: entityHandle.optional(), actionId: uuid.optional(), checkLos: z.boolean().default(false), gridRadius: z.number().int().min(0).max(4).default(1),
+        destination: point.optional(), checkDirect: z.boolean().default(false) }),
+    wait: z.strictObject({ ...namespace, attachmentId: uuid, predicate, timeoutMs: ID.max(actionLimits.waitMaxMs).default(actionLimits.waitDefaultMs) }),
     release: z.strictObject({ ...mutation, attachmentId: uuid }),
     heartbeat: z.strictObject(namespace),
     control: z.strictObject({ ...mutation, attachmentId: uuid, mode: z.enum(['manual', 'keep_control', 'native_ai']), leaseId: uuid.optional(), controlGeneration: ID.optional() }),
-    action: z.strictObject({ ...namespace, ...authority, requestId: ID, sequence: ID, timeoutMs: ID.max(120000).default(30000), command }),
+    action: z.strictObject({ ...namespace, ...authority, requestId: ID, sequence: ID, timeoutMs: ID.max(actionLimits.timeoutMaxMs).default(actionLimits.timeoutDefaultMs), command }),
     cancel: z.strictObject({ ...mutation, ...authority, actionId: uuid }),
     'action-status': z.strictObject({ ...namespace, actionId: uuid.optional(), leaseId: uuid.optional(), requestId: ID.optional() })
         .refine(value => value.actionId ? !value.leaseId && !value.requestId : !!value.leaseId && !!value.requestId),
@@ -79,4 +86,4 @@ function parse(action, payload) {
     if (!result?.success) throw fault('invalid_request');
     return result.data;
 }
-module.exports = { schemas, limits, fault, parse, actorRef, epoch, ID, authority, command };
+module.exports = { schemas, limits, actionLimits, diagnosticLimits, fault, parse, actorRef, epoch, ID, authority, command };

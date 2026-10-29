@@ -1,7 +1,7 @@
 'use strict';
 
 const { randomUUID } = require('crypto');
-const { limits, fault } = require('../../../Mcp/Contracts');
+const { limits, actionLimits, fault } = require('../../../Mcp/Contracts');
 const Journal = require('./Journal');
 const Queries = require('./Queries');
 const waiters = new Map();
@@ -22,8 +22,8 @@ function evaluate(waiter) {
             satisfied = evidence.phase === 'terminal';
         } else if (predicate.kind === 'arrived') {
             const from = Queries.point(actor), to = predicate.to;
-            satisfied = Math.hypot(from.locX - to.locX, from.locY - to.locY) <= predicate.tolerance && Math.abs(from.locZ - to.locZ) <= 64;
-            evidence = { measured: from, xyTolerance: predicate.tolerance, zTolerance: 64, source: 'current_position_not_route_result' };
+            satisfied = Math.hypot(from.locX - to.locX, from.locY - to.locY) <= predicate.tolerance && Math.abs(from.locZ - to.locZ) <= actionLimits.arrivalZ;
+            evidence = { measured: from, xyTolerance: predicate.tolerance, zTolerance: actionLimits.arrivalZ, source: 'current_position_not_route_result' };
         } else if (predicate.kind === 'target_dead') {
             if (predicate.handle.kind === 'drop') throw fault('predicate_unavailable', 409, { reason: 'Ground items have no life state.' });
             const target = Queries.resolve(actor, predicate.handle);
