@@ -132,6 +132,26 @@ Code/docs and source/syntax checks do not authorize deployment. Before stop-and-
 
 Runtime acceptance remains separate: management assets without a DB; stopped reloads; required-listener and disabled-observer readiness; private endpoint/generation isolation and parent loss/deadlines; proxy ETag/204/compression/dynamic resources; LAN teleport denial; live/restart/stale/invalid/overflow/storage-error settings; AI queued dispatch suppression; navigation/drafts/themes/keyboard/narrow view; preset next-start behavior; log fallback; and explicitly authorized synthetic inference. Save/load/delete/wipe checks require disposable or separately protected consistent world/history data. Do not restore over newer personal state, probe destructive behavior on the live world, or describe source checks as runtime passes.
 
+### Game Dashboard deployment and acceptance
+
+Source integration and Git publication do not update running management, gameplay or frontend processes. Deploy matching revisions of all three only with explicit operational authorization. The Dashboard uses management-to-game IPC; enabling the optional private game observer HTTP listener is not required.
+
+Before the first management start that adds account linking, protect unique runtime-local `observer-auth/auth.sqlite` data: stop its writer, take a consistent copy under `/data/!backups/L2Kingdom/<task-directory>/` accounting for SQLite WAL state, and verify the copy opens read-only with the expected schema/row counts without exposing secrets. Do not copy just the main file of an active WAL database. A current verified consistent backup is sufficient; auth identities, sessions and links are not in world saves. Protect any existing world state threatened by gameplay checks separately, or use disposable inputs.
+
+Use the existing management launch environment and the independent frontend commands above. Cleanly stop gameplay and management only as needed for the authorized replacement; build/recreate service `frontend` without restarting the backend as a side effect. Start management, then explicitly start gameplay. A push, syntax check or game-only restart does not prove deployed parity.
+
+Bounded live acceptance should cover:
+
+- Sidebar/direct routes from map, Settings and standalone pages; light/dark/narrow layouts and native skill atlas/catalog delivery.
+- Valid/invalid credentials, uniqueness across frontend identities and case variants; old-link/late-verification fencing, frontend session expiry, and no password in responses/browser persistence/logs.
+- One online real-player character only; offline/stopped/ambiguous states, reconnect/character switch and game restart reject old contexts without choosing an arbitrary actor.
+- Auto-fight/native-panel parity, expected-run Stop, stale native/web edits, explicit load/save recovery, and truthful pending/failed persistence.
+- Party/native `.b` parity, hidden-errand skips and MCP settling/preemption details even for rejected HTTP responses; duplicate Call/Regroup submissions must not replay.
+- Visible-only polling, on-demand Skills and draft/focus/pagination preservation; independent card versions and no full-world bootstrap/full bot diagnostics. Source-path inspection is not a load benchmark.
+- Web reads/actions do not open in-game HTML; logout preserves links, restart preserves links but not transient controls. Restore/wipe invalidation needs separately authorized disposable or protected data, never an exploratory destructive check against personal state.
+
+Record source checks separately from deployed visual/gameplay results and identify any unexercised legacy ambiguity branch. Do not add a harness or run automated suites/soaks to replace this bounded acceptance.
+
 ## Documentation and code checks
 
 - Validate changed claims/paths/relative links; inspect final diff and `git diff --check`. JavaScript changes require `npm run check`, syntax only.

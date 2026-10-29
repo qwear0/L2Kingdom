@@ -226,7 +226,8 @@ function snapshot(session, roster = members(session)) {
         const reason = blocked ? 'action_unavailable' : settling(member) ? 'settling' : null;
         const canPull = ['tank', 'dagger', 'dps'].includes(role);
         const control = member.mcpControl;
-        return { id: actor.fetchId(), name: actor.fetchName(), level: actor.fetchLevel(), classId: actor.fetchClassId(), role,
+        return { id: actor.fetchId(), name: actor.fetchName(), level: actor.fetchLevel(), classId: actor.fetchClassId(),
+            className: Roles.className(actor), role,
             online: actor.fetchIsOnline() === true, dead: actor.isDead(), teleporting: !!member.pendingActorTeleport,
             holding: member.botStay === true, holdPoint: member.stayLocation ? { ...member.stayLocation } : null,
             isPuller: isAssignedPuller(member, settings), canPull, supplyErrand: supply,

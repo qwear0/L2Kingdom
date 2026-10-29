@@ -24,6 +24,7 @@
         points_too_far: 'The center, rest point or current position is outside the permitted setup distance.',
         settling: 'A previous control operation is still settling.', dead: 'This member is dead.', teleporting: 'This member is already teleporting.',
         role_restricted: 'This role cannot be assigned pull duty.', membership_changed: 'Party membership changed before this member could be affected.',
+        group_settling: 'The group order was not applied because another member is still settling.',
         settings_loading: 'Preferences are still loading.', settings_failed: 'Preferences failed to load or save. Use the explicit recovery controls.',
         action_unavailable: 'This action is unavailable in the current state.', invalid_member: 'That member is no longer in the authoritative party.',
         invalid_skill: 'The skill is no longer eligible.', supply_errand: 'Hidden supply errand; this member was not moved.',
@@ -136,8 +137,9 @@
         ++epoch; clearTimeout(timer); readController?.abort();
     }
     function resultMessage(result) {
-        if (!['applied', 'partial'].includes(result.outcome)) throw new Error(explain(result.code || 'Unrecognized command outcome'));
-        let message = result.outcome === 'partial' ? 'Partially applied.' : 'Applied to gameplay.';
+        if (!['applied', 'partial', 'rejected'].includes(result.outcome)) throw new Error(explain(result.code || 'Unrecognized command outcome'));
+        let message = result.outcome === 'rejected' ? `Command rejected: ${explain(result.code)}.`
+            : result.outcome === 'partial' ? 'Partially applied.' : 'Applied to gameplay.';
         if (result.affectedMemberIds) message += ` Affected: ${result.affectedMemberIds.join(', ') || 'none'}.`;
         if (result.skippedMembers) message += ` Skipped: ${result.skippedMembers.map(member => `#${member.id}: ${explain(member.reason)}`).join('; ') || 'none'}.`;
         if (result.preemptedMemberIds) message += ` Preempted MCP activity: ${result.preemptedMemberIds.join(', ') || 'none'}.`;
@@ -159,9 +161,12 @@
                 headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
             const result = await response.json();
             if (!active || contextKey !== key) return;
-            if (!response.ok) throw new Error(`${explain(result.code || `HTTP ${response.status}`)} No automatic retry.`);
+            if (!response.ok && result.outcome !== 'rejected') throw new Error(`${explain(result.code || `HTTP ${response.status}`)} No automatic retry.`);
+            // A rejected group order can still release earlier MCP leases. Keep
+            // its structured side effects visible and retain rejected numeric drafts.
             feedback[card] = resultMessage(result);
-            if (draftName && drafts[draftName] === draft) drafts[draftName] = null;
+            if (result.outcome === 'rejected') feedback[card] += ' No automatic retry. Review refreshed authoritative values before another explicit action.';
+            else if (draftName && drafts[draftName] === draft) drafts[draftName] = null;
         } catch (error) {
             if (active && contextKey === key) feedback[card] = `${error.message} Review refreshed authoritative values before another explicit action. A network failure or timeout is not proof of non-execution.`;
         } finally {
