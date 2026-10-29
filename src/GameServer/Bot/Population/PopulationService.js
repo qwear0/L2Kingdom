@@ -4060,10 +4060,10 @@ const PopulationService = {
         correctedBids = checked.changed;
         // A correction changed the owner's board revision. Its earlier
         // optional plan waits for fresh preparation, rather than replaying it.
-        // A sale visit leaves stock decisions to open(), rather than letting
-        // the worker showcase price and reserve the same cargo first.
+        // A plain sale visit leaves stock decisions to open(); forced cleanup
+        // keeps the existing worker-selected showcase before native cleanup.
         if (updatedState.activity === 'shopping' && workerPlan?.economyPlan && !correctedBids
-            && !saleVisit(updatedState)) {
+            && (!saleVisit(updatedState) || updatedState.stats?.forcedMarketCleanup)) {
             const sourceWorker = ColdSimulationCoordinator.worker, sourceEpoch = ColdSimulationCoordinator.workerEpoch;
             const beforeWrite = () => {
                 if (ColdSimulationCoordinator.stopping || ColdSimulationCoordinator.worker !== sourceWorker
