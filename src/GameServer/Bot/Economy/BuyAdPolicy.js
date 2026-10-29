@@ -2,6 +2,7 @@ const ItemTemplateIndex = require('../../Item/ItemTemplateIndex');
 const DataCache = invoke('GameServer/DataCache');
 const PurchaseFunding = invoke('GameServer/Bot/Economy/PurchaseFunding');
 const { isNativeSource } = require('./TradeIntent');
+const Diagnostics = require('./EconomyDiagnostics');
 const BoardRules = require('../../AfkTrade/BoardRules');
 const nativeGoal = goal => isNativeSource(goal?.plan?.sourceType);
 
@@ -124,6 +125,13 @@ function linesFor(state, goal, { money = Infinity, watchList, ...options } = {})
     const wallet = Number(state.adena || 0);
     const owned = options.board?.ownerLines?.(Number(state.characterId)) || [];
     const limit = BoardRules.BOT_SHOP_LINES + BoardRules.BOT_RECORDS.buy_ad;
+    if (Diagnostics.active()) {
+        Diagnostics.count('cap', 'buy_ads', 'check');
+        if (goals.length > limit) {
+            Diagnostics.count('cap', 'buy_ads', 'cut');
+            Diagnostics.count('cap', 'buy_ads', 'dropped', goals.length - limit);
+        }
+    }
     const candidates = goals.slice(0, limit);
     const townFor = options.townFor || (items => invoke('GameServer/Bot/Economy/MarketTownPolicy').targetTownForItems(state, items));
     let town = townFor(candidates.map(candidate => ({ selfId: Number(candidate.target.itemId) })));

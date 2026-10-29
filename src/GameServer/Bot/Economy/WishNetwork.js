@@ -324,7 +324,11 @@ function createSolver({ nodes, hourAdena = 0, riskWeight = 1, stockFor = null, w
                     branches += mergedBranches(2, commands(units, path.perCommand)) - 1;
                 }
                 price += onceCash; effort += onceEffort; hours += onceHours;
+                // Count only this cap's own rejection, not an inherited child
+                // failure or a repeated evaluation in the native command pass.
+                const ownCut = resolved && branches > MAX_BRANCHES;
                 resolved &&= branches <= MAX_BRANCHES;
+                if (ownCut && !command && diagnostic) Diagnostics.count('cap', 'branches', 'cut');
                 const basePrice = price, baseEffort = effort, baseHours = hours;
                 price += tripValue(tripEntries, 'fees'); effort += tripEffort(tripEntries); hours += tripValue(tripEntries, 'hours');
                 if (available && allocation && !command) for (const [id, count] of local.used) alternativeUse.set(id, Math.max(alternativeUse.get(id) || 0, count));
@@ -456,7 +460,7 @@ function createSolver({ nodes, hourAdena = 0, riskWeight = 1, stockFor = null, w
 // MVP-6: roots in the caller's rank order while the union of their reachable
 // nodes stays within the bound. A root that does not fit is pending (not
 // deleted, not zero cost); the smaller roots after it still proceed.
-function admitRoots(roots, byKey, { rootLimit = MAX_ROOTS, nodeLimit = MAX_NODES } = {}) {
+function admitRoots(roots, byKey, { rootLimit = MAX_ROOTS, nodeLimit = MAX_NODES, label = 'solo' } = {}) {
     const kept = new Set(), admitted = [], pending = [];
     for (const key of roots) {
         if (admitted.length >= rootLimit) { pending.push({ key, reason: 'root_limit' }); continue; }
@@ -474,6 +478,22 @@ function admitRoots(roots, byKey, { rootLimit = MAX_ROOTS, nodeLimit = MAX_NODES
         if (!visit(key)) { pending.push({ key, reason: 'node_limit' }); continue; }
         for (const at of reach) kept.add(at);
         admitted.push(key);
+    }
+    if (Diagnostics.active()) {
+        // Solo dropped rows already enter provider:admission_pending. Only
+        // group admission needs its own dropped totals to avoid double counting.
+        let rootDropped = 0, nodeDropped = 0;
+        for (const row of pending) row.reason === 'root_limit' ? rootDropped++ : nodeDropped++;
+        const group = label === 'group';
+        Diagnostics.count('cap', group ? 'roots_group' : 'roots_solo', 'check');
+        if (rootDropped) {
+            Diagnostics.count('cap', group ? 'roots_group' : 'roots_solo', 'cut');
+            if (group) Diagnostics.count('cap', 'roots_group', 'dropped', rootDropped);
+        }
+        if (nodeDropped) {
+            Diagnostics.count('cap', group ? 'nodes_group' : 'nodes_solo', 'cut');
+            if (group) Diagnostics.count('cap', 'nodes_group', 'dropped', nodeDropped);
+        }
     }
     return { roots: admitted, kept, pending };
 }

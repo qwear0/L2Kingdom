@@ -89,6 +89,13 @@ function gearCandidates(state, ctx = null, wornFor = wornReader(state), acquisit
         // purchases in the comparison, even when the wallet covers a higher one.
         // Rank nominates alternatives, never a required next purchase.
         for (const row of [retained, ...efficientByRank.values(), affordable, above, exchangeEfficient, exchangeStrong]) if (row) selected.set(Number(row.item.selfId), row.item);
+        if (Diagnostics.active()) {
+            Diagnostics.count('cap', 'gear_finalists', 'check');
+            if (selected.size > GEAR_FINALISTS_PER_SLOT) {
+                Diagnostics.count('cap', 'gear_finalists', 'cut');
+                Diagnostics.count('cap', 'gear_finalists', 'dropped', selected.size - GEAR_FINALISTS_PER_SLOT);
+            }
+        }
         result.set(slot, [...selected.values()].slice(0, GEAR_FINALISTS_PER_SLOT));
     }
     return result;
@@ -636,6 +643,13 @@ function buildProjection(state, ctx, deps) {
             admitted.push({ recipe, count, id, ownSales, oldUnits, material, shot, earningPreference, known: knownRecipes.has(Number(recipe.recipeId)),
                 ceiling: positive(count * Math.max(best, positive(ctx.buyback(id))) * Number(recipe.successRate ?? 100) / 100) });
         }
+        if (Diagnostics.active()) {
+            Diagnostics.count('cap', 'producers', 'check');
+            if (admitted.length > PRODUCER_PRICED) {
+                Diagnostics.count('cap', 'producers', 'cut');
+                Diagnostics.count('cap', 'producers', 'dropped', admitted.length - PRODUCER_PRICED);
+            }
+        }
         if (admitted.length > PRODUCER_PRICED) {
             admitted.sort((a, b) => b.earningPreference - a.earningPreference
                 || b.ceiling - a.ceiling || Number(b.known) - Number(a.known) || a.recipe.recipeId - b.recipe.recipeId);
@@ -912,6 +926,13 @@ function buildProjection(state, ctx, deps) {
             if (!affected.length) continue;
             admission.rounds++;
             for (const row of affected) { evaluate(row, used); yield row; }
+        }
+        if (Diagnostics.active() && admitted.length >= GEAR_ROOTS) {
+            const left = winners(family => !closed.has(family)).length;
+            if (left) {
+                Diagnostics.count('cap', 'gear_roots', 'cut');
+                Diagnostics.count('cap', 'gear_roots', 'dropped', left);
+            }
         }
         // Shared held stock (MVP-6): the network allocates it in the author's
         // money priority (stockless full value per price, an unquoted root at

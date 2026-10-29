@@ -303,6 +303,12 @@ function planPurchase(state, selfId, amount, options = {}) {
     if (options.sourcePlan) {
         const source = options.sourcePlan;
         if (!source.town || towns && !towns.includes(source.town) || Number(source.selfId) !== Number(selfId)) return null;
+        // Selected purchases already carry bounded quotes; another cut here
+        // exposes a producer/consumer mismatch without changing admission.
+        if (Diagnostics.active() && (source.lines || []).length > 5) {
+            Diagnostics.count('cap', 'quote_use', 'cut');
+            Diagnostics.count('cap', 'quote_use', 'dropped', source.lines.length - 5);
+        }
         const quotes = (source.lines || []).slice(0, 5).map(entry => entry.line);
         let npcPrice = 0;
         if (npc && Number.isSafeInteger(Number(source.npc)) && Number(source.npc) > 0) {
