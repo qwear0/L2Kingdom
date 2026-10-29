@@ -55,6 +55,12 @@ The explicit gathering catalog preserves authored XY/height bounds and derives m
 
 Agony excludes `gludio_t18_21_009`: its two canonical definitions share remote, off-core bounds. Neighboring fields, the separate Langk coastal corridor and underground Wasteland destinations are not implicitly authorized. Coverage is permission to use the selected polygons, not a guarantee of safe targets or walkable routes everywhere.
 
+Independent gatherers physically collect nearby ground Adena and items, including drops originating outside their own group, only while idle inside the assigned area. Recovery, corpse/Sweep work, combat, urgent supplies, unloading and assignment travel take priority over this additional search. It runs before the next monster selection, not as a separate cleanup trip across the whole area. Companions retain their own-group loot policy.
+
+`PartyCompanionService` uses `World/GroundItemIndex` for recovery searches and queued-item lookups. Gather searches run at most once per 3–3.499 seconds, offset by actor ID; other party recovery retains its 500-ms minimum interval. Each pass inspects at most 48 spatial-query steps (including empty cells and rejected candidates), tests at most three foreign-drop area memberships, and selects at most one target within 1200 units. The cursor continues across passes instead of repeatedly checking the start of a dense pile. Fresh own-group NPC drops still enter the physical pickup queue immediately, without waiting for a scan.
+
+Automated pickup targets have a renewable 35-second reservation shared by gatherers and companions; this prevents competing automated approaches, not native player pickup. Invalid orders, actor/party changes, manual control, recovery and duty transitions cannot authorize a stale foreign-drop award. Movement, capacity checks and award outcomes use the existing native pickup path; exhausted routes and rejected awards defer that item for 30 seconds. See [ground pickup outcomes](economy.md#ground-pickup-and-award-outcomes).
+
 The catalog and area-ID lookup compile lazily and are reused while the `DataCache.npcs` / `DataCache.npcSpawns` array identities remain unchanged. Replacing either array recompiles and validates selected IDs, bounds and templates; invalid or ambiguous selected data fails explicitly. Actor suitability, occupancy and destinations are not cached here.
 
 Gathering distribution and route recovery stay within that assignment:

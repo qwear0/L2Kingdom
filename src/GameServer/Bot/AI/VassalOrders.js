@@ -69,6 +69,7 @@ function status(session, reason) {
 }
 function invalidate(session) {
     Journey.cancel(session, 'duty_invalidated');
+    invoke('GameServer/Bot/AI/PartyCompanionService').cancelGroundPickup(session);
     session.vassalEpoch = Number(session.vassalEpoch || 0) + 1;
     session.vassalRest = null;
     session.vassalRun = null;
@@ -689,6 +690,33 @@ function travelToGatherPoint(session, row, area, run) {
     run.gatherTravel = { avoidZoneIndex: destination.zoneIndex };
     status(session, 'physical_route_blocked');
 }
+function cancelScavenging(session) {
+    if (session.partyGroundPickupQueue?.[0]?.scavenge) {
+        invoke('GameServer/Bot/AI/PartyCompanionService').cancelGroundPickup(session);
+    }
+}
+function gatherLootPolicy(session, row, run, area) {
+    if (run.groundLootPolicy) return run.groundLootPolicy;
+    const bot = session.actor, current = fence(session, row);
+    // A discovered item is not authority to finish after a duty, recovery or
+    // inventory transition. The native claim rechecks this same live scope.
+    return run.groundLootPolicy = {
+        isCurrent: () => current() && session.aiActive === true && bot.fetchIsOnline() === true
+            && session.vassalRun === run && run.phase === 'gather'
+            && !row.gatherResumePending && !run.gatherTravel && eligible(session, row)
+            && Areas.suitable(area, bot.fetchLevel()) && Date.now() >= Number(session.vassalBlockedUntil || 0)
+            && session.plan === 'hunting' && !session.currentTargetId && !session.recoveryLocked
+            && !session.mcpControl && !session.pendingActorTeleport && !session.vassalOperation
+            && !session.vassalAdmission && !session.vassalReceipt && !session.pendingSweeps?.size
+            && !session.activeTrade && !session.trade && !session.activeNegotiation
+            && !bot.state.fetchHits() && !bot.state.fetchCasts() && !bot.state.fetchSeated()
+            && (!bot.state.fetchTowards() || session.partyGroundPickupInProgress || session.partyGroundPickupRoute)
+            && !Rest.needsRest(bot, bot.fetchHp() / Math.max(1, bot.fetchMaxHp()),
+                bot.fetchMp() / Math.max(1, bot.fetchMaxMp()))
+            && Areas.contains(area, bot),
+        contains: item => Areas.contains(area, item)
+    };
+}
 function gatherTick(session, row, run, Generics, BotAI) {
     const bot = session.actor, area = Areas.find(row.areaId);
     if (!area) throw Error('gather_area_data_missing');
@@ -704,19 +732,32 @@ function gatherTick(session, row, run, Generics, BotAI) {
         const need = requiredSupplyMissing(bot) || supplies(bot).some(s => s.priority <= 3
             && count(bot, s.itemId) <= s.restockMin && Number(Shop.rowForNpc(Access.npcId, s.itemId)?.price) <= money);
         const floor = invoke('GameServer/Bot/Population/SurvivalFloor').forActor(bot);
-        if (need || floor?.action === 'unload' && cargo(session).length) { run.phase = 'town'; return; }
+        if (need || floor?.action === 'unload' && cargo(session).length) {
+            cancelScavenging(session);
+            run.phase = 'town';
+            return;
+        }
         // Retained working stock can exceed 50% load (notably the Bow starter kit).
         // With no cargo to unload, only full slots or maximum load prevent work.
         if (floor?.action === 'unload' && (floor.reason === 'no_slot' || floor.weightPenalty >= 4)) {
+            cancelScavenging(session);
             status(session, 'working_inventory_encumbered');
             return;
         }
     }
     if (!session.currentTargetId && (run.gatherTravel || !Areas.contains(area, bot))) {
+        cancelScavenging(session);
         travelToGatherPoint(session, row, area, run);
         return;
     }
     session.plan = 'hunting';
+    const Party = invoke('GameServer/Bot/AI/PartyCompanionService');
+    Party.reconcileGroundLoot(session, { scavenge: gatherLootPolicy(session, row, run, area) });
+    if (session.partyGroundPickupQueue?.length || session.partyGroundPickupInProgress) pauseJourney(session, 'ground_pickup');
+    if (Party.startQueuedGroundPickup(session)) {
+        status(session, 'collecting_ground_loot');
+        return;
+    }
     status(session, 'gathering');
     invoke('GameServer/Bot/AI/States/HuntingState').tick(session, bot, Generics, BotAI);
 }
@@ -873,6 +914,8 @@ function enforceClan(session) {
 }
 function tick(session, Generics, BotAI) {
     const bot = session.actor, row = rowFor(session);
+    const scavenging = session.partyGroundPickupQueue?.[0]?.scavenge;
+    if (scavenging && !scavenging.isCurrent()) cancelScavenging(session);
     if (session.pendingActorTeleport) { pauseClocks(session); return; }
     if (!row || session.vassalAdmission || session.vassalOperation) { pauseJourney(session, 'operation'); return; }
     if (session.vassalReceipt) {
@@ -905,6 +948,7 @@ function tick(session, Generics, BotAI) {
     const incoming = invoke('GameServer/Bot/AI/PartyAwareness').npcThreateningActor(session);
     const busy = defending || incoming || bot.state.fetchHits?.() || session.plan === 'fleeing'
         || session.activeTrade || session.trade || session.activeNegotiation;
+    if (busy) cancelScavenging(session);
     try {
         if (eligible(session, row) && farmWatchdog(session, row, run, !!busy || transportWaiting(session))) return;
     } catch (error) {
@@ -964,9 +1008,11 @@ function tick(session, Generics, BotAI) {
     if (useSupplies(session)) return;
     invoke('GameServer/Bot/AI/BotEquipmentUpgrade').applyBestUpgrades(session);
     const Party = invoke('GameServer/Bot/AI/PartyCompanionService');
-    Party.reconcileGroundLoot(session);
-    if (session.partyGroundPickupQueue?.length || session.partyGroundPickupInProgress) pauseJourney(session, 'ground_pickup');
-    if (Party.startQueuedGroundPickup(session)) return;
+    if (run.phase !== 'gather') {
+        Party.reconcileGroundLoot(session);
+        if (session.partyGroundPickupQueue?.length || session.partyGroundPickupInProgress) pauseJourney(session, 'ground_pickup');
+        if (Party.startQueuedGroundPickup(session)) return;
+    }
     try {
         if (['town', 'supplies', 'warehouse', 'done'].includes(run.phase)) townTick(session, row, run);
         else if (run.phase === 'gather') gatherTick(session, row, run, Generics, BotAI);
