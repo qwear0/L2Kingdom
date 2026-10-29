@@ -6,11 +6,26 @@ using Tick = void (__thiscall*)(void*, float);
 using GetLevel = void* (__thiscall*)(void*);
 using IsA = int (__thiscall*)(void*, void*);
 using StaticClass = void* (__cdecl*)();
+struct Vector { float x, y, z; };
+struct CheckResult {
+    void* next;
+    void* actor;
+    Vector location, normal;
+    void* primitive;
+    float time;
+    int item;
+    void* material;
+};
+static_assert(sizeof(CheckResult) == 0x30, "Exact-build FCheckResult ABI");
+using LineCheck = int (__thiscall*)(void*, CheckResult&, void*, const Vector&, const Vector&, DWORD, Vector);
 Tick originalTick;
 GetLevel getLevel;
+LineCheck lineCheck;
 IsA isA;
 void* actorClass;
-StaticClass actorStaticClass;
+void* pawnClass;
+void* controllerClass;
+StaticClass actorStaticClass, pawnStaticClass, controllerStaticClass;
 CRITICAL_SECTION sampleLock;
 volatile LONG started;
 DWORD lastSampleTime;
@@ -19,8 +34,24 @@ struct Sample {
     void* engine;
     void* viewportActor;
     void* level;
+    void* pawn;
+    Vector origin;
+    float radius, height;
 };
 Sample sample;
+struct Surface {
+    DWORD id, epoch;
+    int status; // 0 unavailable, 1 queued, 2 hit, 3 clear, 4 stale, 5 invalid native result
+    int nativeReturn;
+    Vector start, end;
+    CheckResult hit;
+};
+Surface surface;
+void* requestedPawn;
+constexpr DWORD WorldTraceMask = 0x86;
+
+bool Finite(float value) { return value == value && value > -10000000.0f && value < 10000000.0f; }
+bool Finite(Vector value) { return Finite(value.x) && Finite(value.y) && Finite(value.z); }
 
 bool Readable(const void* address, SIZE_T size) {
     MEMORY_BASIC_INFORMATION memory;
@@ -52,6 +83,8 @@ void __fastcall OnTick(void* engine, void*, float delta) {
     next.thread = GetCurrentThreadId();
     next.engine = engine;
     if (!actorClass) actorClass = actorStaticClass();
+    if (!pawnClass) pawnClass = pawnStaticClass();
+    if (!controllerClass) controllerClass = controllerStaticClass();
     // These offsets come from this build's UGameEngine::Tick viewport path,
     // not a different C4 SDK. No object pointer leaves this frame for reading.
     void* client = PointerAt(engine, 0x58);
@@ -63,14 +96,47 @@ void __fastcall OnTick(void* engine, void*, float delta) {
         if (actorClass && Readable(actor, 0x100) && isA(actor, actorClass)) {
             next.viewportActor = actor;
             next.level = getLevel(actor);
+            // execTrace in this build resolves a controller's source through
+            // +0x3a8. Location and cylinder fields are from execFastTrace and
+            // GetCylinderExtent, respectively, not a borrowed SDK layout.
+            void* pawn = isA(actor, pawnClass) ? actor
+                : (isA(actor, controllerClass) ? PointerAt(actor, 0x3a8) : nullptr);
+            if (Readable(pawn, 0x2f8) && isA(pawn, pawnClass) && getLevel(pawn) == next.level) {
+                next.origin = *reinterpret_cast<Vector*>(static_cast<BYTE*>(pawn) + 0x1bc);
+                next.radius = *reinterpret_cast<float*>(static_cast<BYTE*>(pawn) + 0x2f0);
+                next.height = *reinterpret_cast<float*>(static_cast<BYTE*>(pawn) + 0x2f4);
+                if (Finite(next.origin) && next.radius > 0 && next.radius < 512 && next.height > 0 && next.height < 512) next.pawn = pawn;
+            }
         }
     }
     // RPC serialization must never stall the game thread. A contended sample
     // is skipped, not waited for; world pointers are opaque diagnostic IDs.
     if (!TryEnterCriticalSection(&sampleLock)) return;
     next.sequence = sample.sequence + 1;
-    next.epoch = sample.epoch + (next.engine != sample.engine || next.level != sample.level || next.viewportActor != sample.viewportActor);
+    next.epoch = sample.epoch + (next.engine != sample.engine || next.level != sample.level || next.viewportActor != sample.viewportActor || next.pawn != sample.pawn);
     sample = next;
+    if (surface.status == 1) {
+        if (!next.pawn || surface.epoch != next.epoch || requestedPawn != next.pawn) surface.status = 4;
+        else {
+            surface.start = next.origin;
+            surface.end = {next.origin.x, next.origin.y, next.origin.z - next.height - 256.0f};
+            surface.hit = {};
+            surface.hit.time = 1.0f;
+            surface.hit.item = -1;
+            // Match this binary's execTrace(false) mask, endpoint order and
+            // zero extent. FCheckResult's 12 dwords and output offsets are
+            // verified in execTrace/SingleLineCheck. This is one loaded-world
+            // ray, not a swept cylinder or a claim of complete map loading.
+            surface.nativeReturn = lineCheck(next.level, surface.hit, next.pawn, surface.end, surface.start, WorldTraceMask, {0, 0, 0});
+            surface.status = surface.nativeReturn == 1 ? 3 : 2;
+            if ((surface.nativeReturn != 0 && surface.nativeReturn != 1)
+                || (surface.status == 2 && (!surface.hit.actor || !Finite(surface.hit.location) || !Finite(surface.hit.normal)
+                    || !(surface.hit.time >= 0 && surface.hit.time <= 1)))) surface.status = 5;
+            // Native linked results can use frame scratch storage. Expose only
+            // copied values/opaque IDs; never retain a linked-list reference.
+            surface.hit.next = nullptr;
+        }
+    }
     LeaveCriticalSection(&sampleLock);
 }
 
@@ -82,7 +148,11 @@ bool InstallTick() {
     getLevel = reinterpret_cast<GetLevel>(GetProcAddress(engine, "?GetLevel@AActor@@QBEPAVULevel@@XZ"));
     isA = reinterpret_cast<IsA>(GetProcAddress(core, "?IsA@UObject@@QBEHPAVUClass@@@Z"));
     actorStaticClass = reinterpret_cast<StaticClass>(GetProcAddress(engine, "?StaticClass@AActor@@SAPAVUClass@@XZ"));
-    if (!table || !tick || !getLevel || !isA || !actorStaticClass || !Readable(table, 0x68) || table[0x64 / 4] != reinterpret_cast<void*>(tick)) return false;
+    pawnStaticClass = reinterpret_cast<StaticClass>(GetProcAddress(engine, "?StaticClass@APawn@@SAPAVUClass@@XZ"));
+    controllerStaticClass = reinterpret_cast<StaticClass>(GetProcAddress(engine, "?StaticClass@AController@@SAPAVUClass@@XZ"));
+    lineCheck = reinterpret_cast<LineCheck>(GetProcAddress(engine, "?SingleLineCheck@ULevel@@UAEHAAUFCheckResult@@PAVAActor@@ABVFVector@@2KV4@@Z"));
+    if (!table || !tick || !getLevel || !isA || !actorStaticClass || !pawnStaticClass || !controllerStaticClass || !lineCheck
+        || !Readable(table, 0x68) || table[0x64 / 4] != reinterpret_cast<void*>(tick)) return false;
     originalTick = reinterpret_cast<Tick>(tick);
     DWORD protection = 0;
     if (!VirtualProtect(table + 0x64 / 4, sizeof(void*), PAGE_READWRITE, &protection)) return false;
@@ -118,24 +188,54 @@ void Serve(SOCKET socket, const char* token) {
     }
     if (!used || request[used - 1] != '\n') return;
     request[used - 1] = 0;
-    // Per-launch token grants only these read-only P0 observations. No auth,
-    // movement, memory access, engine calls or process control exist over RPC.
+    // RPC never dereferences engine objects. The sole native query is queued
+    // for one current-pawn ray on the game thread, with epoch/pawn fencing.
+    // There is no auth, movement, arbitrary call or process control method.
     if (strlen(request) < 65 || memcmp(request, token, 64) || request[64] != ' ') return;
     const char* command = request + 65;
+    if (!strcmp(command, "surface")) {
+        EnterCriticalSection(&sampleLock);
+        const char* error = surface.status == 1 ? "surface_busy" : (!sample.pawn ? "pawn_unavailable" : nullptr);
+        if (!error) {
+            surface.id += 1;
+            surface.epoch = sample.epoch;
+            surface.status = 1;
+            requestedPawn = sample.pawn;
+        }
+        DWORD id = surface.id, epoch = surface.epoch;
+        LeaveCriticalSection(&sampleLock);
+        char reply[128];
+        if (error) _snprintf(reply, sizeof(reply), "{\"error\":\"%s\"}\n", error);
+        else _snprintf(reply, sizeof(reply), "{\"requestId\":%lu,\"epoch\":%lu,\"status\":\"queued\"}\n", id, epoch);
+        SendAll(socket, reply);
+        return;
+    }
     if (strcmp(command, "health") && strcmp(command, "sample")) {
         SendAll(socket, "{\"error\":\"unsupported_p0_command\"}\n");
         return;
     }
     EnterCriticalSection(&sampleLock);
     Sample copy = sample;
+    Surface ray = surface;
     LeaveCriticalSection(&sampleLock);
-    char response[1024], age[16];
+    char response[2048], age[16], pawn[256], result[512];
     if (copy.sequence) _snprintf(age, sizeof(age), "%lu", GetTickCount() - copy.time);
     else strcpy(age, "null");
+    if (copy.pawn) _snprintf(pawn, sizeof(pawn),
+        "{\"id\":\"%p\",\"origin\":[%.6f,%.6f,%.6f],\"radius\":%.6f,\"height\":%.6f}",
+        copy.pawn, copy.origin.x, copy.origin.y, copy.origin.z, copy.radius, copy.height);
+    else strcpy(pawn, "null");
+    const char* statuses[] = {"unavailable", "queued", "hit", "clear", "stale_epoch", "invalid_native_result"};
+    if (ray.status == 2) _snprintf(result, sizeof(result),
+        "{\"actor\":\"%p\",\"location\":[%.6f,%.6f,%.6f],\"normal\":[%.6f,%.6f,%.6f],\"time\":%.6f,\"item\":%d,\"primitive\":\"%p\",\"material\":\"%p\"}",
+        ray.hit.actor, ray.hit.location.x, ray.hit.location.y, ray.hit.location.z,
+        ray.hit.normal.x, ray.hit.normal.y, ray.hit.normal.z, ray.hit.time, ray.hit.item, ray.hit.primitive, ray.hit.material);
+    else strcpy(result, "null");
     _snprintf(response, sizeof(response),
-        "{\"protocol\":\"c4-agent-p0/1\",\"profile\":\"%s\",\"pid\":%lu,\"sequence\":%lu,\"ageMs\":%s,\"tickThread\":%lu,\"epoch\":%lu,\"engine\":\"%p\",\"viewportActor\":\"%p\",\"level\":\"%p\",\"pawn\":null,\"capabilities\":[\"health\",\"native_tick_sample\"],\"collision\":\"unverified\",\"gameLogin\":\"unverified\"}\n",
-        c4::Profile, GetCurrentProcessId(), copy.sequence, age,
-        copy.thread, copy.epoch, copy.engine, copy.viewportActor, copy.level);
+        "{\"protocol\":\"c4-agent-p0/1\",\"profile\":\"%s\",\"pid\":%lu,\"sequence\":%lu,\"ageMs\":%s,\"tickThread\":%lu,\"epoch\":%lu,\"engine\":\"%p\",\"viewportActor\":\"%p\",\"level\":\"%p\",\"pawn\":%s,\"capabilities\":[\"health\",\"native_tick_sample\",\"surface\"],\"surface\":{\"requestId\":%lu,\"epoch\":%lu,\"status\":\"%s\",\"nativeReturn\":%d,\"mask\":%lu,\"extent\":[0,0,0],\"start\":[%.6f,%.6f,%.6f],\"end\":[%.6f,%.6f,%.6f],\"hit\":%s}}\n",
+        c4::Profile, GetCurrentProcessId(), copy.sequence, age, copy.thread, copy.epoch, copy.engine, copy.viewportActor, copy.level, pawn,
+        ray.id, ray.epoch, statuses[ray.status], ray.nativeReturn, WorldTraceMask,
+        ray.start.x, ray.start.y, ray.start.z, ray.end.x, ray.end.y, ray.end.z, result);
     SendAll(socket, response);
 }
 
