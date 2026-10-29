@@ -741,7 +741,7 @@ module.exports = {
             if (trip !== 'deferred') return;
         }
 
-        const floor = SurvivalFloor.forActor(bot);
+        const floor = SurvivalFloor.forActor(bot, session.coldLifeState);
         if (!session.vassal && isSoloHunter(session)) DecisionEvents.observe(session, bot);
         if (floor?.action === 'rest' && !(session.vassal && PartyAwareness.npcThreateningActor(session))) {
             TownNpcApproach.reset(session);
@@ -750,6 +750,9 @@ module.exports = {
             return;
         }
         if (!session.vassal && floor?.action === 'unload' && isSoloHunter(session)) {
+            // Like the loot sell trip below and the cold sale visit: the trip starts
+            // the sale retry, so a bag that sold nothing heavy hunts on at penalty 1.
+            pauseSelling(session);
             const trip = startShopping(session, bot, BotAI, `Inventory ${floor.reason}. Heading to town.`);
             if (trip !== 'deferred') return;
         }
