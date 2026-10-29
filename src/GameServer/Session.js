@@ -181,6 +181,7 @@ class Session {
     }
 
     setActor(properties) {
+        if (this.forestScenes) require('./Quest/ForestOfTheDead').dispose(this);
         if (this.actor && (this.actor.fishing || this.actor.fishingMutation || this.actor.fishingChargedRod || this.activeFishingTraining))
             require('./Fishing/FishingService').dispose(this, this.actor);
         this.activeFishingTraining = null;
@@ -336,6 +337,7 @@ class Session {
     }
 
     error(err) {
+        if (this.forestScenes) require('./Quest/ForestOfTheDead').dispose(this);
         invoke('GameServer/World/Generics/NativeUiSession').reset(this);
         if (err) {
             utils.infoWarn('GameServer', 'exception: ' + (err.stack || err.message || err));

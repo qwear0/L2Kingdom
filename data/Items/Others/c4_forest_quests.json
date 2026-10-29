@@ -1,0 +1,197 @@
+[
+  {
+    "selfId": 7063,
+    "template": {
+      "kind": "Other.Quest",
+      "name": "Map - Forest of the Dead",
+      "class1": 4,
+      "class2": 3,
+      "mass": 1,
+      "price": 0
+    },
+    "etc": {
+      "stackable": false,
+      "consumable": false
+    }
+  },
+  {
+    "selfId": 7064,
+    "template": {
+      "kind": "Other.Quest",
+      "name": "Lidia's Diary",
+      "class1": 4,
+      "class2": 3,
+      "mass": 1,
+      "price": 0
+    },
+    "etc": {
+      "stackable": false,
+      "consumable": false
+    }
+  },
+  {
+    "selfId": 7140,
+    "template": {
+      "kind": "Other.Quest",
+      "name": "Cross of Einhasad",
+      "class1": 4,
+      "class2": 3,
+      "mass": 0,
+      "price": 0
+    },
+    "etc": {
+      "stackable": true,
+      "consumable": false
+    }
+  },
+  {
+    "selfId": 7141,
+    "template": {
+      "kind": "Other.Quest",
+      "name": "Cross of Einhasad",
+      "class1": 4,
+      "class2": 3,
+      "mass": 0,
+      "price": 0
+    },
+    "etc": {
+      "stackable": true,
+      "consumable": false
+    }
+  },
+  {
+    "selfId": 7142,
+    "template": {
+      "kind": "Other.Quest",
+      "name": "Lost Skull of Elf",
+      "class1": 4,
+      "class2": 3,
+      "mass": 0,
+      "price": 0
+    },
+    "etc": {
+      "stackable": true,
+      "consumable": false
+    }
+  },
+  {
+    "selfId": 7143,
+    "template": {
+      "kind": "Other.Quest",
+      "name": "Letter of Innocentin",
+      "class1": 4,
+      "class2": 3,
+      "mass": 0,
+      "price": 0
+    },
+    "etc": {
+      "stackable": true,
+      "consumable": false
+    }
+  },
+  {
+    "selfId": 7144,
+    "template": {
+      "kind": "Other.Quest",
+      "name": "Jewel of Adventurer",
+      "class1": 4,
+      "class2": 3,
+      "mass": 0,
+      "price": 0
+    },
+    "etc": {
+      "stackable": true,
+      "consumable": false
+    }
+  },
+  {
+    "selfId": 7145,
+    "template": {
+      "kind": "Other.Quest",
+      "name": "Jewel of Adventurer",
+      "class1": 4,
+      "class2": 3,
+      "mass": 0,
+      "price": 0
+    },
+    "etc": {
+      "stackable": true,
+      "consumable": false
+    }
+  },
+  {
+    "selfId": 7146,
+    "template": {
+      "kind": "Other.Quest",
+      "name": "Sealed Report Box",
+      "class1": 4,
+      "class2": 3,
+      "mass": 0,
+      "price": 0
+    },
+    "etc": {
+      "stackable": true,
+      "consumable": false
+    }
+  },
+  {
+    "selfId": 7147,
+    "template": {
+      "kind": "Other.Quest",
+      "name": "Report Box",
+      "class1": 4,
+      "class2": 3,
+      "mass": 0,
+      "price": 0
+    },
+    "etc": {
+      "stackable": true,
+      "consumable": false
+    }
+  },
+  {
+    "selfId": 7148,
+    "template": {
+      "kind": "Other.Quest",
+      "name": "Lidia's Hairpin",
+      "class1": 4,
+      "class2": 3,
+      "mass": 0,
+      "price": 0
+    },
+    "etc": {
+      "stackable": true,
+      "consumable": false
+    }
+  },
+  {
+    "selfId": 7149,
+    "template": {
+      "kind": "Other.Quest",
+      "name": "Silver Key",
+      "class1": 4,
+      "class2": 3,
+      "mass": 0,
+      "price": 0
+    },
+    "etc": {
+      "stackable": true,
+      "consumable": false
+    }
+  },
+  {
+    "selfId": 7150,
+    "template": {
+      "kind": "Other.Quest",
+      "name": "Silver Spear",
+      "class1": 4,
+      "class2": 3,
+      "mass": 0,
+      "price": 0
+    },
+    "etc": {
+      "stackable": true,
+      "consumable": false
+    }
+  }
+]

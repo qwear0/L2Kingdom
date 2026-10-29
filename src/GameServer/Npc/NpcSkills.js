@@ -39,6 +39,7 @@ const npcSkillRows = [
     ...require('../../../data/Npcs/Skills/c4_garden_of_beasts.json'),
     ...require('../../../data/Npcs/Skills/c4_valley_of_saints.json'),
     ...require('../../../data/Npcs/Skills/c4_forest_of_the_dead.json'),
+    ...require('../../../data/Npcs/Skills/c4_forest_quests.json'),
     ...require('../../../data/Npcs/Skills/c4_devils_isle.json'),
     ...require('../../../data/Npcs/Skills/c4_elmore_northeast_coast.json'),
     ...require('../../../data/Npcs/Skills/c4_devastated_castle.json'),

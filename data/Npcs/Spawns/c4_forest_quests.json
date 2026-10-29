@@ -1,0 +1,120 @@
+[
+  {
+    "selfId": "c4-forest-quests",
+    "bounds": [],
+    "spawns": [
+      {
+        "selfId": 8529,
+        "name": "Ghost of Adventurer",
+        "coords": [
+          {
+            "locX": 34885,
+            "locY": -54472,
+            "locZ": -2050,
+            "head": 26240
+          }
+        ],
+        "total": 1,
+        "respawn": 60,
+        "bias": 0,
+        "period": "always"
+      },
+      {
+        "selfId": 8527,
+        "name": "Well",
+        "coords": [
+          {
+            "locX": 34767,
+            "locY": -54606,
+            "locZ": -2048,
+            "head": 0
+          }
+        ],
+        "total": 1,
+        "respawn": 60,
+        "bias": 0,
+        "period": "always"
+      },
+      {
+        "selfId": 8522,
+        "name": "Mysterious Wizard",
+        "coords": [
+          {
+            "locX": 51878,
+            "locY": -54796,
+            "locZ": -3167,
+            "head": 22912
+          }
+        ],
+        "total": 1,
+        "respawn": 60,
+        "bias": 0,
+        "period": "always"
+      },
+      {
+        "selfId": 8523,
+        "name": "Tombstone",
+        "coords": [
+          {
+            "locX": 51475,
+            "locY": -54596,
+            "locZ": -3155,
+            "head": 11040
+          }
+        ],
+        "total": 1,
+        "respawn": 60,
+        "bias": 0,
+        "period": "always"
+      },
+      {
+        "selfId": 8526,
+        "name": "Broken Bookshelf",
+        "coords": [
+          {
+            "locX": 51995,
+            "locY": -51265,
+            "locZ": -3104,
+            "head": -2064
+          }
+        ],
+        "total": 1,
+        "respawn": 60,
+        "bias": 0,
+        "period": "always"
+      },
+      {
+        "selfId": 8530,
+        "name": "Box",
+        "coords": [
+          {
+            "locX": 56393,
+            "locY": -47191,
+            "locZ": -2993,
+            "head": -10800
+          }
+        ],
+        "total": 1,
+        "respawn": 60,
+        "bias": 0,
+        "period": "always"
+      },
+      {
+        "selfId": 8386,
+        "name": "Violet",
+        "coords": [
+          {
+            "locX": 59618,
+            "locY": -42774,
+            "locZ": -3000,
+            "head": 0
+          }
+        ],
+        "total": 1,
+        "respawn": 240,
+        "bias": 0,
+        "period": "day"
+      }
+    ]
+  }
+]

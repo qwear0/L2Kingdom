@@ -262,6 +262,11 @@ function clearQuestSpawn(npc) {
     if (!npc?.questSpawn) return;
     clearTimeout(npc.questSpawn.timer);
     npc.questSpawn.timer = undefined;
+    // A personal scene can own movement and additional timers. Detach first:
+    // its disposer may remove sibling NPCs through this same lifecycle.
+    const dispose = npc.questSpawn.dispose;
+    npc.questSpawn.dispose = undefined;
+    dispose?.();
 }
 
 function despawnQuestNpc(world, npc, sourceSession = null) {

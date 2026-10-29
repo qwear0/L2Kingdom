@@ -479,7 +479,7 @@ class Automation extends SelectedModel {
         this.schedulePlayerAttackArrival(approach, ticks);
     }
 
-    scheduleMoveToCoords(session, src, to, callback = () => {}) {
+    scheduleMoveToCoords(session, src, to, callback = () => {}, { walking = false } = {}) {
         this.clearPlayerAttackApproach();
         const from = {
             locX: src.fetchLocX(),
@@ -520,7 +520,7 @@ class Automation extends SelectedModel {
             from.locX, from.locY, from.locZ,
             destination.locX, destination.locY, destination.locZ,
             0,
-            src.fetchCollectiveRunSpd()
+            walking ? src.fetchCollectiveWalkSpd() : src.fetchCollectiveRunSpd()
         );
 
         this.startMoveInterpolation(session, src, destination, ticks);

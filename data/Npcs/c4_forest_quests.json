@@ -1,0 +1,673 @@
+[
+  {
+    "selfId": 5217,
+    "template": {
+      "kind": "Monster",
+      "name": "Soul of Well",
+      "title": "Quest Monster",
+      "level": 63,
+      "hostile": false
+    },
+    "base": {
+      "str": 40,
+      "dex": 30,
+      "con": 43,
+      "int": 21,
+      "wit": 20,
+      "men": 10
+    },
+    "stats": {
+      "pAtk": 541.44774,
+      "pAtkRnd": 30,
+      "pDef": 262.19426,
+      "mAtk": 369.73862,
+      "mDef": 191.86238,
+      "accur": 4.75,
+      "atkSpd": 253,
+      "castSpd": 253,
+      "atkRadius": 40
+    },
+    "speed": {
+      "walk": 100,
+      "run": 180
+    },
+    "vitals": {
+      "maxHp": 2089.92274,
+      "maxMp": 1127.4,
+      "revHp": 7.5,
+      "revMp": 2.7,
+      "corpseTime": 7000
+    },
+    "collision": {
+      "radius": 20,
+      "size": 35
+    },
+    "equipment": {
+      "weapon": 0,
+      "shield": 0,
+      "reuseTime": 0
+    },
+    "clan": {
+      "clanName": "",
+      "helpRadius": 0
+    },
+    "rewards": {
+      "exp": 0,
+      "sp": 0
+    },
+    "traits": {
+      "race": "undead",
+      "undead": true
+    }
+  },
+  {
+    "selfId": 8386,
+    "template": {
+      "kind": "Npc",
+      "name": "Violet",
+      "title": "Trader",
+      "level": 70,
+      "hostile": false
+    },
+    "base": {
+      "str": 40,
+      "dex": 30,
+      "con": 43,
+      "int": 21,
+      "wit": 20,
+      "men": 10
+    },
+    "stats": {
+      "pAtk": 688.86373,
+      "pAtkRnd": 30,
+      "pDef": 295.91597,
+      "mAtk": 470.40463,
+      "mDef": 216.53847,
+      "accur": 5,
+      "atkSpd": 253,
+      "castSpd": 253,
+      "atkRadius": 40
+    },
+    "speed": {
+      "walk": 50,
+      "run": 120
+    },
+    "vitals": {
+      "maxHp": 2444.46819,
+      "maxMp": 1345.8,
+      "revHp": 7.5,
+      "revMp": 2.7,
+      "corpseTime": 7000
+    },
+    "collision": {
+      "radius": 8,
+      "size": 25.3
+    },
+    "equipment": {
+      "weapon": 0,
+      "shield": 0,
+      "reuseTime": 0
+    },
+    "clan": {
+      "clanName": "",
+      "helpRadius": 0
+    },
+    "rewards": {
+      "exp": 0,
+      "sp": 0
+    },
+    "traits": {
+      "race": "human",
+      "undead": false
+    }
+  },
+  {
+    "selfId": 8522,
+    "template": {
+      "kind": "Npc",
+      "name": "Mysterious Wizard",
+      "title": "",
+      "level": 70,
+      "hostile": false
+    },
+    "base": {
+      "str": 40,
+      "dex": 30,
+      "con": 43,
+      "int": 21,
+      "wit": 20,
+      "men": 10
+    },
+    "stats": {
+      "pAtk": 688.86373,
+      "pAtkRnd": 30,
+      "pDef": 295.91597,
+      "mAtk": 470.40463,
+      "mDef": 216.53847,
+      "accur": 5,
+      "atkSpd": 253,
+      "castSpd": 253,
+      "atkRadius": 40
+    },
+    "speed": {
+      "walk": 50,
+      "run": 120
+    },
+    "vitals": {
+      "maxHp": 2444.46819,
+      "maxMp": 1345.8,
+      "revHp": 7.5,
+      "revMp": 2.7,
+      "corpseTime": 7000
+    },
+    "collision": {
+      "radius": 8,
+      "size": 22.5
+    },
+    "equipment": {
+      "weapon": 0,
+      "shield": 0,
+      "reuseTime": 0
+    },
+    "clan": {
+      "clanName": "",
+      "helpRadius": 0
+    },
+    "rewards": {
+      "exp": 0,
+      "sp": 0
+    },
+    "traits": {
+      "race": "human",
+      "undead": false
+    }
+  },
+  {
+    "selfId": 8523,
+    "template": {
+      "kind": "Npc",
+      "name": "Tombstone",
+      "title": "",
+      "level": 70,
+      "hostile": false
+    },
+    "base": {
+      "str": 40,
+      "dex": 30,
+      "con": 43,
+      "int": 21,
+      "wit": 20,
+      "men": 10
+    },
+    "stats": {
+      "pAtk": 688.86373,
+      "pAtkRnd": 30,
+      "pDef": 295.91597,
+      "mAtk": 470.40463,
+      "mDef": 216.53847,
+      "accur": 5,
+      "atkSpd": 253,
+      "castSpd": 253,
+      "atkRadius": 40
+    },
+    "speed": {
+      "walk": 50,
+      "run": 120
+    },
+    "vitals": {
+      "maxHp": 2444.46819,
+      "maxMp": 1345.8,
+      "revHp": 7.5,
+      "revMp": 2.7,
+      "corpseTime": 7000
+    },
+    "collision": {
+      "radius": 20,
+      "size": 30
+    },
+    "equipment": {
+      "weapon": 0,
+      "shield": 0,
+      "reuseTime": 0
+    },
+    "clan": {
+      "clanName": "",
+      "helpRadius": 0
+    },
+    "rewards": {
+      "exp": 0,
+      "sp": 0
+    },
+    "traits": {
+      "race": "etc",
+      "undead": false
+    }
+  },
+  {
+    "selfId": 8524,
+    "template": {
+      "kind": "Npc",
+      "name": "Ghost of von Hellmann",
+      "title": "",
+      "level": 70,
+      "hostile": false
+    },
+    "base": {
+      "str": 40,
+      "dex": 30,
+      "con": 43,
+      "int": 21,
+      "wit": 20,
+      "men": 10
+    },
+    "stats": {
+      "pAtk": 688.86373,
+      "pAtkRnd": 30,
+      "pDef": 295.91597,
+      "mAtk": 470.40463,
+      "mDef": 216.53847,
+      "accur": 5,
+      "atkSpd": 253,
+      "castSpd": 253,
+      "atkRadius": 40
+    },
+    "speed": {
+      "walk": 50,
+      "run": 120
+    },
+    "vitals": {
+      "maxHp": 2444.46819,
+      "maxMp": 1345.8,
+      "revHp": 7.5,
+      "revMp": 2.7,
+      "corpseTime": 7000
+    },
+    "collision": {
+      "radius": 8,
+      "size": 22.5
+    },
+    "equipment": {
+      "weapon": 0,
+      "shield": 0,
+      "reuseTime": 0
+    },
+    "clan": {
+      "clanName": "",
+      "helpRadius": 0
+    },
+    "rewards": {
+      "exp": 0,
+      "sp": 0
+    },
+    "traits": {
+      "race": "undead",
+      "undead": true
+    }
+  },
+  {
+    "selfId": 8525,
+    "template": {
+      "kind": "Npc",
+      "name": "Ghost of von Hellmann's Page",
+      "title": "",
+      "level": 70,
+      "hostile": false
+    },
+    "base": {
+      "str": 40,
+      "dex": 30,
+      "con": 43,
+      "int": 21,
+      "wit": 20,
+      "men": 10
+    },
+    "stats": {
+      "pAtk": 688.86373,
+      "pAtkRnd": 30,
+      "pDef": 295.91597,
+      "mAtk": 470.40463,
+      "mDef": 216.53847,
+      "accur": 5,
+      "atkSpd": 253,
+      "castSpd": 253,
+      "atkRadius": 40
+    },
+    "speed": {
+      "walk": 100,
+      "run": 120
+    },
+    "vitals": {
+      "maxHp": 2444.46819,
+      "maxMp": 1345.8,
+      "revHp": 7.5,
+      "revMp": 2.7,
+      "corpseTime": 7000
+    },
+    "collision": {
+      "radius": 20,
+      "size": 35
+    },
+    "equipment": {
+      "weapon": 0,
+      "shield": 0,
+      "reuseTime": 0
+    },
+    "clan": {
+      "clanName": "",
+      "helpRadius": 0
+    },
+    "rewards": {
+      "exp": 0,
+      "sp": 0
+    },
+    "traits": {
+      "race": "undead",
+      "undead": true
+    }
+  },
+  {
+    "selfId": 8526,
+    "template": {
+      "kind": "Npc",
+      "name": "Broken Bookshelf",
+      "title": "",
+      "level": 70,
+      "hostile": false
+    },
+    "base": {
+      "str": 40,
+      "dex": 30,
+      "con": 43,
+      "int": 21,
+      "wit": 20,
+      "men": 10
+    },
+    "stats": {
+      "pAtk": 688.86373,
+      "pAtkRnd": 30,
+      "pDef": 295.91597,
+      "mAtk": 470.40463,
+      "mDef": 216.53847,
+      "accur": 5,
+      "atkSpd": 253,
+      "castSpd": 253,
+      "atkRadius": 40
+    },
+    "speed": {
+      "walk": 50,
+      "run": 120
+    },
+    "vitals": {
+      "maxHp": 2444.46819,
+      "maxMp": 1345.8,
+      "revHp": 7.5,
+      "revMp": 2.7,
+      "corpseTime": 7000
+    },
+    "collision": {
+      "radius": 15,
+      "size": 33.5
+    },
+    "equipment": {
+      "weapon": 0,
+      "shield": 0,
+      "reuseTime": 0
+    },
+    "clan": {
+      "clanName": "",
+      "helpRadius": 0
+    },
+    "rewards": {
+      "exp": 0,
+      "sp": 0
+    },
+    "traits": {
+      "race": "etc",
+      "undead": false
+    }
+  },
+  {
+    "selfId": 8527,
+    "template": {
+      "kind": "Npc",
+      "name": "Well",
+      "title": "",
+      "level": 70,
+      "hostile": false
+    },
+    "base": {
+      "str": 40,
+      "dex": 30,
+      "con": 43,
+      "int": 21,
+      "wit": 20,
+      "men": 10
+    },
+    "stats": {
+      "pAtk": 688.86373,
+      "pAtkRnd": 30,
+      "pDef": 295.91597,
+      "mAtk": 470.40463,
+      "mDef": 216.53847,
+      "accur": 5,
+      "atkSpd": 253,
+      "castSpd": 253,
+      "atkRadius": 40
+    },
+    "speed": {
+      "walk": 50,
+      "run": 120
+    },
+    "vitals": {
+      "maxHp": 2444.46819,
+      "maxMp": 1345.8,
+      "revHp": 7.5,
+      "revMp": 2.7,
+      "corpseTime": 7000
+    },
+    "collision": {
+      "radius": 33,
+      "size": 37
+    },
+    "equipment": {
+      "weapon": 0,
+      "shield": 0,
+      "reuseTime": 0
+    },
+    "clan": {
+      "clanName": "",
+      "helpRadius": 0
+    },
+    "rewards": {
+      "exp": 0,
+      "sp": 0
+    },
+    "traits": {
+      "race": "etc",
+      "undead": false
+    }
+  },
+  {
+    "selfId": 8528,
+    "template": {
+      "kind": "Npc",
+      "name": "Ghost of Priest",
+      "title": "",
+      "level": 70,
+      "hostile": false
+    },
+    "base": {
+      "str": 40,
+      "dex": 30,
+      "con": 43,
+      "int": 21,
+      "wit": 20,
+      "men": 10
+    },
+    "stats": {
+      "pAtk": 688.86373,
+      "pAtkRnd": 30,
+      "pDef": 295.91597,
+      "mAtk": 470.40463,
+      "mDef": 216.53847,
+      "accur": 5,
+      "atkSpd": 253,
+      "castSpd": 253,
+      "atkRadius": 40
+    },
+    "speed": {
+      "walk": 80,
+      "run": 120
+    },
+    "vitals": {
+      "maxHp": 2444.46819,
+      "maxMp": 1345.8,
+      "revHp": 7.5,
+      "revMp": 2.7,
+      "corpseTime": 7000
+    },
+    "collision": {
+      "radius": 7,
+      "size": 21
+    },
+    "equipment": {
+      "weapon": 0,
+      "shield": 0,
+      "reuseTime": 0
+    },
+    "clan": {
+      "clanName": "",
+      "helpRadius": 0
+    },
+    "rewards": {
+      "exp": 0,
+      "sp": 0
+    },
+    "traits": {
+      "race": "undead",
+      "undead": true
+    }
+  },
+  {
+    "selfId": 8529,
+    "template": {
+      "kind": "Npc",
+      "name": "Ghost of Adventurer",
+      "title": "",
+      "level": 70,
+      "hostile": false
+    },
+    "base": {
+      "str": 40,
+      "dex": 30,
+      "con": 43,
+      "int": 21,
+      "wit": 20,
+      "men": 10
+    },
+    "stats": {
+      "pAtk": 688.86373,
+      "pAtkRnd": 30,
+      "pDef": 295.91597,
+      "mAtk": 470.40463,
+      "mDef": 216.53847,
+      "accur": 5,
+      "atkSpd": 253,
+      "castSpd": 253,
+      "atkRadius": 40
+    },
+    "speed": {
+      "walk": 80,
+      "run": 120
+    },
+    "vitals": {
+      "maxHp": 2444.46819,
+      "maxMp": 1345.8,
+      "revHp": 7.5,
+      "revMp": 2.7,
+      "corpseTime": 7000
+    },
+    "collision": {
+      "radius": 8,
+      "size": 22
+    },
+    "equipment": {
+      "weapon": 0,
+      "shield": 0,
+      "reuseTime": 0
+    },
+    "clan": {
+      "clanName": "",
+      "helpRadius": 0
+    },
+    "rewards": {
+      "exp": 0,
+      "sp": 0
+    },
+    "traits": {
+      "race": "undead",
+      "undead": true
+    }
+  },
+  {
+    "selfId": 8530,
+    "template": {
+      "kind": "Npc",
+      "name": "Box",
+      "title": "",
+      "level": 70,
+      "hostile": false
+    },
+    "base": {
+      "str": 40,
+      "dex": 30,
+      "con": 43,
+      "int": 21,
+      "wit": 20,
+      "men": 10
+    },
+    "stats": {
+      "pAtk": 688.86373,
+      "pAtkRnd": 30,
+      "pDef": 295.91597,
+      "mAtk": 470.40463,
+      "mDef": 216.53847,
+      "accur": 5,
+      "atkSpd": 253,
+      "castSpd": 253,
+      "atkRadius": 40
+    },
+    "speed": {
+      "walk": 80,
+      "run": 120
+    },
+    "vitals": {
+      "maxHp": 2444.46819,
+      "maxMp": 1345.8,
+      "revHp": 7.5,
+      "revMp": 2.7,
+      "corpseTime": 7000
+    },
+    "collision": {
+      "radius": 8.5,
+      "size": 8.5
+    },
+    "equipment": {
+      "weapon": 0,
+      "shield": 0,
+      "reuseTime": 0
+    },
+    "clan": {
+      "clanName": "",
+      "helpRadius": 0
+    },
+    "rewards": {
+      "exp": 0,
+      "sp": 0
+    },
+    "traits": {
+      "race": "construct",
+      "undead": false
+    }
+  }
+]
