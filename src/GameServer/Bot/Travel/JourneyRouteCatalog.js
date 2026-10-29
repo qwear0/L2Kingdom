@@ -48,7 +48,7 @@ async function makeTopology(record, checkpoint) {
     const edges = [...record.trunks].sort((a, b) => a.id.localeCompare(b.id));
     const adjacency = Array.from({ length: count }, () => []);
     for (let i = 0; i < edges.length; i++) {
-        await checkpoint();
+        const pending = checkpoint(); if (pending) await pending;
         const edge = edges[i], from = waypointIndex.get(edge.from), to = waypointIndex.get(edge.to);
         if (from === undefined || to === undefined) throw new Error(`trunk_endpoint_missing:${edge.id}`);
         adjacency[from].push(i);
@@ -91,8 +91,12 @@ async function freezeDeep(value, checkpoint) {
         // Freeze before enqueueing children so aliases/cycles cannot expand the
         // work list. Nothing is published until every descendant is frozen.
         Object.freeze(node);
-        for (const key of Object.keys(node)) {
-            const child = node[key];
+        // Parsed JSON arrays have only indexed children. Enumerating their
+        // numeric keys allocates strings for geometry and span-index scalars.
+        const keys = Array.isArray(node) ? null : Object.keys(node);
+        const length = keys ? keys.length : node.length;
+        for (let index = 0; index < length; index++) {
+            const child = node[keys ? keys[index] : index];
             if (child && typeof child === 'object' && !Object.isFrozen(child)) pending.push(child);
             if (++visited === Format.LIMITS.maxBatchRecords) {
                 await checkpoint(visited); visited = 0;
@@ -105,31 +109,31 @@ async function freezeDeep(value, checkpoint) {
 async function makeIndexes(record, revision, checkpoint) {
     const spansByRow = new Map();
     for (const span of record.membershipSpans) {
-        await checkpoint();
+        const pending = checkpoint(); if (pending) await pending;
         const key = keyForRow(span.areaId, span.spawnId, span.layerZ, span.rowY);
         if (!spansByRow.has(key)) spansByRow.set(key, []);
         spansByRow.get(key).push(span);
     }
     for (const spans of spansByRow.values()) {
         for (let i = 1; i < spans.length; i++) {
-            await checkpoint();
+            const pending = checkpoint(); if (pending) await pending;
             if (spans[i].xStart <= spans[i - 1].xEnd) throw new Error('membership_spans_overlap_or_duplicate');
         }
     }
     const polygonByKey = new Map();
     for (const polygon of record.polygons) {
-        await checkpoint();
+        const pending = checkpoint(); if (pending) await pending;
         polygonByKey.set(`${polygon.areaId}\0${polygon.spawnId}`, polygon);
     }
     const coverageByKey = new Map();
     for (const entry of [...record.coverage.polygons, ...record.coverage.components, ...record.coverage.towns,
         ...record.coverage.gates, ...record.coverage.services, ...record.coverage.connections]) {
-        await checkpoint();
+        const pending = checkpoint(); if (pending) await pending;
         coverageByKey.set(`${entry.kind}\0${entry.requirementId}`, entry);
     }
     const attachments = new Map();
     for (const entry of record.attachments || []) {
-        await checkpoint();
+        const pending = checkpoint(); if (pending) await pending;
         const point = entry.point;
         const key = `${Math.floor(point.locX / BUCKET_XY)}:${Math.floor(point.locY / BUCKET_XY)}:${Math.floor(point.locZ / BUCKET_Z)}`;
         if (!attachments.has(key)) attachments.set(key, []);
@@ -308,7 +312,7 @@ async function load(file = Inputs.DEFAULT_FILE, inputIdentity = null) {
             || stat.size !== pathStat.size || stat.size > BigInt(Format.LIMITS.generatedBytes)) {
             throw new Error('journey_catalogue_changed_while_opening');
         }
-        const bytes = Buffer.alloc(Number(stat.size));
+        let bytes = Buffer.alloc(Number(stat.size));
         let offset = 0;
         while (offset < bytes.length) {
             const { bytesRead } = await handle.read(bytes, offset, bytes.length - offset, offset);
@@ -323,17 +327,25 @@ async function load(file = Inputs.DEFAULT_FILE, inputIdentity = null) {
         if (inputIdentity?.status === 'disabled') throw new Error(inputIdentity.reason || 'journey_input_identity_disabled');
         if (!inputIdentity || typeof inputIdentity.fingerprint !== 'string') throw new Error('journey_input_identity_required');
         const record = Format.parseStrictJson(bytes.toString('utf8'), 'journey_catalogue');
+        // Validation/indexing needs the parsed tree, not a second file-sized
+        // backing buffer retained across its asynchronous checkpoints.
+        bytes = null;
         let recordsSinceYield = 0;
-        const checkpoint = async (count = 1) => {
-            recordsSinceYield += count;
-            if (recordsSinceYield >= Format.LIMITS.maxBatchRecords) {
-                recordsSinceYield %= Format.LIMITS.maxBatchRecords;
-                await new Promise(resolve => setImmediate(resolve));
-            }
+        const checkBudget = () => {
             if (Date.now() - startedAtWallMs > Format.LIMITS.maxLoaderMs
                 || process.memoryUsage.rss() - baselineRss > Format.LIMITS.maxLoaderRss) {
                 throw new Error('journey_loader_budget_exceeded');
             }
+        };
+        // Only a real batch boundary needs a promise; fast callers still check
+        // the budget synchronously rather than allocating per-record awaits.
+        const checkpoint = (count = 1) => {
+            recordsSinceYield += count;
+            if (recordsSinceYield >= Format.LIMITS.maxBatchRecords) {
+                recordsSinceYield %= Format.LIMITS.maxBatchRecords;
+                return new Promise(resolve => setImmediate(resolve)).then(checkBudget);
+            }
+            checkBudget();
         };
         await Format.validateRecord(record, inputIdentity, { checkpoint, baselineRss, startedAtWallMs });
         if (Format.canonicalStringify(record.scope) !== Format.canonicalStringify(inputIdentity.scope)) {

@@ -339,7 +339,7 @@ async function validateAuthoredBatched(input, checkpoint) {
         || serviceRoles.some(role => !input.serviceSeedSelection.roles.includes(role))) throw new Error('serviceSeedSelection:invalid_roles');
     const areas = new Set(), polygons = new Set(), towns = new Set(), gates = new Set();
     for (const area of input.requiredAreas) {
-        await checkpoint();
+        const pending = checkpoint(); if (pending) await pending;
         if (!isRecord(area) || typeof area.id !== 'string' || !area.id || areas.has(area.id)) throw new Error('requiredAreas:invalid');
         areas.add(area.id);
     }
@@ -347,7 +347,7 @@ async function validateAuthoredBatched(input, checkpoint) {
         ['abandoned_camp', 37], ['langk_lizardmen', 26], ['wasteland', 99]]);
     const counts = new Map([...areas].map(id => [id, 0]));
     for (const row of input.requiredPolygons) {
-        await checkpoint();
+        const pending = checkpoint(); if (pending) await pending;
         if (!isRecord(row) || !areas.has(row.areaId) || typeof row.spawnId !== 'string' || !row.spawnId
             || !STATUSES.has(row.status) || typeof row.reason !== 'string' || polygons.has(row.spawnId)) {
             throw new Error('requiredPolygons:invalid');
@@ -357,14 +357,14 @@ async function validateAuthoredBatched(input, checkpoint) {
     for (const [id, count] of expectedCounts) if (!areas.has(id) || counts.get(id) !== count) throw new Error(`requiredPolygons:count_mismatch:${id}`);
     if (polygons.has('gludio_t18_21_009')) throw new Error('requiredPolygons:excluded_duplicate_agony_spawn');
     for (const row of input.requiredTowns) {
-        await checkpoint();
+        const pending = checkpoint(); if (pending) await pending;
         if (!isRecord(row) || typeof row.townKey !== 'string' || !row.townKey || towns.has(row.townKey)
             || !finitePoint(row.seedPoint) || !STATUSES.has(row.status) || typeof row.reason !== 'string'
             || typeof row.restartTownKey !== 'string') throw new Error('requiredTowns:invalid');
         towns.add(row.townKey);
     }
     for (const gate of input.waypointSeeds) {
-        await checkpoint();
+        const pending = checkpoint(); if (pending) await pending;
         if (!isRecord(gate) || typeof gate.id !== 'string' || !gate.id || gates.has(gate.id)
             || gate.source !== 'townGates' || !towns.has(gate.townKey) || typeof gate.gateId !== 'string'
             || !Array.isArray(gate.sides) || gate.sides.join(',') !== 'inside,passage,outside') throw new Error('waypointSeeds:invalid');
@@ -375,7 +375,7 @@ async function validateAuthoredBatched(input, checkpoint) {
     const regionIds = new Set();
     let vertices = 0;
     for (const region of [...input.acceptedTransitRegions, ...input.rejectedTransitRegions]) {
-        await checkpoint();
+        const pending = checkpoint(); if (pending) await pending;
         if (!isRecord(region) || typeof region.id !== 'string' || !region.id || regionIds.has(region.id)
             || !Array.isArray(region.polygon) || region.polygon.length < 3 || region.polygon.length > 256
             || !Number.isFinite(region.minZ) || !Number.isFinite(region.maxZ) || region.minZ > region.maxZ
@@ -385,7 +385,7 @@ async function validateAuthoredBatched(input, checkpoint) {
         }
         regionIds.add(region.id); vertices += region.polygon.length;
         for (const point of region.polygon) {
-            await checkpoint();
+            const pending = checkpoint(); if (pending) await pending;
             if (!isRecord(point) || !Number.isFinite(point.locX) || !Number.isFinite(point.locY)) throw new Error('transitRegions:invalid_vertex');
         }
     }
@@ -393,7 +393,7 @@ async function validateAuthoredBatched(input, checkpoint) {
     if (!Array.isArray(input.waypoints) || input.waypoints.length > LIMITS.waypoints) throw new Error('waypoints:limit_exceeded');
     const waypointIds = new Set();
     for (const waypoint of input.waypoints) {
-        await checkpoint();
+        const pending = checkpoint(); if (pending) await pending;
         if (!isRecord(waypoint) || typeof waypoint.id !== 'string' || !waypoint.id || waypointIds.has(waypoint.id)
             || !finitePoint(waypoint.point) || typeof waypoint.provenance !== 'string' || !waypoint.provenance
             || waypoint.areaId && !areas.has(waypoint.areaId) || waypoint.spawnId && !polygons.has(waypoint.spawnId)
@@ -403,7 +403,7 @@ async function validateAuthoredBatched(input, checkpoint) {
     if (!Array.isArray(input.trunks) || input.trunks.length > LIMITS.trunks) throw new Error('trunks:limit_exceeded');
     const trunkIds = new Set();
     for (const trunk of input.trunks) {
-        await checkpoint();
+        const pending = checkpoint(); if (pending) await pending;
         if (!isRecord(trunk) || typeof trunk.id !== 'string' || !trunk.id || trunkIds.has(trunk.id)
             || !waypointIds.has(trunk.from) || !waypointIds.has(trunk.to) || trunk.from === trunk.to
             || !Array.isArray(trunk.transitRegionIds) || trunk.transitRegionIds.some(id => !regionIds.has(id))) {
@@ -417,23 +417,30 @@ async function validateRecord(record, expectedIdentity = null, loadContext = {})
     const baselineRss = loadContext.baselineRss ?? process.memoryUsage.rss();
     const startedAtWallMs = loadContext.startedAtWallMs ?? Date.now();
     let checked = 0;
-    async function checkpoint(count = 1) {
-        if (loadContext.checkpoint) await loadContext.checkpoint(count);
+    function checkBudget() {
+        if (Date.now() - startedAtWallMs > LIMITS.maxLoaderMs) throw new Error('loader_wall_limit');
+        if (process.memoryUsage.rss() - baselineRss > LIMITS.maxLoaderRss) throw new Error('loader_additional_rss_limit');
+    }
+    // Fast checkpoints return no promise: awaiting every scalar creates a
+    // whole validation pass of temporary promises without yielding to I/O.
+    function checkpoint(count = 1) {
+        let pending;
+        if (loadContext.checkpoint) pending = loadContext.checkpoint(count);
         else {
             checked += count;
             if (checked >= LIMITS.maxBatchRecords) {
                 checked %= LIMITS.maxBatchRecords;
-                await new Promise(resolve => setImmediate(resolve));
+                pending = new Promise(resolve => setImmediate(resolve));
             }
         }
-        if (Date.now() - startedAtWallMs > LIMITS.maxLoaderMs) throw new Error('loader_wall_limit');
-        if (process.memoryUsage.rss() - baselineRss > LIMITS.maxLoaderRss) throw new Error('loader_additional_rss_limit');
+        if (pending) return Promise.resolve(pending).then(checkBudget);
+        checkBudget();
     }
     async function unique(rows, label, key = 'id') {
         if (!Array.isArray(rows)) throw new Error(`${label}:expected_array`);
         const ids = new Set();
         for (const row of rows) {
-            await checkpoint();
+            const pending = checkpoint(); if (pending) await pending;
             if (!isRecord(row) || typeof row[key] !== 'string' || !row[key]) throw new Error(`${label}:invalid_${key}`);
             if (ids.has(row[key])) throw new Error(`${label}:duplicate_${row[key]}`);
             ids.add(row[key]);
@@ -449,7 +456,7 @@ async function validateRecord(record, expectedIdentity = null, loadContext = {})
     for (const key of ['requirementIds', 'waypointIds', 'connectionIds']) {
         const values = record.scope[key], ids = new Set();
         for (const value of values) {
-            await checkpoint();
+            const pending = checkpoint(); if (pending) await pending;
             if (typeof value !== 'string' || !value || ids.has(value)) throw new Error(`generated_scope_${key}_invalid`);
             ids.add(value);
         }
@@ -457,7 +464,7 @@ async function validateRecord(record, expectedIdentity = null, loadContext = {})
     if (!Array.isArray(record.inputs) || record.inputs.length === 0) throw new Error('generated_inputs_invalid');
     const inputIds = new Set();
     for (const input of record.inputs) {
-        await checkpoint();
+        const pending = checkpoint(); if (pending) await pending;
         if (!isRecord(input) || typeof input.id !== 'string' || !input.id || typeof input.path !== 'string' || !input.path
             || !(input.missing === true || /^[a-f0-9]{64}$/.test(input.sha256))
             || (input.loadedSha256 !== undefined && !/^[a-f0-9]{64}$/.test(input.loadedSha256))
@@ -466,7 +473,7 @@ async function validateRecord(record, expectedIdentity = null, loadContext = {})
     }
     const sortedInputs = [...record.inputs].sort((a, b) => a.id.localeCompare(b.id));
     for (let i = 0; i < sortedInputs.length; i++) {
-        await checkpoint();
+        const pending = checkpoint(); if (pending) await pending;
         if (record.inputs[i].id !== sortedInputs[i].id) throw new Error('generated_inputs_not_unique_sorted');
     }
     if (expectedIdentity?.authoredDigest) {
@@ -512,11 +519,11 @@ async function validateRecord(record, expectedIdentity = null, loadContext = {})
         ...record.coverage.gates, ...record.coverage.services, ...record.coverage.connections];
     const coverageKeys = new Set();
     for (const service of record.coverage.services) {
-        await checkpoint();
+        const pending = checkpoint(); if (pending) await pending;
         if (!serviceInventoryIds.has(service.requirementId)) throw new Error('generated_service_inventory_coverage_mismatch');
     }
     for (const entry of allCoverage) {
-        await checkpoint();
+        const pending = checkpoint(); if (pending) await pending;
         if (!isRecord(entry) || !['polygon', 'component', 'town', 'gate', 'service', 'connection'].includes(entry.kind)
             || !STATUSES.has(entry.status) || !REASONS.has(entry.reason) && entry.reason !== null
             || typeof entry.requirementId !== 'string' || !entry.requirementId || !Array.isArray(entry.certificateIds)
@@ -544,7 +551,7 @@ async function validateRecord(record, expectedIdentity = null, loadContext = {})
     const polygonKeys = new Set();
     let vertices = 0;
     for (const polygon of record.polygons) {
-        await checkpoint();
+        const pending = checkpoint(); if (pending) await pending;
         if (!isRecord(polygon) || !polygonRequirementIds.has(polygon.spawnId)
             || !selectedPolygons.has(polygon.spawnId) || typeof polygon.areaId !== 'string'
             || !Array.isArray(polygon.bounds) || polygon.bounds.length < 3
@@ -556,11 +563,11 @@ async function validateRecord(record, expectedIdentity = null, loadContext = {})
         polygonKeys.add(key); vertices += polygon.bounds.length;
     }
     for (const waypoint of record.waypoints) {
-        await checkpoint();
+        const pending = checkpoint(); if (pending) await pending;
         if (!finitePoint(waypoint.point)) throw new Error(`generated_waypoint_point_invalid:${waypoint.id}`);
     }
     for (const component of record.components) {
-        await checkpoint();
+        const pending = checkpoint(); if (pending) await pending;
         if (!Number.isInteger(component.nodeCount) || component.nodeCount < 1 || !Array.isArray(component.patchIds)
             || component.patchIds.some(id => !patchIds.has(id)) || !Array.isArray(component.entryAnchorIds)
             || component.entryAnchorIds.length > LIMITS.maxEntryAnchors || component.patchIds.length > LIMITS.maxPatches
@@ -569,7 +576,7 @@ async function validateRecord(record, expectedIdentity = null, loadContext = {})
         }
     }
     for (const patch of record.patches) {
-        await checkpoint();
+        const pending = checkpoint(); if (pending) await pending;
         if (!componentIds.has(patch.componentId) || !Number.isInteger(patch.nodeCount) || patch.nodeCount < 1
             || patch.nodeCount > LIMITS.localNodes || !Number.isFinite(patch.maxPathDistance)
             || patch.maxPathDistance > LIMITS.localDistance || !Number.isFinite(patch.maxXYRadius)
@@ -579,7 +586,7 @@ async function validateRecord(record, expectedIdentity = null, loadContext = {})
     }
     const requirementAreas = new Set(record.requirements.requiredAreas.map(area => area.id));
     for (const span of record.membershipSpans) {
-        await checkpoint();
+        const pending = checkpoint(); if (pending) await pending;
         if (!isRecord(span) || !requirementAreas.has(span.areaId) || !polygonRequirementIds.has(span.spawnId)
             || !selectedPolygons.has(span.spawnId) || !Number.isInteger(span.layerZ) || !Number.isInteger(span.rowY)
             || !Number.isInteger(span.xStart) || !Number.isInteger(span.xEnd) || span.xStart > span.xEnd
@@ -589,7 +596,7 @@ async function validateRecord(record, expectedIdentity = null, loadContext = {})
         }
     }
     for (let i = 1; i < record.membershipSpans.length; i++) {
-        await checkpoint();
+        const pending = checkpoint(); if (pending) await pending;
         const a = record.membershipSpans[i - 1], b = record.membershipSpans[i];
         const order = a.areaId.localeCompare(b.areaId) || a.spawnId.localeCompare(b.spawnId)
             || a.layerZ - b.layerZ || a.rowY - b.rowY || a.xStart - b.xStart || a.xEnd - b.xEnd
@@ -598,14 +605,14 @@ async function validateRecord(record, expectedIdentity = null, loadContext = {})
     }
     const spans = record.membershipSpans;
     for (const patch of record.patches) for (const index of patch.membershipSpanIndices) {
-        await checkpoint();
+        const pending = checkpoint(); if (pending) await pending;
         if (!Number.isInteger(index) || index < 0 || index >= spans.length || !spans[index].patchIds.includes(patch.id)) {
             throw new Error(`generated_patch_span_reference_invalid:${patch.id}`);
         }
     }
     const acceptedRegions = new Set(record.requirements.acceptedTransitRegions.map(region => region.id));
     for (const edge of record.trunks) {
-        await checkpoint();
+        const pending = checkpoint(); if (pending) await pending;
         if (!waypointIds.has(edge.from) || !waypointIds.has(edge.to) || !Array.isArray(edge.points)
             || edge.points.length < 2 || edge.points.length > LIMITS.trunkVertices
             || !Number.isFinite(edge.length) || edge.length < 0 || edge.length > LIMITS.trunkLength
@@ -617,7 +624,7 @@ async function validateRecord(record, expectedIdentity = null, loadContext = {})
     }
     const attachmentBuckets = new Map();
     for (const attachment of record.attachments) {
-        await checkpoint();
+        const pending = checkpoint(); if (pending) await pending;
         if (!isRecord(attachment) || typeof attachment.anchorId !== 'string' || !attachment.anchorId
             || !componentIds.has(attachment.componentId) || attachment.patchId && !patchIds.has(attachment.patchId)
             || !finitePoint(attachment.point) || !['forward', 'reverse', 'both'].includes(attachment.direction)) {
@@ -629,7 +636,7 @@ async function validateRecord(record, expectedIdentity = null, loadContext = {})
         attachmentBuckets.set(key, count);
     }
     for (const certificate of record.certificates) {
-        await checkpoint();
+        const pending = checkpoint(); if (pending) await pending;
         if (!isRecord(certificate) || typeof certificate.id !== 'string' || !certificate.id
             || typeof certificate.kind !== 'string' || typeof certificate.requirementId !== 'string'
             || typeof certificate.direction !== 'string') throw new Error('generated_certificate_invalid');
@@ -639,7 +646,7 @@ async function validateRecord(record, expectedIdentity = null, loadContext = {})
             if (!Array.isArray(certificate.geometry)) throw new Error('generated_certificate_geometry_invalid');
             vertices += certificate.geometry.length;
             for (const point of certificate.geometry) {
-                await checkpoint();
+                const pending = checkpoint(); if (pending) await pending;
                 if (!Array.isArray(point) || point.length !== 3 || !point.every(Number.isInteger)) {
                     throw new Error('generated_certificate_geometry_invalid');
                 }
@@ -648,7 +655,7 @@ async function validateRecord(record, expectedIdentity = null, loadContext = {})
     }
     if (vertices > LIMITS.vertices) throw new Error('generated_vertex_limit_exceeded');
     for (const entry of allCoverage) for (const id of entry.certificateIds) {
-        await checkpoint();
+        const pending = checkpoint(); if (pending) await pending;
         if (!certificateIds.has(id) && !componentIds.has(id)) throw new Error(`generated_coverage_certificate_missing:${id}`);
     }
     const expectedUnresolved = allCoverage.filter(entry => entry.status !== 'supported')
