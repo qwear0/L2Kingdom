@@ -16,6 +16,7 @@ const BotRoles = invoke('GameServer/Bot/AI/BotRoles');
 const BotHuntingTargetPolicy = invoke('GameServer/Bot/AI/BotHuntingTargetPolicy');
 const NpcSkills = invoke('GameServer/Npc/NpcSkills');
 const RAID_MINIONS = require('../../../../data/Npcs/Minions/c4_raid_bosses.json');
+const PopulationConfig = invoke('GameServer/Bot/Population/PopulationConfig');
 
 // Rebuild persisted kits that could have been overwritten by an older resolve.
 const PROFILE_VERSION = 6;
@@ -867,15 +868,27 @@ function npcForSpot(spot = {}, rng = Math.random, options = {}) {
 const buildGains = new Map();
 const ownerBuilds = new Map(), ownerPreparations = new Map();
 const candidateIndex = new Map();
+const stats = { gainHits: 0, gainMisses: 0, limitMisses: 0, switches: 0, preparationSwitches: 0, clanSwitches: 0, filledDrops: 0, evictions: 0 };
+function cacheStats() { return { ...size(), ...stats }; }
+// A clan member copy can replace the bot's held build. Attribute only the
+// synchronous calculation's ordinary switches, preserving its result/errors.
+function countClanSwitches(compute) {
+    if (!PopulationConfig.developerDiagnostics) return compute();
+    const before = stats.switches;
+    try { return compute(); } finally { stats.clanSwitches += stats.switches - before; }
+}
 const POWER_FIELDS = ['pAtk', 'mAtk', 'atkSpd', 'castSpd', 'pDef', 'mDef', 'maxHp'];
 const CANDIDATE_LIMIT = 65536, ENTRY_LIMIT = 256, NONZERO_LIMIT = 128;
 function ownerLimit() {
-    return Math.ceil(1.25 * Math.max(256, Number(invoke('GameServer/Bot/Population/PopulationConfig').maxPlayingPopulation) || 0));
+    return Math.ceil(1.25 * Math.max(256, Number(PopulationConfig.maxPlayingPopulation) || 0));
 }
 function releaseBuild(key) {
     const entry = buildGains.get(key);
     if (!entry) return;
-    if (--entry.owners <= 0) buildGains.delete(key);
+    if (--entry.owners <= 0) {
+        PopulationConfig.developerDiagnostics && entry.size > 0 && (stats.filledDrops += 1);
+        buildGains.delete(key);
+    }
     if (entry.night === 1) {
         const marker = buildGains.get(entry.baseKey);
         if (marker && --marker.owners <= 0) buildGains.delete(entry.baseKey);
@@ -958,7 +971,10 @@ function buildGainsFor(state = {}, timestamp = Date.now(), { preparation = false
     if (held !== key) {
         entry.owners++;
         if (entry.night === 1) buildGains.get(baseKey).owners++;
-        if (held !== undefined) releaseBuild(held);
+        if (held !== undefined) {
+            PopulationConfig.developerDiagnostics && (preparation ? stats.preparationSwitches += 1 : stats.switches += 1);
+            releaseBuild(held);
+        }
         if (!preparation && held !== undefined) forgetFrom(ownerPreparations, owner);
     }
     owners.delete(owner);
@@ -966,6 +982,7 @@ function buildGainsFor(state = {}, timestamp = Date.now(), { preparation = false
     while (owners.size > ownerLimit()) {
         const [oldest, oldKey] = owners.entries().next().value;
         owners.delete(oldest);
+        PopulationConfig.developerDiagnostics && (stats.evictions += 1);
         releaseBuild(oldKey);
     }
     return entry;
@@ -988,13 +1005,18 @@ function gainFor(entry, key, compute) {
     }
     for (let index = 0; id !== undefined && index < entry.size; index++) {
         if (entry.ids[index] !== id) continue;
+        PopulationConfig.developerDiagnostics && (stats.gainHits += 1);
         const slot = entry.slots[index];
         return slot === 0 ? { attack: 0, defence: 0 }
             : { attack: entry.gains[(slot - 1) * 2], defence: entry.gains[(slot - 1) * 2 + 1] };
     }
+    PopulationConfig.developerDiagnostics && (stats.gainMisses += 1);
     const effect = compute();
     const zero = Object.is(effect.attack, 0) && Object.is(effect.defence, 0);
-    if (id === undefined || entry.size >= ENTRY_LIMIT || (!zero && entry.gainSize >= NONZERO_LIMIT)) return effect;
+    if (id === undefined || entry.size >= ENTRY_LIMIT || (!zero && entry.gainSize >= NONZERO_LIMIT)) {
+        PopulationConfig.developerDiagnostics && (stats.limitMisses += 1);
+        return effect;
+    }
     const idCapacity = entry.size === entry.ids.length ? Math.min(ENTRY_LIMIT, entry.ids.length * 2) : entry.ids.length;
     const gainCapacity = !zero && entry.gainSize * 2 === entry.gains.length
         ? Math.min(NONZERO_LIMIT, entry.gains.length) : entry.gains.length / 2;
@@ -1011,7 +1033,7 @@ function gainFor(entry, key, compute) {
 function size() { return { buildGains: buildGains.size, ownerBuilds: ownerBuilds.size, ownerPreparations: ownerPreparations.size, candidateIndex: candidateIndex.size }; }
 
 module.exports = {
-    PROFILE_VERSION, capture, legacySnapshot, treeSnapshot, needsDatabaseBackfill, profileFor, withProfileScope, skillsFor, powerFor, buildGainsFor, buildInputKey, gainFor, forgetBuild, powerNumbers, buildOptions, withEquipmentPreparation, size,
+    PROFILE_VERSION, capture, legacySnapshot, treeSnapshot, needsDatabaseBackfill, profileFor, withProfileScope, skillsFor, powerFor, buildGainsFor, buildInputKey, gainFor, forgetBuild, powerNumbers, buildOptions, withEquipmentPreparation, size, cacheStats, countClanSwitches,
     isAttackSkill, offensiveSkills, summonDetails, summonSkills, corpseSummonSkills, activeMusicEffects, partyMusicSkills, partyMusicMpCost, partyMusicEffect,
     spotSpawns, npcForSpot, npcCombatStats, skillSnapshotsFromRecords, skillRecordsFromTree, treeSkillLevel,
     statMultiplier: multiplier, statAdd: add
