@@ -79,6 +79,7 @@ Do not automatically build, start, stop, or restart the server. Changes and Git 
 - Store persistent backups only in `/data/!backups/L2Kingdom/`.
 - Store task artifacts worth retaining in the repository's Git-ignored `tmp/` directory: plans in `tmp/plans/`, reports in `tmp/reports/`, and investigation results or verification evidence in appropriate subfolders.
 - If the user explicitly requests a report, create it in a dedicated subfolder under `tmp/reports/`. Do not store investigation reports in documentation directories.
+- Bot MCP is still under testing. After every usage session (including read-only use and failed attempts), save a diagnostic report with all encountered problems and no repair recommendations under `tmp/reports/bot-mcp/<unique-session-id>/diagnostic.md`; follow `docs/bot-mcp.md#testing-status-and-mandatory-diagnostic-report`.
 - Store disposable files, temporary task artifacts, and short-lived backups only in `/tmp/L2Kingdom/`.
 
 ## Git

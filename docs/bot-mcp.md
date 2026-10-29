@@ -2,6 +2,15 @@
 
 Read with [WorldObserver](world-observer.md), [runtime](runtime.md), [bot execution](bot-runtime.md) and [vassal ownership](vassals.md). This is an opt-in local development interface to **existing owned vassals**, not a provisioning tool, browser login, game client or second management frontend.
 
+## Testing status and mandatory diagnostic report
+
+**The bot MCP interface is still under testing.** After every usage session, including read-only use, failed connection attempts and interrupted sessions, the agent must save a diagnostic report to `tmp/reports/bot-mcp/<unique-session-id>/diagnostic.md` before finishing the task. A chat summary does not replace the file. The agent writes this report through its normal file tools; the MCP interface itself does not write reports or accept filesystem paths.
+
+- Record the session scope, tools/actions attempted and observed outcomes, with relevant runtime/actor/action/request identifiers when available.
+- Include **every problem encountered**, even if a later retry succeeded: connection or protocol errors, rejected calls, timeouts, unexpected behavior, unavailable capabilities, missing evidence and cleanup or AI-handoff issues. For each problem, record the triggering steps/input, expected versus actual outcome, and available error/receipt/diagnostic evidence. Distinguish observed facts from unknown causes and unverified behavior.
+- If no problems were observed, state this explicitly and describe the actual scope of use; do not imply that unexercised behavior passed verification.
+- Report observations only: **do not include repair recommendations, proposed fixes or remediation plans**. Exclude credentials, tokens and private configuration. Keep reports under ignored `tmp/`, not in maintained documentation or Git.
+
 ## Boundary and setup
 
 ```text
