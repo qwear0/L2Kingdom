@@ -73,7 +73,10 @@ class ObserverAuth {
             sendJson(response, { ok: true });
             return true;
         }
-        const user = this.store.session(token);
+        const authenticated = this.store.authenticate(token);
+        const user = authenticated?.user;
+        // The principal is internal request context, never part of the public user DTO.
+        if (context && authenticated) context.principal = authenticated.principal;
         if (url.pathname === LOGIN || url.pathname === `${LOGIN}/`) {
             if (!['GET', 'HEAD'].includes(request.method)) { response.setHeader('Allow', 'GET, HEAD'); throw error('Method not allowed.', 405); }
             if (user) { response.writeHead(302, { Location: '/observer/' }); response.end(); }

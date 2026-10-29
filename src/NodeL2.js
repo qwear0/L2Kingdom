@@ -39,8 +39,10 @@ function exitWithOutcome(outcome) {
     else process.exit(code);
 }
 let shuttingDown = false;
+let runtimeReady = false;
 let initialization = Promise.resolve();
 require('./WorldObserver/SettingsRuntime').install(() => shuttingDown);
+require('./WorldObserver/GameDashboardRuntime').install(() => shuttingDown || !runtimeReady);
 function shutdown(signal) {
     if (shuttingDown) return;
     shuttingDown = true;
@@ -162,6 +164,7 @@ Database.init(() => {
         const observer = await WorldObserver.init(managed ? { hostname: '127.0.0.1', port: 0, internal: true } : undefined);
         if (shuttingDown) return;
         DevConsole.init();
+        runtimeReady = true;
         report({ type: 'ready', listeners: { auth: true, game: true }, observer: observer ? 'ready' : 'disabled', port: observer?.port });
         if (!invoke('GameServer/Bot/Population/PopulationConfig').ownedOnly && process.env.L2NODE_HOT_LOAD_TEST === '1') {
             invoke('GameServer/Bot/LoadTest/HotBotLoadTest').start();

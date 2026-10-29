@@ -13,11 +13,19 @@ Read this before changing database writes, snapshots, worker handoffs or recover
 | `src/DatabaseCheckpointCoordinator.js`, `src/DatabaseCheckpointWorker.js` | Background WAL checkpoint work. |
 | `src/DatabaseRestore.js` | Interrupted paired world/history replacement recovery. |
 | `scripts/database-access.js`, `scripts/saved-games.js` | Cross-process access lock and stopped-database saves. |
-| `src/WorldObserver/ObserverAuthStore.js` | Separate runtime-local `observer-auth/auth.sqlite`: named admin-key hashes and expiring session-token hashes, not game accounts or world/history save content. |
+| `src/WorldObserver/ObserverAuthStore.js` | Separate runtime-local `observer-auth/auth.sqlite`: named admin-key hashes, expiring session-token hashes and one-to-one game-account associations; no game passwords or world/history save content. |
 
 `database/sql/sqlite.sql` is the SQLite bootstrap, but **not the complete evolved schema**. `Database.applySchemaMigrations` adds migrations transactionally with their receipts. Account warehouses additionally use `src/DatabasePlayerWarehouse.js`; Lord/vassal tables and capacity triggers use `src/GameServer/Lord/Repository.js`. `database/sql/database.sql` is legacy MySQL material, not the running SQLite bootstrap.
 
 `Database.init` recovers an interrupted restore before opening the current files. `src/NodeL2.js` also performs data-dependent startup maintenance. Reading a schema file does not establish the state of a deployed world.
+
+## Observer game-account associations
+
+`ObserverAuthStore` creates `observer_game_accounts` in the existing auth database when the auth store opens, including management startup (no world-schema migration). Rows contain the frontend `key_hash`, canonical `account_name`, random UUID `revision` and `linked_at` milliseconds. A non-null primary key permits one association per key; `account_name COLLATE NOCASE UNIQUE` arbitrates claims across principals/connections. The key foreign key uses `ON DELETE CASCADE`. No submitted game password or reusable password equivalent is stored here.
+
+`GameAccountService` asks the game-owned `Database.fetchUserPassword` to verify an existing account over bounded generation-bound IPC, without auto-creation/session login. Only afterward does a short `BEGIN IMMEDIATE` transaction recheck the expected link revision and replace the association. Failed credential checks, stale revisions and uniqueness conflicts preserve the previous row. Unlink cancels pending verification's commit permission; every successful link/replace receives a fresh revision, including the same account after unlink. Logout/password change does not revoke the durable association.
+
+Auth data is excluded from world/history saves. Before managed load, clear all associations; before managed wipe, clear the affected `bot_`/non-`bot_`/all account scope. This conservative invalidation remains even if the world operation fails, and an in-memory epoch fences outstanding verification replies. Keys/sessions are untouched. Out-of-band replacement and standalone destructive tools require explicit clearing/relinking before dashboard access; name equality is not durable account identity. See the [HTTP/IPC contract](world-observer.md#game-account-linking-and-dashboard-transport-p1) and [operations](operations.md#saved-games-and-restore).
 
 ## Producer → write queue → world state
 

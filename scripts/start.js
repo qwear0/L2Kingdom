@@ -10,6 +10,8 @@ const { settingsRoute, sendJson } = require('../src/WorldObserver/SettingsRoutes
 const { access, parsePublicOrigin, managementRoute, proxy } = require('../src/WorldObserver/ManagementRoutes');
 const BotControlRoutes = require('../src/WorldObserver/BotControlRoutes');
 const ObserverAuth = require('../src/WorldObserver/ObserverAuth');
+const GameAccountService = require('../src/WorldObserver/GameAccountService');
+const { gameDashboardRoute } = require('../src/WorldObserver/GameDashboardRoutes');
 const controller = new ManagementController();
 const settings = new SettingsService(controller);
 const config = Config.load().effective.WorldObserver || {};
@@ -20,6 +22,8 @@ const publicOrigin = parsePublicOrigin(config.publicOrigin);
 if (publicOrigin && hostname !== '127.0.0.1') throw new Error('WorldObserver.hostname must be 127.0.0.1 when publicOrigin is set.');
 controller.binding = { hostname, port, publicOrigin: config.publicOrigin ?? '' };
 const auth = new ObserverAuth(port, { servePages: false });
+const gameAccounts = new GameAccountService(auth.store, controller);
+controller.invalidateGameAccounts = scope => gameAccounts.invalidate(scope);
 
 const server = http.createServer((request, response) => {
     (async () => {
@@ -28,6 +32,7 @@ const server = http.createServer((request, response) => {
         if (context.proxied && url.pathname.startsWith(BotControlRoutes.BASE)) throw Config.error('Direct loopback bot-control access only.', 403);
         if (await BotControlRoutes.proxy(request, response, url, controller)) return;
         if (await auth.handle(request, response, url, context)) return;
+        if (await gameDashboardRoute(request, response, url, context, gameAccounts)) return;
         if (await settingsRoute(request, response, url, settings)) return;
         if (await managementRoute(request, response, url, controller)) return;
         if (await proxy(request, response, url, controller, context)) return;

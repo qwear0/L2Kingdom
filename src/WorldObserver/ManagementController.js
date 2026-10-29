@@ -10,6 +10,7 @@ const PresetStore = require('./ManagementPresetStore');
 const SavedGames = require('../../scripts/saved-games');
 const { acquireDatabaseAccess } = require('../../scripts/database-access');
 const HistoryStore = require('../HistoryStore');
+const GameContract = require('./GameDashboardContract');
 
 class ManagementController {
     constructor() {
@@ -37,6 +38,7 @@ class ManagementController {
         this.llmFingerprint = null;
         this.llmPromise = null;
         this.closing = false;
+        this.invalidateGameAccounts = null;
     }
     config() { return Config.load(); }
     databasePaths() {
@@ -122,11 +124,16 @@ class ManagementController {
                     this.finish(operation, 'failed', { message: 'Required initialization or listener failed; shutting down.' });
                 } else if (message.type === 'tree-exited') {
                     treeReport = message;
-                } else if (message.type === 'settings.reply') {
+                } else if (['settings.reply', 'game.reply'].includes(message.type)) {
                     const pending = this.requests.get(message.requestId);
-                    if (!pending || pending.generation !== generation) return;
+                    if (!pending || pending.generation !== generation || pending.replyType !== message.type) return;
                     this.requests.delete(message.requestId); clearTimeout(pending.timer);
-                    if (message.error) pending.reject(Config.error('Runtime settings request failed.', 503));
+                    if (this.phase !== 'running' || this.closing) pending.reject(GameContract.failure('runtime_unavailable'));
+                    else if (pending.expiresAt <= Date.now()) pending.reject(GameContract.failure('runtime_timeout'));
+                    else if (message.type === 'game.reply') {
+                        if (message.code) pending.reject(GameContract.failure(Object.hasOwn(GameContract.REASONS, message.code) ? message.code : 'runtime_unavailable'));
+                        else pending.resolve(message.result);
+                    } else if (message.error) pending.reject(Config.error('Runtime settings request failed.', 503));
                     else pending.resolve(message.state);
                 }
             });
@@ -139,9 +146,7 @@ class ManagementController {
                 this.shutdownOutcome = treeReport?.outcome || 'unknown';
                 this.phase = this.treeConfirmed && this.shutdownOutcome === 'clean' ? 'stopped' : 'error';
                 this.lastExit = { code, signal, at: Date.now(), shutdownOutcome: this.shutdownOutcome, treeConfirmed: this.treeConfirmed };
-                for (const [id, pending] of this.requests) {
-                    clearTimeout(pending.timer); pending.reject(Config.error('Game exited during settings request.', 503)); this.requests.delete(id);
-                }
+                this.rejectRequests();
                 if (this.operation?.kind === 'stop') this.finish(this.operation, this.shutdownOutcome === 'clean' ? 'completed' : 'failed', { shutdownOutcome: this.shutdownOutcome });
                 else this.finish(operation, 'failed', { message: 'Game exited before readiness.' });
                 this.append('management', `wrapper exited code=${code} signal=${signal || '-'} cleanup=${this.shutdownOutcome} tree=${this.treeConfirmed ? 'exited' : 'unknown'}`);
@@ -155,6 +160,7 @@ class ManagementController {
         if (!this.child) { this.finish(operation, 'completed'); return this.public(); }
         if (this.phase === 'stopping') { this.finish(operation, 'failed'); throw Config.error('Already stopping.', 409); }
         this.phase = 'stopping'; this.endpoint = null; this.observerState = 'unavailable';
+        this.rejectRequests();
         const child = this.child;
         if (child.connected) child.send({ v: 1, type: 'shutdown', generation: this.generation, reason: 'management_stop' }, error => { if (error) child.kill('SIGTERM'); });
         else child.kill('SIGTERM');
@@ -167,22 +173,46 @@ class ManagementController {
         return this.public();
     }
     runtime(type, changes) {
-        if (this.phase !== 'running' || !this.child?.connected) return Promise.reject(Config.error('Runtime unavailable.', 503));
-        if (this.requests.size >= 32) return Promise.reject(Config.error('Too many runtime requests.', 409));
+        if (!['settings.read', 'settings.apply'].includes(type)) return Promise.reject(GameContract.failure('invalid_request'));
+        return this.requestRuntime(type, changes ? { changes } : {}, 'settings.reply');
+    }
+    gameRuntime(type, payload) {
+        GameContract.runtimePayload(type, payload);
+        return this.requestRuntime(type, { payload }, 'game.reply');
+    }
+    rejectRequests() {
+        for (const pending of this.requests.values()) {
+            clearTimeout(pending.timer); pending.reject(GameContract.failure('runtime_unavailable'));
+        }
+        this.requests.clear();
+    }
+    requestRuntime(type, body, replyType) {
+        if (this.closing || this.phase !== 'running' || !this.child?.connected) return Promise.reject(GameContract.failure('runtime_unavailable'));
+        if (this.requests.size >= 32) return Promise.reject(GameContract.failure('busy'));
         const requestId = randomUUID(), generation = this.generation, child = this.child;
+        const expiresAt = Date.now() + 4000;
         return new Promise((resolve, reject) => {
-            const timer = setTimeout(() => { this.requests.delete(requestId); reject(Config.error('Runtime response timed out; saved values may not be applied.', 503)); }, 4000);
-            this.requests.set(requestId, { generation, resolve, reject, timer });
-            child.send({ v: 1, generation, requestId, type, ...(changes ? { changes } : {}) }, error => {
-                if (!error || !this.requests.has(requestId)) return;
-                clearTimeout(timer); this.requests.delete(requestId); reject(Config.error('Runtime IPC unavailable.', 503));
-            });
+            const timer = setTimeout(() => { this.requests.delete(requestId); reject(GameContract.failure('runtime_timeout')); }, 4000);
+            this.requests.set(requestId, { generation, replyType, expiresAt, resolve, reject, timer });
+            const failed = () => {
+                if (!this.requests.has(requestId)) return;
+                clearTimeout(timer); this.requests.delete(requestId); reject(GameContract.failure('runtime_unavailable'));
+            };
+            try {
+                child.send({ v: 1, generation, requestId, type, expiresAt, ...body }, error => { if (error) failed(); });
+            } catch (_) { failed(); }
         });
     }
     async dataOperation(kind, payload) {
         const operation = this.reserve(kind, true);
+        let linksInvalidated = false;
         try {
             const paths = this.databasePaths();
+            if (kind === 'load' || kind === 'wipe') {
+                if (typeof this.invalidateGameAccounts !== 'function') throw Config.error('Account-link invalidation is unavailable.', 503);
+                this.invalidateGameAccounts(kind === 'load' ? 'all' : payload.scope);
+                linksInvalidated = true;
+            }
             let result;
             if (kind === 'wipe') {
                 const WorldWipe = require('../../scripts/world-wipe');
@@ -190,11 +220,13 @@ class ManagementController {
                 try { result = await WorldWipe.wipe(payload.scope, { databasePath: paths.world, historyPath: paths.history }); } finally { release(); }
             } else result = await SavedGames.run({ operation: kind, databasePath: paths.world, historyPath: paths.history,
                 savesDir: this.savesDir, name: payload.name, id: payload.id });
-            this.finish(operation, 'completed', { result });
+            this.finish(operation, 'completed', { result, gameAccountLinksInvalidated: linksInvalidated });
             return { result, operation: this.lastOperation };
         } catch (error) {
             // Wipe world commit can precede a history error. Do not claim rollback.
-            this.finish(operation, 'failed', { message: kind === 'wipe' ? 'Wipe failed; world deletion may already be committed. Inspect logs/history recovery before any retry.' : 'Saved-game operation failed; inspect the result before retrying.' });
+            const message = kind === 'wipe' ? 'Wipe failed; world deletion may already be committed. Inspect logs/history recovery before any retry.' : 'Saved-game operation failed; inspect the result before retrying.';
+            this.finish(operation, 'failed', { gameAccountLinksInvalidated: linksInvalidated,
+                message: message + (linksInvalidated ? ' Affected game-account links were cleared; relink before dashboard access.' : '') });
             this.append('management', `${kind} failed: ${error.message}`);
             throw Config.error(this.lastOperation.message, error.statusCode || 500);
         }

@@ -3,6 +3,7 @@
 const { spawn } = require('child_process');
 const path = require('path');
 const { ensureGeodata } = require('./geodata-bootstrap');
+const { REQUEST_TYPES } = require('../src/WorldObserver/GameDashboardContract');
 const rootDir = path.resolve(__dirname, '..');
 const generation = process.env.L2NODE_MANAGED_GENERATION;
 const managed = Boolean(generation && process.send);
@@ -54,7 +55,7 @@ function startServer() {
     child.on('message', message => {
         if (message?.v !== 1 || message.generation !== generation) return;
         if (message.type === 'shutdown-result' && cleanup !== 'timed_out') cleanup = ['clean', 'failed', 'timed_out'].includes(message.outcome) ? message.outcome : 'unknown';
-        if (['ready', 'startup-failed', 'settings.reply', 'shutdown-result'].includes(message.type)) send(message);
+        if (['ready', 'startup-failed', 'settings.reply', 'game.reply', 'shutdown-result'].includes(message.type)) send(message);
     });
     child.on('error', () => { cleanup = 'failed'; });
     child.on('close', (code, signal) => { serverChild = null; finish(code, signal); });
@@ -69,7 +70,7 @@ process.on('SIGTERM', () => stopServer('SIGTERM'));
 process.on('message', message => {
     if (message?.v !== 1 || message.generation !== generation) return;
     if (message.type === 'shutdown') stopServer(message.reason);
-    else if (['settings.read', 'settings.apply'].includes(message.type) && serverChild?.connected && !shuttingDown) serverChild.send(message, () => {});
+    else if (['settings.read', 'settings.apply', ...REQUEST_TYPES].includes(message.type) && serverChild?.connected && !shuttingDown) serverChild.send(message, () => {});
 });
 if (managed) process.on('disconnect', () => stopServer('management_ipc_lost'));
 main().catch(error => {
