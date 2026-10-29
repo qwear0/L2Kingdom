@@ -21,6 +21,7 @@ These are existing commands, not checks executed by creating this document.
 | `npm run NodeL2` | Standalone geodata/runtime wrapper, not another full management UI. Starts gameplay, which may migrate/write SQLite and restore owned actors. Prefer `npm start` for the unified product. |
 | `node scripts/run-simulations.js` | Creates isolated per-instance files as needed and starts management parents on 8181..8183, one origin per instance. Does not start games unless `--start-servers` (or `--restart-servers`) is explicitly selected. `--stop-servers` operates through management; `--count=1..3` and `--no-browser` remain supported. Lifecycle flags require `L2NODE_OBSERVER_KEY_<managementPort>` (for example `L2NODE_OBSERVER_KEY_8181`), or the fallback `L2NODE_OBSERVER_KEY`; the script logs in and reuses a session cookie. These are runtime operations, not checks. |
 | `npm run geodata` | Prepares/checks geodata; may download/install a large archive. Does not start gameplay. |
+| `node scripts/prepare-oren-geodata.js --base <file> --candidate <file> --output <new-file>` | Reproduces the pinned Oren block correction into scratch only. Requires exact input hashes; does not generate from the client, download, install, publish a cache or start gameplay. See [Oren preparation](#preparing-the-bounded-oren-geodata-correction). |
 | `npm run generate:knowledge-base` | Regenerates the five committed `data/KnowledgeBase/` outputs. |
 | `npm run check:knowledge-base` | Rebuilds catalogue content in memory and compares outputs; not gameplay verification. |
 | `npm run check` | Existing Node `--check` traversal of JavaScript under `src/`, `scripts/`, `tests/`; syntax only, no application startup. |
@@ -46,6 +47,22 @@ Other scripts can migrate, generate, benchmark or mutate data. Inspect the speci
 - Initial separation requires an authorized clean game stop, backup of affected private configuration, loopback management/publicOrigin configuration, management replacement and independent frontend deployment. Verify clean shutdown before replacement; never infer it from a disconnected UI. Use the owner's existing management launch environment, including any MCP secret; do not install a new supervisor or change ports unnecessarily.
 - For Compose, provide the selected local environment file explicitly when values are not exported: `docker compose --env-file <local-env-file> -f src/frontend/compose.yaml config --quiet`, then use that same option for the independently authorized `build frontend` and `up ... frontend` commands above. Listener, client CIDR and backend port must agree with the actual deployment. Do not commit private inputs or credentials.
 - Once deployed, later UI-only replacements operate on service `frontend` only. Check the same session and continued backend/game uptime; do not restart management/game merely to refresh pages.
+
+## Preparing the bounded Oren geodata correction
+
+`data/GeodataCorrections/22_18-oren.json` pins the original `22_18.l2j`, the separately generated Cruma 0.8.5 candidate, selected block ranges and final output hash. `scripts/prepare-oren-geodata.js` copies those complete blocks from the candidate and keeps every other block from the original. It does not apply the entire Cruma region or invent heights/NSWE. Both binary inputs must be supplied locally; they are not committed or downloaded by this command. The recipe reproduces the correction from these exact inputs, not the upstream Cruma build itself.
+
+```sh
+mkdir -p tmp/geodata-corrections/oren
+node scripts/prepare-oren-geodata.js \
+  --base data/Geodata/22_18.l2j \
+  --candidate /path/to/matching-cruma-output/22_18.l2j \
+  --output tmp/geodata-corrections/oren/22_18.l2j
+```
+
+The output parent must already exist under repository `tmp/` or `/tmp/L2Kingdom/`; its resolved location is checked, and existing outputs are never overwritten. The command reads configuration through `Global` and reuses the native block indexer without initializing data, geodata regions, the database or world. Input size/hash, sorted block ranges and the complete output size/hash are checked before writing. A mismatch requires inspecting the changed input/recipe, not disabling validation. No new per-bot work or spawn/path budget is introduced.
+
+Preparation is **not installation or full-world acceptance**. The bounded Oren result does not resolve other spawn failures or certify native-client collision. Any later installation requires explicit authorization, recovery of the actual installed bytes, the appropriate stopped-game lifecycle boundary, and preparation of the complete native cache against final inputs. Never publish a region-only cache as the world's cache. The ordinary geodata bootstrap does not automatically apply this correction.
 
 ## Offline territory profiling
 
