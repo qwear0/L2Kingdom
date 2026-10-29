@@ -72,7 +72,11 @@ Legacy recovery: <legacy path and observation time | not needed>
 - No candidates discovered yet is not the same as no updates available.
 ```
 
-Keep reviewed decisions when refreshing tips. List the actual candidate IDs for an enumerated window, or link a retained exact inventory if it is too large. Never collapse a partially processed set to one last-SHA cursor. Counts must identify their discovery window and distinguish full/partial integrations, approved skips, deferred/blocked items and unreviewed candidates.
+Keep reviewed decisions when refreshing tips. List the actual candidate IDs for an enumerated window, or link a retained exact inventory if it is too large. Never collapse a partially processed set to one last-SHA cursor. Counts must identify their discovery window and distinguish full/partial integrations, user-approved skips, automatic test-only skips, deferred/blocked items and unreviewed candidates.
+
+## Automatic test-only skip receipt
+
+Use a minimal receipt instead of the proposal template for a newly classified test-only candidate. Record the source/full SHA, commit URL/title, pinned discovery window, complete changed-file list (or a link to retained complete evidence), any minimal diff evidence needed to resolve ambiguous paths, owner/session and timestamp. Set review state to `skipped`, reason to `automatic test-only skip`, user approval to `not requested; standing test-only policy`, local result to `not applied`, and publication to `not-applicable`. Add the receipt/reason to the source queue and continue without creating an active proposal. Do not fill compatibility/implementation sections or imply the user explicitly approved that commit. Preserve existing decisions and approved/in-progress work.
 
 ## Per-commit proposal and receipt template
 
@@ -122,7 +126,7 @@ Keep reviewed decisions when refreshing tips. List the actual candidate IDs for 
 - Next safe action after interruption:
 ```
 
-Review states: `unreviewed`, `awaiting-approval`, `approved`, `skipped`, `deferred`, `blocked`, `integrated`, `partially-integrated`. Use execution/publication fields separately: a committed but unpushed patch is not an unapplied patch. Only set an integration result after inspecting the actual local commit and checks; retain partial scope and unrun runtime acceptance. After an accepted skip/defer or a completed receipt, clear only this source's active proposal. Keep a blocked/interrupted operation active in its own lane until reconciled; it does not block unrelated work in the other lane.
+Review states: `unreviewed`, `awaiting-approval`, `approved`, `skipped`, `deferred`, `blocked`, `integrated`, `partially-integrated`. Use execution/publication fields separately: a committed but unpushed patch is not an unapplied patch. Only set an integration result after inspecting the actual local commit and checks; retain partial scope and unrun runtime acceptance. After a user-accepted skip/defer or a completed integration receipt, clear only this source's active proposal. Automatic test-only skips do not create an active proposal and must not clear an unrelated pending proposal. Keep a blocked/interrupted operation active in its own lane until reconciled; it does not block unrelated work in the other lane.
 
 Never infer user approval from a recommendation or from this template. Preserve earlier decision history when a deferred/partial item is revisited, increment the proposal revision, and request approval for additional scope.
 

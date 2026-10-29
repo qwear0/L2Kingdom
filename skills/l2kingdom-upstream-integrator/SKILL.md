@@ -7,9 +7,9 @@ description: Review and incrementally integrate L2Solo and L2J Mobius C4 commits
 
 ## Contract
 
-Explain **one upstream commit per source**, wait for the user's decision, implement only the approved scope, and record the result. L2Solo and Mobius may progress in parallel in separate sessions; each source keeps its own single active proposal and owner. This is a conversational workflow, not an automatic updater or a batch-rebase instruction.
+Automatically skip confirmed **test-only commits** before compatibility analysis or a decision card, without asking for approval. For every other candidate, explain **one upstream commit per source**, wait for the user's decision, implement only the approved scope, and record the result. L2Solo and Mobius may progress in parallel in separate sessions; each source keeps its own single active proposal and owner. This is a conversational workflow, not an automatic updater or a batch-rebase instruction.
 
-**Default continuation:** after successful publication or an explicit skip/defer, immediately analyze the next unreviewed commit in the same source's pinned queue and present its decision card; do not wait for `next`. Stop at the next approval gate, a blocker, an exhausted queue, or the user's request to pause. Never auto-approve, refresh the source tip, or switch sources.
+**Default continuation:** after successful publication, an explicit skip/defer, or an automatic test-only skip, immediately select the next unreviewed commit in the same source's pinned queue; automatically skip any further confirmed test-only commits and present the first remaining candidate's decision card. Do not wait for `next`. Stop at the next approval gate, a blocker, an exhausted queue, or the user's request to pause. Never auto-approve, refresh the source tip, or switch sources.
 
 - Communicate in Russian; write skill documentation and saved records in English. Preserve the user's actual Russian approval wording in the decision record.
 - Read repository `AGENTS.md`, `docs/README.md`, the affected feature documentation and `skills/l2kingdom-doc-maintainer/SKILL.md`. Their verification, Git and runtime policies remain authoritative.
@@ -40,7 +40,7 @@ Natural-language requests are sufficient. Examples:
 - `Пропусти <sha>: <reason>` or `Отложи <sha>`
 - `/skill:l2kingdom-upstream-integrator refresh l2solo`
 
-`status [source]` reads progress and reconciles it with Git without applying changes; without a source it reports both lanes. `refresh` discovers/pins a new source tip without approving changes. `next` prepares one unresolved proposal in the selected source and stops; it does not silently skip candidates. Without an explicit source, resume this session's established source, or the sole active proposal if unambiguous. If both sources have active proposals and this session has no source context, ask which to process; never adopt another session's ownership.
+`status [source]` reads progress and reconciles it with Git without applying changes; without a source it reports both lanes. `refresh` discovers/pins a new source tip without approving changes. `next` automatically records and passes over confirmed test-only candidates, then prepares one unresolved non-test-only proposal in the selected source and stops (or reports queue exhaustion). No other candidate may be skipped without the user's decision. Without an explicit source, resume this session's established source, or the sole active proposal if unambiguous. If both sources have active proposals and this session has no source context, ask which to process; never adopt another session's ownership.
 
 ## 1. Establish the current state
 
@@ -65,7 +65,14 @@ Natural-language requests are sufficient. Examples:
 - At first Mobius discovery, inspect available provenance and recommend a bounded starting range. A revision in quest comments is a quest reference, **not** a whole-server import baseline. Record older/unexamined coverage as unknown. Dates can bound discovery, but cannot prove ancestry, completeness or missing functionality.
 - Freeze each discovery window at a full source tip. Retain entries by `(source, full SHA)`, not date or a single “last applied” cursor; skipping or deferring one commit must not hide earlier gaps. New tips append newly discovered candidates. If history is rewritten/non-descendant, reconcile explicitly; do not erase prior decisions.
 - Keep inventory pagination/range completion separate from per-commit review completion. “All reviewed” can mean only all entries of a stated, fully enumerated window, never all of Mobius or full C4 parity.
-- Select **one** unresolved commit in this source's lane. If it needs unapproved prerequisites, name them and propose reviewing them individually first. Do not silently bundle dependencies. For a very large/mixed commit, propose one explicit partial adaptation with exclusions or defer it; record partial coverage honestly.
+- Before selecting a proposal, apply the test-only filter below to unresolved candidates in queue order. Select **one** remaining unresolved commit in this source's lane. If it needs unapproved prerequisites, name them and propose reviewing them individually first. Do not silently bundle dependencies. For a very large/mixed commit, propose one explicit partial adaptation with exclusions or defer it; record partial coverage honestly.
+
+### Automatic test-only filter
+
+- Apply this rule to both sources before detailed review. Confirm only the complete changed-file list and, where paths are ambiguous, the minimum diff needed to establish test-only scope. A title/message alone is not evidence; incomplete/truncated file coverage cannot justify an automatic skip.
+- A commit is test-only when **all** changes exclusively affect automated tests, test fixtures/snapshots, test-only helpers, or dedicated test configuration/infrastructure. Check the whole commit, not only Mobius's C4 subset. Mixed commits with runtime code, authored game data, shared dependencies/configuration or other non-test changes are not eligible; unclear scope follows the normal review/blocker workflow.
+- Once confirmed, do **not** analyze local compatibility, inspect gameplay consumers, prepare a proposal/decision card, or request user approval. Under the source's ownership claim, record `skipped` with reason `automatic test-only skip`, the full source SHA and classification evidence in the queue and a minimal receipt as defined in the record contract. Do not invent user consent or count the commit as integrated or compatibility-reviewed.
+- Continue immediately within the same pinned source queue, including consecutive test-only commits. A brief aggregate notice is enough; no per-commit discussion is required. Do not alter existing decisions or an approved/in-progress integration retroactively.
 
 ## 3. Analyze compatibility, not just patch application
 
@@ -82,7 +89,7 @@ Explain:
 7. **Data and provenance:** NPC/item/skill ID mapping, units/probabilities, schema/handler availability, save-state compatibility and actual selected-file licenses/notices where relevant. Never use a universal ID offset or wholesale XML replacement without proof.
 8. **Verification and limits:** smallest authorized checks with pass conditions; `npm run check` for JS changes, source/data/link checks as relevant. Do not create/modify automated tests or run suites by default. Identify runtime acceptance that remains unverified without treating it as a silent blocker or a pass.
 
-Write the proposal to its receipt and show a concise Russian decision card using the template. Recommend **integrate**, **skip**, or **defer**, with the reason. Stop and ask for the decision. Even “already equivalent” or “not applicable” remains a recommendation until the user accepts skipping it; it is not silently counted as integrated.
+Write the proposal to its receipt and show a concise Russian decision card using the template. Recommend **integrate**, **skip**, or **defer**, with the reason. Stop and ask for the decision. Except for confirmed test-only commits filtered before this step, even “already equivalent” or “not applicable” remains a recommendation until the user accepts skipping it; it is not silently counted as integrated.
 
 ## 4. Bind approval to the proposal
 
@@ -90,7 +97,7 @@ Write the proposal to its receipt and show a concise Russian decision card using
 - Bind the decision to source/full SHA, proposal revision, local baseline, exact intended scope/exclusions, approach and verification limits. Preserve the user message and session/message reference when available; never fabricate an identifier.
 - Recheck HEAD, relevant source, index and working changes immediately before editing. A moving source branch does not change the approved SHA. If local HEAD moved, revalidate: unrelated changes can be recorded with an explanation, but changed assumptions, conflicts, prerequisites or affected contracts require a revised card and renewed approval.
 - A saved `approved` label alone is not sufficient proof of consent in a later session. Locate the recorded user authorization/context; if it cannot be verified or no longer matches the proposal, ask again before writes.
-- `skip` is an explicit decision with a reason; `defer` remains unresolved and can be revisited on request or when its stated prerequisite changes. Neither authorizes code changes. After recording the decision, follow the default continuation rule.
+- Except for the automatic test-only filter, `skip` requires an explicit user decision with a reason; `defer` remains unresolved and can be revisited on request or when its stated prerequisite changes. Neither authorizes code changes. After recording the decision, follow the default continuation rule.
 
 ## 5. Implement only the approved change
 
