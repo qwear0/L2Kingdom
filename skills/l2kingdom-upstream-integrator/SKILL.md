@@ -128,4 +128,4 @@ Report in Russian: what changed, local/upstream SHAs, exclusions, checks and gap
 
 ## Installation
 
-Canonical source: `skills/l2kingdom-upstream-integrator/`. This project's local installation follows its existing skill convention: `~/.agents/skills/l2kingdom-upstream-integrator` is a symlink to that directory. Never replace an unrelated existing path. Run `/reload` in Pi after installation; use `/skill:l2kingdom-upstream-integrator` explicitly. The skill adds instructions only, not a background process or an executable permission gate.
+Canonical source: `skills/l2kingdom-upstream-integrator/`. The tracked project-local symlink `.agents/skills/l2kingdom-upstream-integrator` points to `../../skills/l2kingdom-upstream-integrator`, making it discoverable from this repository and its subdirectories only. Do not install it under `~/.agents/skills/` or replace an unrelated existing path. Run `/reload` in Pi after installation; use `/skill:l2kingdom-upstream-integrator` explicitly. The skill adds instructions only, not a background process or an executable permission gate.

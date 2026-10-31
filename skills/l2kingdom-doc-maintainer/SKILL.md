@@ -86,6 +86,6 @@ When a maintained documentation tree is introduced, link its entry map from READ
 
 ## Local availability
 
-The canonical source is `skills/l2kingdom-doc-maintainer/` in this repository. Expose that directory locally through a symlink at `~/.agents/skills/l2kingdom-doc-maintainer`; do not maintain a second copied version or replace an unrelated existing skill.
+The canonical source is `skills/l2kingdom-doc-maintainer/` in this repository. The tracked project-local symlink `.agents/skills/l2kingdom-doc-maintainer` points to `../../skills/l2kingdom-doc-maintainer`. Do not install it under `~/.agents/skills/`, maintain a second copied version, or replace an unrelated existing skill.
 
-Pi discovers `~/.agents/skills/`. Run `/reload` in an existing Pi session after installation or updates; `/skill:l2kingdom-doc-maintainer` explicitly loads it. Agents without skill discovery should read the canonical `SKILL.md` directly when `AGENTS.md` requires it.
+Pi discovers the project's `.agents/skills/` from this repository and its subdirectories, not from unrelated repositories. Run `/reload` in an existing Pi session after installation or updates; `/skill:l2kingdom-doc-maintainer` explicitly loads it. Agents without skill discovery should read the canonical `SKILL.md` directly when `AGENTS.md` requires it.

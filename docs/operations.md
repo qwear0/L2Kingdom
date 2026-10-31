@@ -185,7 +185,7 @@ Invoke `/skill:l2kingdom-upstream-integrator next l2solo` or `next mobius-c4`; u
 
 Progress lives in ignored `tmp/upstream-integration/sources/<source>/state.md` and per-commit receipts; source/publication claims live under `tmp/upstream-integration/locks/`. The old combined `tmp/upstream-integration/state.md` remains a legacy recovery input: split only the selected source without overwriting another active session or changing saved decisions. Progress persists between local sessions, but is not pushed with Git and is lost if those files are deleted. Integration commit trailers retain source provenance, not skipped decisions. Read the skill's [record contract](../skills/l2kingdom-upstream-integrator/references/records.md) for ownership and recovery. Root restrictions on tests, runtime operations, backups and scoped commits still apply; a pushed code change is not evidence of live activation.
 
-Local discovery follows the existing skill convention: `~/.agents/skills/l2kingdom-upstream-integrator` links to `skills/l2kingdom-upstream-integrator/`. Run `/reload` in Pi after installation. The skill is an instruction workflow, not an executable approval guard or background updater.
+Repository-only discovery uses the tracked relative symlink `.agents/skills/l2kingdom-upstream-integrator` → `../../skills/l2kingdom-upstream-integrator`; do not install this skill under `~/.agents/skills/`. Both L2Kingdom skills use project-local `.agents/skills/` links and are discoverable from this repository and its subdirectories, not from unrelated repositories. Run `/reload` in Pi after installation or a discovery-scope change. The skill is an instruction workflow, not an executable approval guard or background updater.
 
 ## Update together
 
